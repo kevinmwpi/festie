@@ -2,7 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(grep -E \"\\\\.\\(env|json|yml\\)$\")",
-      "Bash(find /c/Users/KevnP/festival_app_codex -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.js\" -o -name \"*.jsx\" \\\\\\) -exec grep -l \"verify-otp\\\\|request-otp\" {} \\\\;)"
+      "Bash(find /c/Users/KevnP/festie -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.js\" -o -name \"*.jsx\" \\\\\\) -exec grep -l \"verify-otp\\\\|request-otp\" {} \\\\;)"
     ]
   }
 }
