@@ -1,4 +1,4 @@
 {
   "$comment": "Template values for docs/legal/generate.mjs. supportEmail fills __SUPPORT_EMAIL__ in the hosted pages and is the in-app fallback; it must equal EXPO_PUBLIC_SUPPORT_EMAIL. Leave empty until decided (docs/release-runbook.md section 7.1).",
-  "supportEmail": "kevinmwpi+app@gmail.com"
+  "supportEmail": "support@joinfestie.com"
 }

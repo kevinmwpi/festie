@@ -667,10 +667,10 @@ them while EAS CLI resolves the config.
 cd apps/mobile
 for env in preview production; do
   npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value '<anon key>'
-  npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_SUPPORT_EMAIL --value '<support email>'
-  npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_PRIVACY_POLICY_URL --value 'https://…/privacy.html'
-  npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_SUPPORT_URL --value 'https://…/support.html'
-  npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_TERMS_URL --value 'https://…/terms.html'
+  npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_SUPPORT_EMAIL --value 'support@joinfestie.com'
+  npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_PRIVACY_POLICY_URL --value 'https://joinfestie.com/privacy'
+  npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_SUPPORT_URL --value 'https://joinfestie.com/support'
+  npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_TERMS_URL --value 'https://joinfestie.com/terms'
   npx eas-cli@latest env:set --environment "$env" --visibility plaintext --name EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN --value 'pk.…'
 done
 npx eas-cli@latest env:list --environment production
@@ -834,13 +834,13 @@ values below are entered in App Store Connect, EAS and Supabase only, never in t
 |---|---|---|
 | ~~`__LEGAL_NAME__`~~ | privacy policy, terms | Filled: Kevin M Pi (must match the App Store seller name) |
 | ~~`__POSTAL_ADDRESS__`~~ | privacy policy, terms | Removed by decision: contact is name + support email (no home address published). Add a PO box or virtual mailbox to §12/§17 if you want one later |
-| `__SUPPORT_EMAIL__` | `supportEmail` in `docs/legal/values.json`, `EXPO_PUBLIC_SUPPORT_EMAIL`, review notes | Set: `kevinmwpi+app@gmail.com` (`values.json`). Use the same value for `EXPO_PUBLIC_SUPPORT_EMAIL` in EAS. The legal Markdown keeps the token; the generator and the app fill it in |
+| `__SUPPORT_EMAIL__` | `supportEmail` in `docs/legal/values.json`, `EXPO_PUBLIC_SUPPORT_EMAIL`, review notes | Set: `support@joinfestie.com` (`values.json`; Cloudflare Email Routing forwards it to the owner's inbox). Use the same value for `EXPO_PUBLIC_SUPPORT_EMAIL` in EAS. The legal Markdown keeps the token; the generator and the app fill it in |
 | ~~`__SUPABASE_REGION__`~~ | privacy policy | Filled: the United States (Oregon, AWS us-west-2), the project's region. Update it if you move to a project in another region |
 | ~~`__EMAIL_PROVIDER__`~~ | privacy policy, §2.7 | Filled: Resend. Accept Resend's data processing addendum when you create the account (privacy policy §4 promises one) |
 | ~~`__GOVERNING_LAW__`~~ | terms §14 | Filled: the State of Texas |
 | ~~`__GOVERNING_VENUE__`~~ | terms §14 | Filled: state and federal courts in Dallas County, Texas |
-| `__PRIVACY_POLICY_URL__` | app-store-privacy, EAS env, App Store Connect | Hosted `privacy.html` (§4) |
-| `__SUPPORT_URL__` | app-store-privacy, EAS env, App Store Connect | Hosted `support.html` (§4) |
+| `__PRIVACY_POLICY_URL__` | app-store-privacy, EAS env, App Store Connect | `https://joinfestie.com/privacy` (hosted `privacy.html`, §4) |
+| `__SUPPORT_URL__` | app-store-privacy, EAS env, App Store Connect | `https://joinfestie.com/support` (hosted `support.html`, §4) |
 | `__DEMO_LOGIN_EMAIL__` | review notes, function secret (§2.10) | A mailbox you control; never committed |
 | `__DEMO_LOGIN_CODE__` | review notes, function secret (§2.10) | Random 8 digits; never committed |
 | `__REAL_FESTIVALS__` | review notes | The real festivals published at submission |

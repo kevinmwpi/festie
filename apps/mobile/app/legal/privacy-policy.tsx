@@ -22,7 +22,7 @@ const TITLE = "Privacy Policy";
 const UPDATED = "October 5, 2026";
 const SUPPORT_EMAIL_TOKEN = '__SUPPORT_EMAIL__';
 /** docs/legal/values.json `supportEmail`, used only when the build has no EXPO_PUBLIC_SUPPORT_EMAIL. */
-const SUPPORT_EMAIL_FALLBACK: string | null = "kevinmwpi+app@gmail.com";
+const SUPPORT_EMAIL_FALLBACK: string | null = "support@joinfestie.com";
 const SUPPORT_ADDRESS = SUPPORT_EMAIL ?? SUPPORT_EMAIL_FALLBACK;
 
 const CONTENT: Block[] = [
