@@ -1,0 +1,11 @@
+// Publishes the public website (docs/site: privacy policy, terms, support) as a static-assets Worker.
+// Cloudflare Workers Builds runs `npx wrangler deploy` from the repository root on every push to the
+// production branch (docs/release-runbook.md §4). The site needs no npm install, so the Worker's build
+// settings leave the build command empty and set the build variable SKIP_DEPENDENCY_INSTALL=true.
+{
+  "name": "festie",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./docs/site"
+  }
+}

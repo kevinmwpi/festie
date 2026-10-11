@@ -614,6 +614,15 @@ external assets) and `apps/mobile/app/legal/*.tsx`.
    ```
 
 2. Publish `docs/site/` on any static host:
+   - **Cloudflare Workers (what Festie uses, on `joinfestie.com`)**: `wrangler.jsonc` at the repository
+     root publishes `docs/site/` as a static-assets Worker named `festie`. Cloudflare dashboard →
+     Workers & Pages → Create → import this GitHub repository; project name `festie` (must match `name`
+     in `wrangler.jsonc`); build command empty; deploy command `npx wrangler deploy`; preview builds off;
+     build variable `SKIP_DEPENDENCY_INSTALL=true` (without it Cloudflare runs `npm ci` and the
+     `postinstall` workspace build for nothing); production branch = the branch you release from. Then
+     the Worker's Settings → Domains & Routes → add the custom domains `joinfestie.com` and
+     `www.joinfestie.com`. The pages are at `https://joinfestie.com/privacy`, `/terms` and `/support`
+     (requests for the `.html` paths redirect there).
    - **Any static host that serves just that folder** (Netlify, Cloudflare Pages, S3 + CloudFront, your
      own server): upload the four files in `docs/site/` as they are. This is the cleanest option.
    - **GitHub Pages** (public repository, or a paid GitHub plan for private ones): repository Settings →
