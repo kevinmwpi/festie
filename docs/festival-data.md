@@ -303,8 +303,9 @@ attribution text, and who approved it) with the files next to it. `media:validat
 against the rules (allowed licences, attribution present where the licence requires it, file hashes,
 subjects that exist). `media:upload` pushes approved files to the public `artwork` storage bucket
 (migration 013) and writes `image_url`, `image_credit`, `image_license` and `image_source_url` on the
-artist or festival row (migration 012), then bumps the version of every published festival that uses a
-changed artist so phones refetch. The app shows every credit under Settings → Photo credits.
+artist or festival row (migration 012), then bumps the version of every published festival whose lineup
+(`festival_artists`) or sets include a changed artist, so phones refetch (a festival published before its
+set times exist is bumped too). The app shows every credit under Settings → Photo credits.
 
 - **Artists:** `npm run admin -- media:fetch-commons --artist "<name>" --artist-id <uuid>` (or
   `--seed <festival.json>` for every artist of a festival) fetches a Wikimedia Commons photo through

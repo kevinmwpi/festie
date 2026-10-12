@@ -191,9 +191,10 @@ npx supabase db push
   columns and calls `suggest_festival`. 012 clears the `image_url` of any legacy row without a licence or
   with a non-https URL (re-seed it with a credit). 013 holds only `storage.*` statements, like 008.
 - **014 (festival lineup) goes in before any app build that shows "set times to be announced"**: the app
-  selects `festival_artists` with every festival bundle (a build without 014 on the server still loads
-  the bundle, from the sets alone). 014 backfills the lineup of every existing festival from its sets;
-  `festival:seed` refuses to run against a project without it. Older builds ignore the table.
+  selects `festival_artists` with every festival bundle, and a newer build against a database without 014
+  cannot download festival data (it keeps what it cached), exactly like 011. 014 backfills the lineup of
+  every existing festival from its sets; `festival:seed` and `demo:seed` refuse to run against a project
+  without it. Older builds ignore the table.
 
 - 006 is idempotent; 007 is idempotent and safe on a database with dashboard edits or only one of the two
   historical `005` files. **The CLI does not wrap a migration file in a transaction** (it prints
@@ -425,7 +426,10 @@ delete from public.groups where festival_id in (select id from legacy_festivals)
 -- The festivals themselves (cascades to stages, sets and follows).
 delete from public.festivals where id in (select id from legacy_festivals);
 -- Artists that no remaining set refers to.
-delete from public.artists a where not exists (select 1 from public.sets s where s.artist_id = a.id);
+-- Artists still billed somewhere (a set, or a lineup row of festival_artists, 014) stay.
+delete from public.artists a
+where not exists (select 1 from public.sets s where s.artist_id = a.id)
+  and not exists (select 1 from public.festival_artists fa where fa.artist_id = a.id);
 
 commit;
 ```

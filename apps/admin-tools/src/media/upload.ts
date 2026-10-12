@@ -223,10 +223,35 @@ async function fetchRowsWithImages(client: SupabaseClient, table: SubjectTable):
   }
 }
 
-/** Festival ids that have a set by any of the artists, with the artist ids that caused it. */
+/**
+ * Festival ids whose lineup (`festival_artists`, migration 014) or sets include any of the artists, with
+ * the artist ids that caused it. Both tables are read: a festival published with its lineup before set
+ * times exist has no sets yet, and legacy data may have sets without lineup rows.
+ */
 async function festivalsUsingArtists(client: SupabaseClient, artistIds: string[]): Promise<Map<string, Set<string>>> {
   const result = new Map<string, Set<string>>();
+  const add = (festivalId: string, artistId: string) => {
+    const artists = result.get(festivalId) ?? new Set<string>();
+    artists.add(artistId);
+    result.set(festivalId, artists);
+  };
   for (const part of chunk(artistIds, IN_CHUNK_SIZE)) {
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const page = check(
+        await client
+          .from('festival_artists')
+          .select('festival_id, artist_id')
+          .in('artist_id', part)
+          .order('festival_id')
+          .order('artist_id')
+          .range(from, from + PAGE_SIZE - 1),
+        'Reading the lineups (festival_artists; apply migration 014 with `npx supabase db push` first)',
+      ) as Array<{ festival_id: string; artist_id: string }>;
+      page.forEach((row) => add(row.festival_id, row.artist_id));
+      if (page.length < PAGE_SIZE) {
+        break;
+      }
+    }
     for (let from = 0; ; from += PAGE_SIZE) {
       const page = check(
         await client
@@ -237,11 +262,7 @@ async function festivalsUsingArtists(client: SupabaseClient, artistIds: string[]
           .range(from, from + PAGE_SIZE - 1),
         'Reading sets',
       ) as Array<{ id: string; festival_id: string; artist_id: string }>;
-      for (const row of page) {
-        const artists = result.get(row.festival_id) ?? new Set<string>();
-        artists.add(row.artist_id);
-        result.set(row.festival_id, artists);
-      }
+      page.forEach((row) => add(row.festival_id, row.artist_id));
       if (page.length < PAGE_SIZE) {
         break;
       }
@@ -432,7 +453,7 @@ export async function planMediaUpload(
     }
   }
 
-  // Version bumps: published festivals whose own image changed or that have a set by a changed artist.
+  // Version bumps: published festivals whose own image changed or whose lineup or sets include a changed artist.
   const reasons = new Map<string, string[]>();
   for (const [festivalId, name] of changedFestivals) {
     reasons.set(festivalId, [`image of ${name} changed`]);

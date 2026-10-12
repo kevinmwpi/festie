@@ -24,6 +24,8 @@ const URL = 'https://xyz.supabase.co';
 const F1 = '11111111-1111-4111-8111-111111111111';
 const F2 = '11111111-1111-4111-8111-111111111112';
 const F3 = '11111111-1111-4111-8111-111111111113';
+/** Published with its lineup only (set times to be announced): no sets, a festival_artists row. */
+const F4 = '11111111-1111-4111-8111-111111111114';
 const A1 = '33333333-3333-4333-8333-333333333331';
 const A2 = '33333333-3333-4333-8333-333333333332';
 const JPEG = tinyJpeg(400, 300);
@@ -34,6 +36,7 @@ type Row = Record<string, unknown>;
 interface Tables {
   artists: Row[];
   festivals: Row[];
+  festival_artists: Row[];
   sets: Row[];
 }
 
@@ -103,7 +106,7 @@ function fakeClient(tables: Tables, objects: Record<string, StoredFake> = {}) {
           calls.push(`update:${table}:${rows.map((row) => row.id).join(',')}:${JSON.stringify(state.values)}`);
           return { data: null, error: null };
         }
-        rows = rows.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        rows = rows.sort((a, b) => String(a.id ?? `${a.festival_id}:${a.artist_id}`).localeCompare(String(b.id ?? `${b.festival_id}:${b.artist_id}`)));
         if (state.range) {
           rows = rows.slice(state.range[0], state.range[1] + 1);
         }
@@ -182,6 +185,13 @@ function tablesWithSets(): Tables {
   return {
     artists: [artistRow(A1, 'Artist One'), artistRow(A2, 'Artist Two')],
     festivals: [festivalRow(F1, 'Riverside Sounds', 'published', 3), festivalRow(F2, 'Draft Fest', 'draft', 1), festivalRow(F3, 'Other Fest', 'published', 7)],
+    // The lineup (014) mirrors the sets.
+    festival_artists: [
+      { festival_id: F1, artist_id: A1 },
+      { festival_id: F1, artist_id: A2 },
+      { festival_id: F2, artist_id: A1 },
+      { festival_id: F3, artist_id: A2 },
+    ],
     sets: [
       { id: 's1', festival_id: F1, artist_id: A1 },
       { id: 's2', festival_id: F1, artist_id: A2 },
@@ -298,6 +308,20 @@ describe('planMediaUpload', () => {
     expect(text).toContain('Draft Fest');
     expect(text).toContain('is draft, not bumped');
     expect(text).not.toContain('Nothing to do.');
+  });
+
+  it('bumps a festival that bills the artist in its lineup but has no set times yet (014)', async () => {
+    const tables = tablesWithSets();
+    tables.festivals.push(festivalRow(F4, 'Announced Fest', 'published', 2));
+    tables.festival_artists.push({ festival_id: F4, artist_id: A1 });
+    const { client } = fakeClient(tables);
+    const result = await plan(client, [approvedArtist()]);
+
+    expect(result.bumps.map((bump) => [bump.festivalId, bump.version, bump.reasons]).sort()).toEqual([
+      [F1, 3, ['image of artist Artist One changed']],
+      [F4, 2, ['image of artist Artist One changed']],
+    ]);
+    expect(describeMediaPlan(result)).toContain(`Announced Fest (${F4}) version 2 -> 3: image of artist Artist One changed`);
   });
 
   it('does nothing for an entry whose object and row are already current', async () => {
