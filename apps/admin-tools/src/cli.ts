@@ -2,6 +2,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 
+import { formatCandidateTable, listCandidates, promoteCandidate, evaluateCandidate, formatEvalReport } from './candidates/store';
+import { scaffoldCandidate } from './candidates/scaffold';
 import { buildDemoPlan } from './demo/plan';
 import { describeDemoPlan, runDemoSeed } from './demo/seed';
 import {
@@ -19,10 +21,21 @@ import { applyFestivalSeed, describeSeedPlan, planFestivalSeed } from './festiva
 import { shiftFestivalDates } from './festival/shift-dates';
 import type { FestivalSeed } from './festival/types';
 import { formatIssues, validateFestivalSeed } from './festival/validate';
+import { MEDIA_COMMANDS, MEDIA_HELP } from './media/command';
 import { banUser, describeBan, resolveBanTarget } from './moderation/ban';
 import { formatReportTable, listReports, planContentRemoval, REPORT_STATUSES, type ReportStatus } from './moderation/reports';
 import { addTerms, listTerms, normalizeTerms, removeTerms } from './moderation/terms';
+import { REVIEW_SERVE_USAGE, reviewServeCommand } from './review/server';
 import { storageSweepOrphans } from './storage/command';
+import {
+  formatSuggestionTable,
+  isSuggestionStatus,
+  listSuggestions,
+  setSuggestionStatus,
+  SUGGESTION_STATUSES,
+  suggestionToCandidate,
+  type SuggestionStatus,
+} from './suggestions/list';
 
 const HELP = `Festie admin tools (service role). Usage:
 
@@ -46,6 +59,23 @@ Moderation
 
 Storage
   storage:sweep-orphans [--dry-run]                Delete totem photos no meetup references (older than 24 h)
+
+Candidates (seed-data/candidates, reviewed before anything is seeded; docs/agents/festival-pipeline.md)
+  candidate:list [--json]                          Candidate bundles with counts, images and validation issues
+  candidate:new <slug> --name <name> [--source <url>]
+                                                   Empty bundle (headed CSVs, candidate.json, REVIEW.md)
+  ${REVIEW_SERVE_USAGE}
+                                                   Local review page for the candidates (127.0.0.1 only)
+  candidate:promote <slug> [--dry-run]             Approved candidate -> seed-data/<slug>.json + CSV dir, media, golden index
+  scout:eval <slug> --golden <seed.json> [--tolerance <min>] [--json]
+                                                   Score a candidate against a golden festival file
+
+Suggestions (festival_suggestions from the app's "Suggest a festival" form)
+  suggestions:list [--status new|accepted|rejected|duplicate|all] [--limit <n>] [--json]
+  suggestions:to-candidate <id> [--slug <slug>]    Scaffold a candidate from a suggestion and mark it accepted
+  suggestions:set-status <id> <new|accepted|rejected|duplicate>
+
+${MEDIA_HELP}
 
 Environment: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY).
 See docs/festival-data.md.`;
@@ -294,6 +324,118 @@ async function moderationChangeTerms(args: string[], mode: 'add' | 'remove'): Pr
   }
 }
 
+async function candidateList(args: string[]): Promise<void> {
+  const { values } = parse(args, { json: { type: 'boolean' } }, { min: 0, max: 0, usage: 'candidate:list [--json]' });
+  const candidates = await listCandidates();
+  log(values.json ? JSON.stringify(candidates, null, 2) : formatCandidateTable(candidates));
+}
+
+async function candidateNew(args: string[]): Promise<void> {
+  const usage = 'candidate:new <slug> --name <name> [--source <url>]';
+  const { positionals, values } = parse(args, { name: { type: 'string' }, source: { type: 'string' } }, { min: 1, max: 1, usage });
+  if (typeof values.name !== 'string' || values.name.trim() === '') {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  let result;
+  try {
+    result = scaffoldCandidate({
+      slug: positionals[0],
+      name: values.name.trim(),
+      trigger: { kind: 'manual' },
+      sources:
+        typeof values.source === 'string'
+          ? [{ url: values.source, title: null, kind: 'other', accessed_at: new Date().toISOString(), used_for: [] }]
+          : [],
+    });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(`Created ${result.dir}\n${result.files.map((file) => `  - ${file}`).join('\n')}`);
+  log('Fill the CSVs (or run the festival-scout agent), then: npm run admin -- review:serve');
+}
+
+async function candidatePromote(args: string[]): Promise<void> {
+  const { positionals, values } = parse(args, DRY_RUN, { min: 1, max: 1, usage: 'candidate:promote <slug> [--dry-run]' });
+  let result;
+  try {
+    result = await promoteCandidate(positionals[0], { dryRun: Boolean(values['dry-run']) });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(result.actions.map((action) => `  - ${action}`).join('\n'));
+  if (values['dry-run']) {
+    log('Dry run: nothing written.');
+    return;
+  }
+  log(`Promoted ${result.slug} (${result.mediaMerged} image(s) merged). Next: npm run admin -- media:upload --dry-run, then festival:seed ${result.seedFile} --dry-run.`);
+}
+
+async function scoutEval(args: string[]): Promise<void> {
+  const usage = 'scout:eval <slug> --golden <seed.json> [--tolerance <min>] [--json]';
+  const { positionals, values } = parse(
+    args,
+    { golden: { type: 'string' }, tolerance: { type: 'string' }, json: { type: 'boolean' } },
+    { min: 1, max: 1, usage },
+  );
+  if (typeof values.golden !== 'string') {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  const tolerance = typeof values.tolerance === 'string' ? Number(values.tolerance) : 10;
+  if (!Number.isInteger(tolerance) || tolerance < 0 || tolerance > 240) {
+    throw new UsageError('--tolerance must be a whole number of minutes between 0 and 240');
+  }
+  let report;
+  try {
+    report = await evaluateCandidate(positionals[0], resolveInputPath(values.golden), { toleranceMinutes: tolerance });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(values.json ? JSON.stringify(report, null, 2) : formatEvalReport(report));
+}
+
+async function suggestionsList(args: string[]): Promise<void> {
+  const usage = 'suggestions:list [--status new|accepted|rejected|duplicate|all] [--limit <n>] [--json]';
+  const { values } = parse(args, { status: { type: 'string' }, limit: { type: 'string' }, json: { type: 'boolean' } }, { min: 0, max: 0, usage });
+  const status = typeof values.status === 'string' ? values.status : 'new';
+  if (status !== 'all' && !isSuggestionStatus(status)) {
+    throw new UsageError(`--status must be one of ${[...SUGGESTION_STATUSES, 'all'].join(', ')}`);
+  }
+  const limit = typeof values.limit === 'string' ? Number(values.limit) : 50;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+    throw new UsageError('--limit must be an integer between 1 and 1000');
+  }
+  const rows = await listSuggestions(createAdminClient(requireSupabaseConfig()), { status: status as SuggestionStatus | 'all', limit });
+  log(values.json ? JSON.stringify(rows, null, 2) : formatSuggestionTable(rows));
+}
+
+async function suggestionsToCandidate(args: string[]): Promise<void> {
+  const { positionals, values } = parse(args, { slug: { type: 'string' } }, { min: 1, max: 1, usage: 'suggestions:to-candidate <id> [--slug <slug>]' });
+  let result;
+  try {
+    result = await suggestionToCandidate(createAdminClient(requireSupabaseConfig()), {
+      id: positionals[0],
+      slug: typeof values.slug === 'string' ? values.slug : undefined,
+    });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(`Created ${result.dir} and marked the suggestion accepted. Next: run the festival-scout agent for it, then review:serve.`);
+}
+
+async function suggestionsSetStatus(args: string[]): Promise<void> {
+  const usage = 'suggestions:set-status <id> <new|accepted|rejected|duplicate>';
+  const { positionals } = parse(args, {}, { min: 2, max: 2, usage });
+  if (!isSuggestionStatus(positionals[1])) {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  try {
+    await setSuggestionStatus(createAdminClient(requireSupabaseConfig()), positionals[0], positionals[1]);
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(`Suggestion ${positionals[0]} is now ${positionals[1]}.`);
+}
+
 const COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'festival:validate': festivalValidate,
   'festival:seed': festivalSeed,
@@ -307,6 +449,17 @@ const COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'moderation:add-terms': (args) => moderationChangeTerms(args, 'add'),
   'moderation:remove-terms': (args) => moderationChangeTerms(args, 'remove'),
   'storage:sweep-orphans': (args) => storageSweepOrphans(args, log),
+  'candidate:list': candidateList,
+  'candidate:new': candidateNew,
+  'candidate:promote': candidatePromote,
+  'review:serve': (args) => reviewServeCommand(args, log),
+  'scout:eval': scoutEval,
+  'suggestions:list': suggestionsList,
+  'suggestions:to-candidate': suggestionsToCandidate,
+  'suggestions:set-status': suggestionsSetStatus,
+  ...Object.fromEntries(
+    Object.entries(MEDIA_COMMANDS).map(([name, run]) => [name, (args: string[]) => run(args, log)]),
+  ),
 };
 
 export async function main(argv: string[]): Promise<number> {

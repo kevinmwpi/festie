@@ -112,11 +112,12 @@ export async function applyFestivalSeed(client: SupabaseClient, seed: FestivalSe
   const { version: _requestedVersion, ...festivalColumns } = seed.festival;
   const now = new Date().toISOString();
 
+  // image_url and its credit columns are registry-managed (media:upload); never touch them here.
+  const { image_url: _imageUrl, ...festivalRow } = festivalColumns as typeof festivalColumns & { image_url?: unknown };
   check(
     await client.from('festivals').upsert(
       {
-        ...festivalColumns,
-        image_url: null,
+        ...festivalRow,
         map_asset_url: null,
         status: plan.isNew ? 'draft' : plan.currentStatus,
         version: plan.isNew ? plan.nextVersion : plan.currentVersion,

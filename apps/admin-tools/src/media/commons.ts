@@ -28,7 +28,7 @@ export interface FetchResponseLike {
   ok: boolean;
   status: number;
   json(): Promise<unknown>;
-  arrayBuffer(): Promise<ArrayBuffer>;
+  arrayBuffer(): Promise<ArrayBuffer | SharedArrayBuffer>;
 }
 
 /** The subset of `fetch` the fetcher uses; the global fetch (Node ≥ 18) fits. */
@@ -302,16 +302,22 @@ export function mapLicense(shortName: string | null, license: string | null): Li
   return { ok: false, reason: `unrecognised licence "${label}"; add it to seed-data/media/README.md only after a rights check` };
 }
 
-/** `Photo: <author>, <licence>, via Wikimedia Commons`, trimmed to the image_credit limit. */
+/**
+ * `Photo: <author>, <licence>, via Wikimedia Commons`, trimmed to the image_credit limit. Without an
+ * author (possible for public-domain files) the credit is `Photo: <licence>, via Wikimedia Commons`.
+ */
 export function buildAttribution(author: string | null, licenseLabel: string): string {
-  const suffix = `, ${licenseLabel}, via Wikimedia Commons`;
+  const suffix = `${licenseLabel}, via Wikimedia Commons`;
   const prefix = 'Photo: ';
-  const room = IMAGE_CREDIT_MAX_LENGTH - prefix.length - suffix.length;
   let name = (author ?? '').trim();
+  if (name === '') {
+    return `${prefix}${suffix}`;
+  }
+  const room = IMAGE_CREDIT_MAX_LENGTH - prefix.length - suffix.length - 2;
   if (name.length > room) {
     name = `${name.slice(0, room - 1).trimEnd()}…`;
   }
-  return `${prefix}${name}${suffix}`;
+  return `${prefix}${name}, ${suffix}`;
 }
 
 export type CommonsStage = 'search' | 'entity' | 'imageinfo' | 'license' | 'download';

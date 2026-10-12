@@ -47,14 +47,14 @@ export type Log = (line: string) => void;
 const quiet: Log = () => {};
 
 export const MEDIA_VALIDATE_USAGE = 'media:validate [--file <registry>]';
-export const MEDIA_UPLOAD_USAGE = 'media:upload [--dry-run] [--file <registry>]';
+export const MEDIA_UPLOAD_USAGE = 'media:upload [--dry-run]';
 export const MEDIA_FETCH_COMMONS_USAGE =
   'media:fetch-commons --artist <name> --artist-id <uuid> [--wikidata <Q..>] [--into <dir>]\n' +
   '       media:fetch-commons --seed <file> [--into <dir>]';
 
 export const MEDIA_HELP = `Media (licensed images, seed-data/media/README.md)
   media:validate [--file <registry>]               Check seed-data/media/registry.json and its files (offline)
-  media:upload [--dry-run] [--file <registry>]     Upload approved images to the artwork bucket, write image columns, bump versions
+  media:upload [--dry-run]                         Upload approved images to the artwork bucket, write image columns, bump versions
   media:fetch-commons --artist <name> --artist-id <uuid> [--wikidata <Q..>] [--into <dir>]
                                                    Fetch a CC-licensed artist photo from Wikimedia Commons as a pending entry
   media:fetch-commons --seed <file> [--into <dir>] Same for every artist of a festival file (or candidate CSV dir) without an entry`;
@@ -116,6 +116,7 @@ export async function mediaValidate(options: MediaValidateOptions = {}): Promise
 
 export interface MediaUploadOptions {
   dryRun: boolean;
+  /** Tests only; the CLI always uses the golden registry (a partial registry would clear other images). */
   file?: string;
   seedDataDir?: string;
   /** Injected in tests; otherwise built from SUPABASE_URL + service-role key. */
@@ -405,8 +406,9 @@ export const MEDIA_COMMANDS: Record<string, (args: string[], log: Log) => Promis
     }
   },
   'media:upload': async (args, log) => {
-    const values = parse(args, { 'dry-run': { type: 'boolean' }, file: { type: 'string' } }, MEDIA_UPLOAD_USAGE);
-    await mediaUpload({ dryRun: values['dry-run'] === true, file: stringOption(values, 'file'), log });
+    // Always the golden registry: uploading from a candidate registry would clear every other image.
+    const values = parse(args, { 'dry-run': { type: 'boolean' } }, MEDIA_UPLOAD_USAGE);
+    await mediaUpload({ dryRun: values['dry-run'] === true, log });
   },
   'media:fetch-commons': async (args, log) => {
     const values = parse(
