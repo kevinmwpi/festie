@@ -656,6 +656,25 @@ describe('local schema v2', () => {
     expect(await reopened.getFirstAsync('SELECT bundle_version FROM festivals WHERE id = ?;', ['f1'])).toEqual({ bundle_version: 6 });
   });
 
+  it('adds the photo credit columns in place on upgrade and marks bundles stale', async () => {
+    // Exactly what the release before migration 012 had on devices.
+    const existing = await previousReleaseCache({
+      artists: ['image_credit', 'image_license', 'image_source_url'],
+      festivals: ['image_credit', 'image_license', 'image_source_url'],
+    });
+    await existing.runAsync("INSERT INTO artists (id, name, image_url) VALUES ('a1', 'Artist', NULL);");
+    setDatabaseFactoryForTests(async () => existing);
+
+    const db = await getDb();
+    expect(await db.getAllAsync('SELECT id, image_url, image_credit, image_license, image_source_url FROM artists;')).toEqual([
+      { id: 'a1', image_url: null, image_credit: null, image_license: null, image_source_url: null },
+    ]);
+    expect(await db.getAllAsync('SELECT id, image_credit, image_source_url, bundle_version FROM festivals ORDER BY id;')).toEqual([
+      { id: 'f1', image_credit: null, image_source_url: null, bundle_version: 0 },
+      { id: 'f2', image_credit: null, image_source_url: null, bundle_version: null },
+    ]);
+  });
+
   it('keeps bundles current when only a non-catalog cache table gains a column', async () => {
     const existing = await previousReleaseCache({ groups: ['invite_code_rotated_at'] });
     setDatabaseFactoryForTests(async () => existing);

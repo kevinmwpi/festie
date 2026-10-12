@@ -97,6 +97,21 @@ Admin commands: [`festival-data.md`](./festival-data.md).
       sources."
 - [ ] Pull to refresh while online picks up a festival edit made with `festival:seed` (e.g. a renamed
       stage) without reinstalling.
+- [ ] **Festival photo:** a festival with an approved photo (`media:upload`, [`festival-data.md`](./festival-data.md))
+      shows it inside the card's rounded icon box, cropped to fill; festivals without one keep the flag
+      icon. On a fresh install in airplane mode (the photo never downloaded), or after removing the object
+      from the `artwork` bucket on staging and relaunching, the card shows the flag — never a blank or
+      broken box. Once a photo has loaded, it still shows after relaunching in airplane mode.
+- [ ] **Suggest a festival:** "Don't see your festival? Suggest it" under the list (and "Suggest a
+      festival" in the "No festivals yet" state) opens the form. Send a name with the website and note
+      empty: "Thanks — we'll check it out." appears and the list is back; a `festival_suggestions` row
+      exists with your user id. Send again with `fest.example` as the website: the row's `url` is
+      `https://fest.example`; `http://…` is rejected inline; a name with a disallowed word is rejected
+      with the "not allowed" message; the same name twice creates no second row.
+- [ ] Suggest a festival in airplane mode: the Send button is disabled and the form says "Connect to
+      send a suggestion."; nothing is queued (no "Waiting to sync", nothing sent after reconnecting).
+- [ ] Rate limit: after 5 suggestions with different names within a day, the 6th shows "You've sent a
+      lot of suggestions today. Try again tomorrow." and no row is added.
 
 ## 6. Lineup, picks and conflicts
 
@@ -105,6 +120,16 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Overlapping picks show a conflict; back-to-back sets (end = next start) do not.
 - [ ] Crew schedule shows the picks of crew members for the same festival, and not those of a blocked
       member.
+- [ ] **Artist photos:** an artist with an approved photo shows it on the Lineup card's rounded tile
+      (cropped to fill, the Add/✓ button still on its corner); artists without one keep the initials
+      monogram. Add sets, My Schedule and the crew schedule stay text-only.
+- [ ] Photo fallback: on a fresh install in airplane mode (photos never downloaded), and after removing
+      an artist's object from the `artwork` bucket on staging and relaunching, the card shows the
+      monogram — never a blank tile or a broken image. A photo that has loaded once still shows after
+      relaunching in airplane mode. Scrolling a long lineup never shows another artist's photo on a card.
+- [ ] VoiceOver reads each Lineup card's artist name once; the photo or monogram is not a separate element.
+- [ ] Every artist and festival photo visible in the app is listed under Settings → Photo credits with
+      its credit line (§13).
 - [ ] **Schedule changes**, on future data so picks can be made before the change: shift the demo
       festival into the future (`festival:shift-dates`, §7) and seed it unchanged; pick two sets on
       device A. Then, in a copy of its CSV, mark one picked set `moved` to another day (new `start`/`end`,
@@ -254,6 +279,12 @@ Admin commands: [`festival-data.md`](./festival-data.md).
       support page; Version shows "1.0.0 (build)".
 - [ ] The legal screens' back button and links are readable (blue link colour, not pastel) and every
       `__PLACEHOLDER__` has been replaced in the release build.
+- [ ] About → "Photo credits" lists every artist and festival photo this device shows, grouped
+      Festivals / Artists and sorted by name, each with its attribution (the credit text, or the licence
+      such as "CC BY-SA 4.0" when there is no credit text) and a thumbnail; tapping a row that has a
+      source opens the source page in the browser, a row without one is not tappable. Works in airplane
+      mode. With no photos cached (fresh install offline) it reads "No photos yet — Festie shows licensed
+      photos only, with credit."
 - [ ] Delete account offline: "You're offline…" shown and nothing is deleted.
 - [ ] Delete account online (A is the only admin of a crew with B): type DELETE, tap "Delete my
       account": A returns to sign-in with "Your account has been deleted."; on B, A is gone from the crew,

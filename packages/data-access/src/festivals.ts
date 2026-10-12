@@ -10,7 +10,7 @@ import { requireStoredSession } from './session';
 import { getSupabase, unwrapResult } from './supabase';
 
 export const FESTIVAL_COLUMNS =
-  'id, name, start_date, end_date, timezone, venue_name, accent_color, image_url, map_asset_url, version, status, is_demo, latitude, longitude, default_zoom, bounds_sw_lat, bounds_sw_lng, bounds_ne_lat, bounds_ne_lng, source_url, updated_at';
+  'id, name, start_date, end_date, timezone, venue_name, accent_color, image_url, image_credit, image_license, image_source_url, map_asset_url, version, status, is_demo, latitude, longitude, default_zoom, bounds_sw_lat, bounds_sw_lng, bounds_ne_lat, bounds_ne_lng, source_url, updated_at';
 export const STAGE_COLUMNS = 'id, festival_id, name, zone, latitude, longitude';
 export const SET_COLUMNS =
   'id, festival_id, artist_id, stage_id, start_time, end_time, set_type, status, original_start_time, change_note';
@@ -18,7 +18,7 @@ export const SET_COLUMNS =
 export const QUALIFIED_SET_COLUMNS = SET_COLUMNS.split(', ')
   .map((column) => `sets.${column}`)
   .join(', ');
-export const ARTIST_COLUMNS = 'id, name, image_url, genre';
+export const ARTIST_COLUMNS = 'id, name, image_url, image_credit, image_license, image_source_url, genre';
 const USER_FESTIVAL_COLUMNS = 'id, user_id, festival_id, selected_at';
 const IN_FILTER_CHUNK = 150;
 

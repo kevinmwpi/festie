@@ -15,7 +15,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ArtistMonogram } from '@/src/components/ArtistMonogram';
+import { ArtistAvatar } from '@/src/components/ArtistAvatar';
 import { FestivalDisclaimer, TimeZoneHint } from '@/src/components/FestivalNotes';
 import { ScreenHeader } from '@/src/components/ScreenHeader';
 import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/components/SetChange';
@@ -59,7 +59,7 @@ function ArtistCard({
     <View style={styles.artistCard}>
       <View style={styles.cardInner}>
         <View style={styles.imageWrap}>
-          <ArtistMonogram name={row.artist_name} colorKey={row.artist_id} />
+          <ArtistAvatar name={row.artist_name} colorKey={row.artist_id} imageUrl={row.artist_image_url} />
           {canToggle ? (
             <Pressable
               onPress={onToggle}

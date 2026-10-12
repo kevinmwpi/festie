@@ -49,6 +49,9 @@ const AUTH_CODE_MESSAGES: Record<string, string> = {
   refresh_token_not_found: 'Your session expired. Please sign in again.',
 };
 
+/** `suggest_festival` allows 5 suggestions a day; the generic rate-limit copy would suggest waiting minutes. */
+export const SUGGESTION_RATE_LIMITED_MESSAGE = "You've sent a lot of suggestions today. Try again tomorrow.";
+
 export const GENERIC_ERROR_MESSAGE = 'Something went wrong. Please try again.';
 export const OFFLINE_ERROR_MESSAGE = "You're offline or the connection is weak. Try again when you have signal.";
 export const TIMEOUT_ERROR_MESSAGE = 'That took too long. Try again when you have a better signal.';
@@ -157,4 +160,12 @@ export function toUserMessage(error: unknown): string {
   }
 
   return GENERIC_ERROR_MESSAGE;
+}
+
+/**
+ * Friendly copy for a failed `suggestFestival`: the daily limit gets its own message, everything else
+ * (`content_not_allowed`, `invalid_input`, offline, …) the standard `toUserMessage` copy.
+ */
+export function toSuggestionErrorMessage(error: unknown): string {
+  return getAppErrorCode(error) === 'rate_limited' ? SUGGESTION_RATE_LIMITED_MESSAGE : toUserMessage(error);
 }

@@ -13,6 +13,7 @@ export default function FestivalsLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: 'Festivals' }} />
+      <Stack.Screen name="suggest" options={{ title: 'Suggest a festival' }} />
     </Stack>
   );
 }

@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Hand-maintained to match supabase/migrations through 011 (docs/v1-architecture.md §2.9).
+// Hand-maintained to match supabase/migrations through 013 (docs/v1-architecture.md §2.9).
 // `users.Row` lists only the columns `authenticated` may select; `users` has no client writes.
 // Regenerate with `supabase gen types typescript` and re-apply those two rules when the schema changes.
 export type Database = {
@@ -21,18 +21,27 @@ export type Database = {
         Row: {
           genre: string | null
           id: string
+          image_credit: string | null
+          image_license: string | null
+          image_source_url: string | null
           image_url: string | null
           name: string
         }
         Insert: {
           genre?: string | null
           id?: string
+          image_credit?: string | null
+          image_license?: string | null
+          image_source_url?: string | null
           image_url?: string | null
           name: string
         }
         Update: {
           genre?: string | null
           id?: string
+          image_credit?: string | null
+          image_license?: string | null
+          image_source_url?: string | null
           image_url?: string | null
           name?: string
         }
@@ -107,6 +116,44 @@ export type Database = {
           },
         ]
       }
+      festival_suggestions: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          note: string | null
+          status: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          note?: string | null
+          status?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          note?: string | null
+          status?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_suggestions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       festivals: {
         Row: {
           accent_color: string | null
@@ -117,6 +164,9 @@ export type Database = {
           default_zoom: number | null
           end_date: string
           id: string
+          image_credit: string | null
+          image_license: string | null
+          image_source_url: string | null
           image_url: string | null
           is_demo: boolean
           latitude: number | null
@@ -140,6 +190,9 @@ export type Database = {
           default_zoom?: number | null
           end_date: string
           id?: string
+          image_credit?: string | null
+          image_license?: string | null
+          image_source_url?: string | null
           image_url?: string | null
           is_demo?: boolean
           latitude?: number | null
@@ -163,6 +216,9 @@ export type Database = {
           default_zoom?: number | null
           end_date?: string
           id?: string
+          image_credit?: string | null
+          image_license?: string | null
+          image_source_url?: string | null
           image_url?: string | null
           is_demo?: boolean
           latitude?: number | null
@@ -844,6 +900,10 @@ export type Database = {
         Returns: undefined
       }
       stop_sharing_location: { Args: { p_group_id: string }; Returns: undefined }
+      suggest_festival: {
+        Args: { p_name: string; p_note?: string | null; p_url?: string | null }
+        Returns: string
+      }
       unblock_user: { Args: { p_user_id: string }; Returns: undefined }
       upsert_my_profile: {
         Args: {

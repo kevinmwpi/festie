@@ -221,6 +221,11 @@ export default function SettingsScreen() {
       <ListSection title="About">
         <ListRow title="Privacy Policy" onPress={openPrivacyPolicy} />
         <ListRow title="Terms of Use" onPress={openTermsOfUse} />
+        <ListRow
+          title="Photo credits"
+          subtitle="Who took the artist and festival photos"
+          onPress={() => router.push('/settings/credits')}
+        />
         {SUPPORT_EMAIL ? (
           <ListRow
             title="Contact support"

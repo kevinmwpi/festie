@@ -13,10 +13,12 @@ import {
   deriveAccentColors,
   EmptyState,
   IconButton,
+  layout,
   radii,
   SecondaryButton,
   showToast,
   spacing,
+  TextLink,
   useOfflineStatus,
 } from '@festival/ui';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +29,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 
 import { Avatar } from '@/src/components/Avatar';
 import { FestivalDisclaimer } from '@/src/components/FestivalNotes';
+import { RemoteImage, useImageFallback } from '@/src/components/RemoteImage';
 import { ScreenHeader } from '@/src/components/ScreenHeader';
 import { ErrorState, LoadingState, StaleDataNote } from '@/src/components/StateViews';
 import { queryKeys } from '@/src/hooks/query-keys';
@@ -59,6 +62,9 @@ function FestivalCard({
   const accent = deriveAccentColors(festival.accent_color ?? colors.primary);
   const dates = formatFestivalDateRange(festival);
   const meta = [festival.venue_name, dates].filter(Boolean).join(' • ');
+  // The festival's licensed photo (credited under Settings → Photo credits) fills the icon box; the
+  // flag stays for festivals without one and whenever the photo cannot load (e.g. offline, never cached).
+  const image = useImageFallback(festival.image_url);
 
   const [pressed, setPressed] = React.useState(false);
 
@@ -86,7 +92,11 @@ function FestivalCard({
           style={styles.cardBody}
         >
           <View style={[styles.iconBox, { backgroundColor: accent.solid }]}>
-            <Ionicons name="flag" size={28} color={colors.textPrimary} />
+            {image.showImage && festival.image_url ? (
+              <RemoteImage uri={festival.image_url} onError={image.onError} style={styles.iconImage} />
+            ) : (
+              <Ionicons name="flag" size={28} color={colors.textPrimary} />
+            )}
           </View>
 
           <View style={styles.cardText}>
@@ -194,6 +204,10 @@ export default function FestivalsScreen() {
     await Promise.all([catalog.refetch(), following.refetch()]);
   }, [catalog, following]);
 
+  const openSuggest = React.useCallback(() => {
+    router.push('/(tabs)/festivals/suggest');
+  }, []);
+
   const activeName = festivals.find((festival) => festival.id === activeFestivalId)?.name;
   const isEmpty = festivals.length === 0;
 
@@ -214,7 +228,8 @@ export default function FestivalsScreen() {
       emptyContent = (
         <EmptyState
           title="No festivals yet"
-          description="Festivals appear here as soon as their schedules are published. Pull down to check again."
+          description="Festivals appear here as soon as their schedules are published. Pull down to check again, or tell us which festival you'd like to see."
+          action={<SecondaryButton label="Suggest a festival" onPress={openSuggest} />}
         />
       );
     }
@@ -273,6 +288,12 @@ export default function FestivalsScreen() {
         {!isEmpty ? <StaleDataNote error={catalog.refreshError ?? following.refreshError} /> : null}
         {!isEmpty && catalog.localError ? (
           <SecondaryButton label="Reload festivals" onPress={() => void catalog.refetch()} />
+        ) : null}
+        {!isEmpty ? (
+          <View style={styles.suggestRow}>
+            <Text style={styles.suggestText}>Don't see your festival?</Text>
+            <TextLink label="Suggest it" onPress={openSuggest} accessibilityLabel="Suggest a festival" />
+          </View>
         ) : null}
         <FestivalDisclaimer />
       </ScrollView>
@@ -355,6 +376,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  // Fills the icon box; its own radius keeps the box's shadow (overflow: hidden would clip it on iOS).
+  iconImage: { ...StyleSheet.absoluteFillObject, borderRadius: 24 },
   cardText: { flex: 1, gap: 4 },
   festivalName: {
     color: colors.textPrimary,
@@ -387,4 +410,17 @@ const styles = StyleSheet.create({
   },
   toggleFollowing: { backgroundColor: colors.success },
   toggleNotFollowing: { backgroundColor: '#FFFFFF' },
+
+  /* "Don't see your festival? Suggest it" under the list */
+  suggestRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    justifyContent: 'center',
+    minHeight: layout.minTouchTarget,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+  },
+  suggestText: { color: colors.textSecondary, fontSize: 14 },
 });

@@ -93,13 +93,27 @@ Warn before a voluntary sign-out when `getPendingCount() > 0` (sync-engine).
 | `fetchAndCacheFestival(id)` | `(string) => Promise<FestivalBundle \| null>` | Online. Light `select id, version` first; downloads stages/sets/artists only when the version changed. `null` (and removed locally) when no longer published. |
 | `getLocalFestivalBundle(id)` | `(string) => Promise<FestivalBundle \| null>` | `{ festival, stages, artists, sets }`. Stages carry `latitude/longitude` (no `map_x/map_y`). Sets carry `status` (`scheduled`, `moved`, `cancelled`), `original_start_time` and `change_note`; cancelled sets stay in the bundle (render them with `describeSetChange` from `@festival/domain`). A changed status reaches the cache only after `festivals.version` changes. |
 | `hasCachedFestivalBundle(id)` | `(string) => Promise<boolean>` | |
-| `getLocalFestivalLineup(id)` | `(string) => Promise<FestivalLineupRow[]>` | Sets joined with artist/stage names. |
+| `getLocalFestivalLineup(id)` | `(string) => Promise<FestivalLineupRow[]>` | Sets joined with artist/stage names and `artist_image_url`. |
+| `getLocalImageCredits()` | `() => Promise<ImageCredit[]>` | Cache only. Every cached artist and festival photo (`image_url` set) as `{ subject_type: 'artist' \| 'festival', subject_id, name, image_url, image_credit, image_license, image_source_url }`, ordered by name. Backs Settings → Photo credits. |
 | `getLocalUserFestivals()` | `() => Promise<LocalUserFestival[]>` | Followed festivals (cache). |
 | `refreshUserFestivals()` | `() => Promise<LocalUserFestival[]>` | Online; replaces the cache, except festivals followed or unfollowed while it was in flight (they keep their local state). |
 | `followFestival(id)` / `unfollowFestival(id)` | `(string) => Promise<void>` | Online writes (not queued); already-following is not an error. |
 | `toggleUserFestival(id)` | `(string) => Promise<boolean>` | `true` when now followed. |
 
 Format every time with `@festival/domain` helpers and `festival.timezone`.
+
+Festivals and artists carry `image_url` (a public https URL in the `artwork` bucket when an approved,
+licensed photo exists, else `null`) with `image_credit`, `image_license` and `image_source_url`
+(migration 012). The app shows a photo only when `image_url` is set and falls back to the monogram /
+flag icon otherwise or when it fails to load.
+
+## Festival suggestions
+
+| Export | Signature | Behaviour |
+|---|---|---|
+| `suggestFestival(input)` | `({ name, url?, note? }) => Promise<string>` | Online RPC `suggest_festival` (never queued). Trims; name 1–120, website an `https://` address ≤ 500 (`https://` is added to a bare "fest.example"), note ≤ 300 → `ValidationError` with `field` before anything is sent. P0001 `rate_limited` (5 a day), `content_not_allowed`, `invalid_input`. The same name again resolves the same id. |
+| `validateFestivalSuggestion(input)`, `normaliseSuggestionUrl(value)`, `FESTIVAL_SUGGESTION_{NAME,URL,NOTE}_MAX_LENGTH` | pure | Form validation. |
+| `toSuggestionErrorMessage(error)` | `(unknown) => string` | `toUserMessage`, except `rate_limited` → `SUGGESTION_RATE_LIMITED_MESSAGE` ("You've sent a lot of suggestions today. Try again tomorrow."). |
 
 ## Schedule (selections — offline queue)
 

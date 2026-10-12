@@ -40,6 +40,10 @@ export const CACHE_TABLES = {
       ['venue_name', 'TEXT'],
       ['accent_color', 'TEXT'],
       ['image_url', 'TEXT'],
+      // Attribution of `image_url` (server migration 012); shown on the Photo credits screen.
+      ['image_credit', 'TEXT'],
+      ['image_license', 'TEXT'],
+      ['image_source_url', 'TEXT'],
       ['map_asset_url', 'TEXT'],
       ['version', 'INTEGER NOT NULL DEFAULT 1'],
       ['status', "TEXT NOT NULL DEFAULT 'published'"],
@@ -75,6 +79,10 @@ export const CACHE_TABLES = {
       ['id', 'TEXT NOT NULL'],
       ['name', 'TEXT NOT NULL'],
       ['image_url', 'TEXT'],
+      // Attribution of `image_url` (server migration 012); shown on the Photo credits screen.
+      ['image_credit', 'TEXT'],
+      ['image_license', 'TEXT'],
+      ['image_source_url', 'TEXT'],
       ['genre', 'TEXT'],
     ],
     primaryKey: ['id'],
