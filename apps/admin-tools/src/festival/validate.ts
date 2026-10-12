@@ -6,15 +6,17 @@ import {
   localDateOf,
   parseOffsetTimestamp,
 } from '../lib/time';
-import type {
-  ArtistRecord,
-  FestivalRecord,
-  FestivalSeed,
-  FestivalStatus,
-  SetRecord,
-  StageRecord,
-  ValidationIssue,
-  ValidationResult,
+import {
+  SET_STATUSES,
+  type ArtistRecord,
+  type FestivalRecord,
+  type FestivalSeed,
+  type FestivalStatus,
+  type SetRecord,
+  type SetStatus,
+  type StageRecord,
+  type ValidationIssue,
+  type ValidationResult,
 } from './types';
 
 /**
@@ -30,7 +32,10 @@ const FESTIVAL_KEYS = [
 ] as const;
 const STAGE_KEYS = ['id', 'festival_id', 'name', 'zone', 'latitude', 'longitude'] as const;
 const ARTIST_KEYS = ['id', 'name', 'genre', 'image_url'] as const;
-const SET_KEYS = ['id', 'festival_id', 'artist_id', 'stage_id', 'start_time', 'end_time', 'set_type'] as const;
+const SET_KEYS = [
+  'id', 'festival_id', 'artist_id', 'stage_id', 'start_time', 'end_time', 'set_type', 'status', 'original_start_time',
+  'change_note',
+] as const;
 const TOP_KEYS = ['festival', 'stages', 'artists', 'sets'] as const;
 
 export const LIMITS = {
@@ -41,6 +46,7 @@ export const LIMITS = {
   artistName: 120,
   genre: 60,
   setType: 40,
+  changeNote: 140,
   maxSetHours: 24,
 } as const;
 
@@ -471,6 +477,8 @@ function validateSets(
       setType = c.text(s.set_type, `${path}.set_type`, LIMITS.setType);
     }
 
+    const change = validateSetChange(c, s, path, start, datesUsable ? { festival: festival!, earliestDate, latestDate } : null);
+
     return [
       {
         id,
@@ -480,16 +488,17 @@ function validateSets(
         start_time: typeof s.start_time === 'string' ? s.start_time : '',
         end_time: typeof s.end_time === 'string' ? s.end_time : '',
         set_type: setType,
+        ...change,
       },
     ];
   });
 
-  // Overlapping sets on one stage are usually a data-entry mistake.
+  // Overlapping sets on one stage are usually a data-entry mistake (a cancelled set frees its slot).
   const byStage = new Map<string, Array<{ index: number; start: number; end: number }>>();
   sets.forEach((set, index) => {
     const start = parseOffsetTimestamp(set.start_time);
     const end = parseOffsetTimestamp(set.end_time);
-    if (!start || !end || !set.stage_id) {
+    if (!start || !end || !set.stage_id || set.status === 'cancelled') {
       return;
     }
     const list = byStage.get(set.stage_id) ?? [];
@@ -506,6 +515,64 @@ function validateSets(
   }
 
   return sets;
+}
+
+/**
+ * `status`, `original_start_time` and `change_note` of one set, matching the checks of migration
+ * 011. Always returns all three so a re-seed also clears a change that was removed from the file.
+ */
+function validateSetChange(
+  c: Collector,
+  s: Json,
+  path: string,
+  start: Date | null,
+  dates: { festival: FestivalRecord; earliestDate: string; latestDate: string } | null,
+): Pick<SetRecord, 'status' | 'original_start_time' | 'change_note'> {
+  let status: SetStatus = 'scheduled';
+  if (s.status !== undefined && s.status !== null) {
+    if (typeof s.status === 'string' && (SET_STATUSES as readonly string[]).includes(s.status)) {
+      status = s.status as SetStatus;
+    } else {
+      c.error(`${path}.status`, `must be one of ${SET_STATUSES.join(', ')}`);
+    }
+  }
+
+  let originalStartTime: string | null = null;
+  if (s.original_start_time !== undefined && s.original_start_time !== null) {
+    const original = parseOffsetTimestamp(s.original_start_time);
+    if (status !== 'moved') {
+      c.error(`${path}.original_start_time`, 'is only allowed when status is "moved"');
+    } else if (!original) {
+      c.error(`${path}.original_start_time`, 'must be an ISO 8601 timestamp with an offset, e.g. 2027-06-18T19:30:00-04:00');
+    } else {
+      originalStartTime = s.original_start_time as string;
+      if (start && original.getTime() === start.getTime()) {
+        c.warn(`${path}.original_start_time`, 'equals start_time; leave it empty for a set that only changed stage');
+      }
+      if (dates) {
+        const localDate = localDateOf(original, dates.festival.timezone);
+        if (localDate < dates.earliestDate || localDate > dates.latestDate) {
+          c.error(
+            `${path}.original_start_time`,
+            `is on ${localDate} (${dates.festival.timezone}), outside the festival dates ±1 day (${dates.earliestDate}..${dates.latestDate})`,
+          );
+        }
+      }
+    }
+  } else if (status === 'moved') {
+    c.warn(`${path}.original_start_time`, 'is empty: the app shows "Moved" without the old time');
+  }
+
+  let changeNote: string | null = null;
+  if (s.change_note !== undefined && s.change_note !== null) {
+    if (typeof s.change_note === 'string' && /[\r\n\t]/.test(s.change_note)) {
+      c.error(`${path}.change_note`, 'must be a single line');
+    } else {
+      changeNote = c.optionalText(s.change_note, `${path}.change_note`, LIMITS.changeNote);
+    }
+  }
+
+  return { status, original_start_time: originalStartTime, change_note: changeNote };
 }
 
 export function validateFestivalSeed(input: unknown): ValidationResult {

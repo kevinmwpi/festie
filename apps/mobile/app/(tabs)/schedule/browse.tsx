@@ -1,4 +1,4 @@
-import { festivalDayKey, listFestivalDays } from '@festival/domain';
+import { describeSetChange, festivalDayKey, listFestivalDays } from '@festival/domain';
 import {
   Badge,
   Chip,
@@ -18,6 +18,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 
 import { FestivalDisclaimer, TimeZoneHint } from '@/src/components/FestivalNotes';
 import { SubScreenHeader } from '@/src/components/ScreenHeader';
+import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/components/SetChange';
 import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } from '@/src/components/StateViews';
 import { useFestivalClock } from '@/src/hooks/use-festival';
 import { useLineup, type LineupRow } from '@/src/hooks/use-lineup';
@@ -140,32 +141,43 @@ export default function BrowseScheduleScreen() {
                 {filteredRows.map((row, index) => {
                   const selected = Boolean(row.selection_id);
                   const busy = busyIds.has(row.id);
+                  const change = describeSetChange(row, clock.timeZone);
+                  const cancelled = change?.status === 'cancelled';
+                  const changeSuffix = change ? `. ${change.accessibilityLabel}` : '';
                   return (
                     <View key={row.id} style={[styles.row, index > 0 && styles.rowDivider]}>
                       <View style={styles.rowText}>
-                        <Text style={styles.artist}>{row.artist_name}</Text>
-                        <Text style={styles.meta}>
+                        <Text style={[styles.artist, cancelled && cancelledTextStyle]}>{row.artist_name}</Text>
+                        <Text style={[styles.meta, cancelled && cancelledTextStyle]}>
                           {row.stage_name} · {clock.day(row.start_time)} {clock.range(row.start_time, row.end_time)}
                         </Text>
-                        {row.is_conflicting ? <Badge label="Conflict" tone="warning" /> : null}
+                        <SetChangeDetail change={change} />
+                        {change?.label || row.is_conflicting ? (
+                          <View style={styles.badgeRow}>
+                            <SetChangeBadge change={change} />
+                            {row.is_conflicting ? <Badge label="Conflict" tone="warning" /> : null}
+                          </View>
+                        ) : null}
                       </View>
-                      <Pressable
-                        onPress={() => void toggle(row)}
-                        disabled={busy}
-                        accessibilityRole="button"
-                        accessibilityLabel={selected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}
-                        accessibilityState={{ selected, busy }}
-                        style={({ pressed }) => [styles.toggle, selected ? styles.toggleOn : styles.toggleOff, pressed && { opacity: 0.8 }]}
-                      >
-                        {busy ? (
-                          <ActivityIndicator size="small" color={colors.textPrimary} />
-                        ) : (
-                          <>
-                            <Ionicons name={selected ? 'checkmark' : 'add'} size={16} color={colors.textPrimary} />
-                            <Text style={styles.toggleLabel}>{selected ? 'Added' : 'Add'}</Text>
-                          </>
-                        )}
-                      </Pressable>
+                      {cancelled && !selected ? null : (
+                        <Pressable
+                          onPress={() => void toggle(row)}
+                          disabled={busy}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${selected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}${changeSuffix}`}
+                          accessibilityState={{ selected, busy }}
+                          style={({ pressed }) => [styles.toggle, selected ? styles.toggleOn : styles.toggleOff, pressed && { opacity: 0.8 }]}
+                        >
+                          {busy ? (
+                            <ActivityIndicator size="small" color={colors.textPrimary} />
+                          ) : (
+                            <>
+                              <Ionicons name={selected ? 'checkmark' : 'add'} size={16} color={colors.textPrimary} />
+                              <Text style={styles.toggleLabel}>{selected ? 'Added' : 'Add'}</Text>
+                            </>
+                          )}
+                        </Pressable>
+                      )}
                     </View>
                   );
                 })}
@@ -200,6 +212,7 @@ const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, minHeight: 64, paddingVertical: spacing.sm + 4 },
   rowDivider: { borderTopColor: 'rgba(44, 51, 39, 0.08)', borderTopWidth: StyleSheet.hairlineWidth },
   rowText: { flex: 1, gap: 3 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   artist: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
   meta: { color: colors.textSecondary, fontSize: 13 },
   toggle: {

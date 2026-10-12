@@ -62,6 +62,46 @@ describe('buildSeedFromCsv', () => {
     expect(second.artists.map((artist) => artist.id)).toEqual(first.artists.map((artist) => artist.id));
   });
 
+  it('reads status, original_start and note, and keeps the id of a set that moved to another day', () => {
+    const before = validateFestivalSeed(buildSeedFromCsv(minimal).seed).seed!;
+    const built = buildSeedFromCsv({
+      ...minimal,
+      'sets.csv': [
+        'artist,stage,start,end,status,original_start,note',
+        // Friday 19:00 moved to Saturday 21:00: the id still comes from Friday.
+        'Artist One,Main,2027-08-07 21:00,2027-08-07 22:00,Moved,2027-08-06 19:00,"Moved to Saturday, weather"',
+        'artist one,tent,2027-08-07 01:00,2027-08-07 02:00,,,',
+        '"Artist, Two",Main,2027-08-07T18:00:00-05:00,2027-08-07T19:00:00-05:00,Canceled,,Artist withdrew',
+      ].join('\n'),
+    });
+    expect(built.errors).toEqual([]);
+    const result = validateFestivalSeed(built.seed);
+    expect(result.errors).toEqual([]);
+    const seed = result.seed!;
+    expect(seed.sets.map((set) => set.id)).toEqual(before.sets.map((set) => set.id));
+    expect(seed.sets.map((set) => [set.status, set.original_start_time, set.change_note])).toEqual([
+      ['moved', '2027-08-06T19:00:00-05:00', 'Moved to Saturday, weather'],
+      ['scheduled', null, null],
+      ['cancelled', null, 'Artist withdrew'],
+    ]);
+  });
+
+  it('reproduces seed-data/head-trip-2026.json from its CSVs, keeping the pre-change set ids', () => {
+    const csv = (file: string) => readRepoFile(`seed-data/head-trip-2026-csv/${file}`);
+    const built = buildSeedFromCsv({
+      'festival.csv': csv('festival.csv'),
+      'stages.csv': csv('stages.csv'),
+      'artists.csv': csv('artists.csv'),
+      'sets.csv': csv('sets.csv'),
+    });
+    expect(built.errors).toEqual([]);
+    const seed = validateFestivalSeed(built.seed).seed!;
+    expect(seed).toEqual(JSON.parse(readRepoFile('seed-data/head-trip-2026.json')));
+    // Calvin Harris moved from Saturday 23:00 to Sunday and keeps the id of his Saturday slot.
+    const calvin = seed.sets.find((set) => set.original_start_time === '2026-10-10T23:00:00-07:00');
+    expect(calvin).toMatchObject({ id: 'd7a78947-0a4d-5f80-a039-05879861acd6', status: 'moved', start_time: '2026-10-11T21:10:00-07:00' });
+  });
+
   it('respects ids given in the CSV', () => {
     const built = buildSeedFromCsv({
       ...minimal,

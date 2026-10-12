@@ -1,8 +1,10 @@
 import { getConflictSetIds, type ScheduleRow } from '@festival/data-access';
 import {
   DEFAULT_DAY_START_HOUR,
+  describeSetChange,
   festivalDayKey,
   festivalDayMinutesRange,
+  isCancelledSet,
   listFestivalDays,
 } from '@festival/domain';
 import { syncSetReminders } from '@festival/notification-utils';
@@ -26,6 +28,7 @@ import { ActionSheet } from '@/src/components/BottomSheet';
 import { TimeZoneHint } from '@/src/components/FestivalNotes';
 import { pastelFor } from '@/src/components/palette';
 import { ScreenHeader } from '@/src/components/ScreenHeader';
+import { cancelledTextStyle, ScheduleChangesNotice, setChangeDetailText } from '@/src/components/SetChange';
 import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } from '@/src/components/StateViews';
 import { useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useMySchedule } from '@/src/hooks/use-lineup';
@@ -142,11 +145,15 @@ function layoutTimeline(rows: ScheduleRow[], timeZone: string, conflictIds: Set<
 function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; clock: FestivalClock; onPress: () => void }) {
   const widthPercent = 100 / block.totalColumns;
   const time = clock.range(block.row.start_time, block.row.end_time);
+  const change = describeSetChange(block.row, clock.timeZone);
+  const cancelled = change?.status === 'cancelled';
+  // Small blocks have room for one status word in place of the stage line.
+  const stageLine = change?.label ? `${change.label} · ${block.row.stage_name}` : block.row.stage_name;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${block.row.artist_name}, ${block.row.stage_name}, ${time}${block.isConflict ? ', conflicts with another pick' : ''}`}
+      accessibilityLabel={`${block.row.artist_name}, ${block.row.stage_name}, ${time}${block.isConflict ? ', conflicts with another pick' : ''}${change ? `. ${change.accessibilityLabel}` : ''}`}
       accessibilityHint="Shows options for this set"
       style={({ pressed }) => [
         styles.block,
@@ -158,14 +165,20 @@ function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; cloc
           borderLeftColor: pastelFor(block.row.stage_id),
         },
         block.isConflict && styles.blockConflict,
+        cancelled && styles.blockCancelled,
+        change?.status === 'moved' && styles.blockMoved,
         pressed && { opacity: 0.8 },
       ]}
     >
-      <Text style={styles.blockArtist} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
+      <Text style={[styles.blockArtist, cancelled && cancelledTextStyle]} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
         {block.row.artist_name}
       </Text>
-      <Text style={styles.blockStage} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
-        {block.row.stage_name}
+      <Text
+        style={[styles.blockStage, change?.label ? (cancelled ? styles.blockStatusCancelled : styles.blockStatusMoved) : null]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}
+      >
+        {stageLine}
       </Text>
       {block.height >= 80 ? (
         <Text style={styles.blockTime} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
@@ -174,6 +187,16 @@ function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; cloc
       ) : null}
     </Pressable>
   );
+}
+
+function actionSheetMessage(row: ScheduleRow, clock: FestivalClock): string {
+  const when = `${row.stage_name} · ${clock.day(row.start_time, { weekday: 'short', month: 'short', day: 'numeric' })} · ${clock.range(row.start_time, row.end_time)}`;
+  const change = describeSetChange(row, clock.timeZone);
+  if (!change) {
+    return when;
+  }
+  const detail = setChangeDetailText(change);
+  return [when, [change.label, detail].filter(Boolean).join(': ')].filter(Boolean).join('\n');
 }
 
 /* ─── Screen ────────────────────────────────────────────── */
@@ -213,9 +236,11 @@ export default function PersonalScheduleScreen() {
   );
 
   const days = React.useMemo(() => (festival ? listFestivalDays(festival, rows) : []), [festival, rows]);
+  // Day chips count the sets the user will actually see (cancelled picks stay listed but not counted).
   const countsByDay = React.useMemo(() => {
     const counts = new Map<string, number>();
     rows.forEach((row) => {
+      if (isCancelledSet(row)) return;
       const day = dayOf(row);
       if (day) counts.set(day, (counts.get(day) ?? 0) + 1);
     });
@@ -242,13 +267,16 @@ export default function PersonalScheduleScreen() {
   const dayRows = React.useMemo(() => rows.filter((row) => dayOf(row) === activeDay), [activeDay, dayOf, rows]);
   const timeline = React.useMemo(() => layoutTimeline(dayRows, timeZone, conflictIds), [conflictIds, dayRows, timeZone]);
 
-  // Keep existing reminders in step with picks (cancel removed sets, reschedule moved ones). Never prompts.
+  // Keep existing reminders in step with picks (cancel removed and cancelled sets, reschedule moved
+  // ones). Never prompts.
   React.useEffect(() => {
     if (!festival || schedule.isLoading || schedule.data === undefined) {
       return;
     }
     void syncSetReminders(
-      rows.map((row) => ({ id: row.id, start_time: row.start_time, artist_name: row.artist_name, stage_name: row.stage_name })),
+      rows
+        .filter((row) => !isCancelledSet(row))
+        .map((row) => ({ id: row.id, start_time: row.start_time, artist_name: row.artist_name, stage_name: row.stage_name })),
       { timeZone: festival.timezone, festivalId: festival.id },
     );
   }, [festival, rows, schedule.data, schedule.isLoading]);
@@ -342,6 +370,15 @@ export default function PersonalScheduleScreen() {
                 ) : null}
               </View>
 
+              <ScheduleChangesNotice
+                picks={rows}
+                timeZone={timeZone}
+                onSelect={(pick) => {
+                  const day = dayOf(pick);
+                  if (day) setSelectedDay(day);
+                }}
+              />
+
               {dayRows.length === 0 ? (
                 <EmptyState title="Nothing picked this day" description="Pick another day, or add sets from the lineup." />
               ) : (
@@ -376,7 +413,7 @@ export default function PersonalScheduleScreen() {
       <ActionSheet
         visible={actionRow !== null}
         title={actionRow?.artist_name}
-        message={actionRow ? `${actionRow.stage_name} · ${clock.day(actionRow.start_time, { weekday: 'short', month: 'short', day: 'numeric' })} · ${clock.range(actionRow.start_time, actionRow.end_time)}` : undefined}
+        message={actionRow ? actionSheetMessage(actionRow, clock) : undefined}
         actions={
           actionRow
             ? [{ label: 'Remove from my schedule', destructive: true, onPress: () => void toggle(actionRow) }]
@@ -433,6 +470,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   blockConflict: { borderColor: colors.destructive, borderWidth: 1.5, borderLeftWidth: 4 },
+  blockCancelled: { backgroundColor: colors.destructiveBg },
+  blockMoved: { borderColor: colors.link, borderWidth: 1, borderLeftWidth: 4 },
+  blockStatusCancelled: { color: colors.destructive },
+  blockStatusMoved: { color: colors.link },
   blockArtist: { color: colors.textPrimary, fontFamily: 'Georgia', fontSize: 13, fontStyle: 'italic', fontWeight: '700' },
   blockStage: { color: colors.textSecondary, fontSize: 9, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
   blockTime: { color: colors.textSecondary, fontSize: 10, fontWeight: '700', marginTop: 'auto' },

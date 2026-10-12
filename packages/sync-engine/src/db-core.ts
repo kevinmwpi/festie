@@ -1,5 +1,6 @@
 import {
   CACHE_TABLES,
+  CATALOG_TABLES,
   LOCAL_SCHEMA_VERSION,
   PERSISTENT_TABLES,
   SCHEMA_VERSION_META_KEY,
@@ -176,9 +177,24 @@ export async function initialiseSchema(database: LocalDatabase): Promise<void> {
   const currentVersion = versionRow ? Number(versionRow.value) : null;
 
   if (currentVersion === LOCAL_SCHEMA_VERSION) {
-    for (const [name, definition] of Object.entries(CACHE_TABLES) as Array<[string, TableDefinition]>) {
-      await createTable(database, name, definition);
-    }
+    await database.transaction(async (tx) => {
+      let catalogChanged = false;
+      for (const [name, definition] of Object.entries(CACHE_TABLES) as Array<[string, TableDefinition]>) {
+        await createTable(tx, name, definition);
+        const existing = await getColumnNames(tx, name);
+        for (const [column, columnDefinition] of definition.columns) {
+          if (!existing.has(column)) {
+            await tx.execAsync(`ALTER TABLE ${name} ADD COLUMN ${column} ${columnDefinition};`);
+            catalogChanged ||= CATALOG_TABLES.has(name);
+          }
+        }
+      }
+      // Rows cached before a catalog column existed hold its default, not the server value. Keep them
+      // for offline use, but mark every bundle stale so the next online open refetches it.
+      if (catalogChanged) {
+        await tx.runAsync('UPDATE festivals SET bundle_version = 0 WHERE bundle_version IS NOT NULL;');
+      }
+    });
     return;
   }
 

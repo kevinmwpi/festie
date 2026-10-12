@@ -17,6 +17,8 @@ import type { ValidationIssue } from './types';
  * re-importing an updated schedule keeps ids stable and users keep their picks:
  *   festival: name + start_date        stage: festival + stage name
  *   artist:   artist name (global)     set:   festival + artist + festival day (+ ordinal)
+ * A moved set (status "moved" with an original_start) takes its day from original_start, so it keeps
+ * the id it had before the move — and users keep their picks — even when it moved to another day.
  * The result still has to pass validateFestivalSeed().
  */
 
@@ -32,7 +34,10 @@ export const CSV_SCHEMAS = {
   },
   'stages.csv': { required: ['name'], optional: ['id', 'zone', 'latitude', 'longitude'] },
   'artists.csv': { required: ['name'], optional: ['id', 'genre'] },
-  'sets.csv': { required: ['artist', 'stage', 'start', 'end'], optional: ['id', 'set_type'] },
+  'sets.csv': {
+    required: ['artist', 'stage', 'start', 'end'],
+    optional: ['id', 'set_type', 'status', 'original_start', 'note'],
+  },
 } as const;
 
 export type CsvFileName = (typeof CSV_FILES)[number];
@@ -176,7 +181,7 @@ export function buildSeedFromCsv(input: CsvInput): CsvImportResult {
   });
 
   // sets.csv --------------------------------------------------------------
-  const toTimestamp = (record: CsvRecord, column: 'start' | 'end'): string | null => {
+  const toTimestamp = (record: CsvRecord, column: 'start' | 'end' | 'original_start'): string | null => {
     const raw = record.values[column];
     const withOffset = parseOffsetTimestamp(raw);
     if (withOffset) {
@@ -214,20 +219,29 @@ export function buildSeedFromCsv(input: CsvInput): CsvImportResult {
     if (providedId !== null && !isUuid(providedId)) {
       errors.push({ path: at('sets.csv', record, 'id'), message: 'must be a UUID' });
     }
+    // Lenient like is_demo: any case, and the US spelling "canceled". The validator checks the value.
+    const rawStatus = optional(record, 'status')?.trim().toLowerCase() ?? 'scheduled';
+    const status = rawStatus === 'canceled' ? 'cancelled' : rawStatus;
+    const originalStart = optional(record, 'original_start') === null ? null : toTimestamp(record, 'original_start');
+    const start = toTimestamp(record, 'start');
     return {
       record,
       artistId,
       stageId,
       providedId: providedId && isUuid(providedId) ? providedId.toLowerCase() : null,
-      start: toTimestamp(record, 'start'),
+      start,
       end: toTimestamp(record, 'end'),
+      status,
+      originalStart,
+      // The instant the derived id is based on: where the set was before it moved.
+      idTime: status === 'moved' && originalStart ? originalStart : start,
     };
   });
 
-  // Ordinals follow start time so ids do not depend on row order.
+  // Ordinals follow (original) start time so ids do not depend on row order.
   const ordered = [...candidates].sort((a, b) => {
-    const left = a.start ? Date.parse(a.start) : 0;
-    const right = b.start ? Date.parse(b.start) : 0;
+    const left = a.idTime ? Date.parse(a.idTime) : 0;
+    const right = b.idTime ? Date.parse(b.idTime) : 0;
     return left - right || a.record.line - b.record.line;
   });
   const setIds = new Map<CsvRecord, string>();
@@ -236,10 +250,10 @@ export function buildSeedFromCsv(input: CsvInput): CsvImportResult {
       setIds.set(candidate.record, candidate.providedId);
       continue;
     }
-    if (!candidate.artistId || !candidate.start) {
+    if (!candidate.artistId || !candidate.idTime) {
       continue;
     }
-    const day = festivalDayOf(new Date(candidate.start), timezone);
+    const day = festivalDayOf(new Date(candidate.idTime), timezone);
     const key = `${candidate.artistId}:${day}`;
     const ordinal = (ordinals.get(key) ?? 0) + 1;
     ordinals.set(key, ordinal);
@@ -254,6 +268,9 @@ export function buildSeedFromCsv(input: CsvInput): CsvImportResult {
     start_time: candidate.start ?? '',
     end_time: candidate.end ?? '',
     set_type: optional(candidate.record, 'set_type') ?? 'performance',
+    status: candidate.status,
+    original_start_time: candidate.originalStart,
+    change_note: optional(candidate.record, 'note'),
   }));
 
   if (errors.length > 0) {

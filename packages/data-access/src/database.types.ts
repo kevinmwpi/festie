@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Hand-maintained to match supabase/migrations through 009 (docs/v1-architecture.md §2.9).
+// Hand-maintained to match supabase/migrations through 011 (docs/v1-architecture.md §2.9).
 // `users.Row` lists only the columns `authenticated` may select; `users` has no client writes.
 // Regenerate with `supabase gen types typescript` and re-apply those two rules when the schema changes.
 export type Database = {
@@ -510,30 +510,39 @@ export type Database = {
       sets: {
         Row: {
           artist_id: string
+          change_note: string | null
           end_time: string
           festival_id: string
           id: string
+          original_start_time: string | null
           set_type: string
           stage_id: string
           start_time: string
+          status: string
         }
         Insert: {
           artist_id: string
+          change_note?: string | null
           end_time: string
           festival_id: string
           id?: string
+          original_start_time?: string | null
           set_type?: string
           stage_id: string
           start_time: string
+          status?: string
         }
         Update: {
           artist_id?: string
+          change_note?: string | null
           end_time?: string
           festival_id?: string
           id?: string
+          original_start_time?: string | null
           set_type?: string
           stage_id?: string
           start_time?: string
+          status?: string
         }
         Relationships: [
           {

@@ -231,14 +231,16 @@ export function ScreenHeader({ title, subtitle, onBack, backIcon = '‹', backAc
 
 /* ─── Badge ─────────────────────────────────────────────── */
 
-export type BadgeTone = 'neutral' | 'sample' | 'warning' | 'success';
+export type BadgeTone = 'neutral' | 'sample' | 'info' | 'warning' | 'success' | 'danger';
 
 /** Text/background pairs; every pair is ≥ 4.5:1. */
 const BADGE_TONES: Record<BadgeTone, { backgroundColor: string; color: string }> = {
   neutral: { backgroundColor: '#ECEDEA', color: colors.textPrimary }, // 11.1:1
   sample: { backgroundColor: '#EAF1FF', color: colors.link }, // 5.7:1
+  info: { backgroundColor: '#EAF1FF', color: colors.link }, // 5.7:1
   warning: { backgroundColor: '#FFF4D6', color: '#7A4A00' }, // 6.8:1
   success: { backgroundColor: colors.successBg, color: '#1F5C2E' }, // 7.1:1
+  danger: { backgroundColor: colors.destructiveBg, color: colors.destructive }, // 5.76:1
 };
 
 export interface BadgeProps {

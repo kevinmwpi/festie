@@ -7,7 +7,11 @@
  * The rule matches what the app schedules in the moment: a reminder for every future picked set
  * (`useSetSelection`) and for every future meetup the user created (Create Meetup). Restoring never
  * prompts — it only runs when notification permission is already granted — and never throws.
+ *
+ * Schedule changes are applied too: a pick that was cancelled loses its reminder, and a pick that
+ * moved gets its reminder moved to the new start (keeping the lead time it was scheduled with).
  */
+import { isCancelledSet } from '@festival/domain';
 import {
   getCachedProfile,
   getLocalFestival,
@@ -60,33 +64,53 @@ async function scheduledIds(entityType: ReminderEntityType): Promise<Set<string>
   return new Set((await getScheduledReminders(entityType)).map((reminder) => reminder.entity_id));
 }
 
-/** Schedules the missing reminders of the user's future picks in one festival (cache only). */
+/**
+ * Schedules the missing reminders of the user's future picks in one festival, moves reminders of
+ * picks whose set moved and cancels reminders of picks whose set was cancelled (cache only).
+ */
 export async function restoreSetReminders(festivalId: string, now = Date.now()): Promise<void> {
   try {
     const userId = currentUserId();
     if (!userId || !festivalId || (await getReminderPermission()) !== 'granted') {
       return;
     }
-    const [festival, picks, existing] = await Promise.all([
+    const [festival, picks, scheduled] = await Promise.all([
       getLocalFestival(festivalId),
       getSelectedSchedule(festivalId),
-      scheduledIds('set'),
+      getScheduledReminders('set'),
     ]);
     if (!festival) {
       return;
     }
+    const existing = new Map(scheduled.map((reminder) => [reminder.entity_id, reminder]));
     for (const set of picks) {
-      if (existing.has(set.id) || new Date(set.start_time).getTime() <= now) {
+      const reminder = existing.get(set.id);
+      const startMs = new Date(set.start_time).getTime();
+      const upToDate = reminder !== undefined && new Date(reminder.starts_at).getTime() === startMs;
+      if (isCancelledSet(set) || (startMs <= now && !upToDate)) {
+        if (reminder) {
+          await cancelReminderForEntity('set', set.id);
+        }
         continue;
       }
-      const stillSignedIn = await scheduleForUser(userId, 'set', set.id, () =>
-        scheduleSetReminder(
+      if (upToDate || startMs <= now) {
+        continue;
+      }
+      let scheduledNow = false;
+      const stillSignedIn = await scheduleForUser(userId, 'set', set.id, async () => {
+        const result = await scheduleSetReminder(
           { id: set.id, start_time: set.start_time, artist_name: set.artist_name, stage_name: set.stage_name, festival_id: festivalId },
-          { timeZone: festival.timezone, requestPermission: false },
-        ),
-      );
+          { timeZone: festival.timezone, requestPermission: false, minutesBefore: reminder?.minutes_before },
+        );
+        scheduledNow = result.status === 'scheduled';
+        return result;
+      });
       if (!stillSignedIn) {
         return;
+      }
+      // A moved set whose new reminder time has already passed must not keep the old reminder.
+      if (reminder && !scheduledNow) {
+        await cancelReminderForEntity('set', set.id);
       }
     }
   } catch {

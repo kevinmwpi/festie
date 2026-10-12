@@ -1,7 +1,7 @@
--- Verifies that 007–009 repaired supabase/tests/local/dirty-fixture.sql.
--- Run after the first apply and again after re-applying 007–009.
+-- Verifies that 007–011 repaired supabase/tests/local/dirty-fixture.sql.
+-- Run after the first apply and again after re-applying 007–011.
 begin;
-select plan(42);
+select plan(43);
 
 -- Users: dedupe, backfill, orphans ------------------------------------------
 select is(
@@ -165,6 +165,12 @@ select is(
   (select status from public.festivals where id = 'd3000000-0000-4000-8000-000000000001'),
   'draft',
   'legacy non-demo festivals are drafts until re-entered with a source_url'
+);
+select is(
+  (select status || ':' || coalesce(original_start_time::text, '-') || ':' || coalesce(change_note, '-')
+   from public.sets where id = 'd3300000-0000-4000-8000-000000000001'),
+  'scheduled:-:-',
+  'legacy sets read as scheduled with no original start or note (011)'
 );
 
 -- Policies and privileges --------------------------------------------------------

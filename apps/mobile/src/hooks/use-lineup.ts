@@ -21,7 +21,7 @@ export type LineupRow = ScheduleRow & { is_conflicting: boolean };
  * When a festival bundle changes (new version downloaded), re-read the local reads built on it.
  * React Query's structural sharing keeps `bundle.data` referentially stable while nothing changed.
  */
-function useReReadOnBundleChange(bundleData: unknown, keys: ReadonlyArray<readonly unknown[]>): void {
+export function useReReadOnBundleChange(bundleData: unknown, keys: ReadonlyArray<readonly unknown[]>): void {
   const queryClient = useQueryClient();
   const first = useRef(true);
   const keysRef = useRef(keys);

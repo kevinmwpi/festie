@@ -47,7 +47,16 @@ export interface SetRecord {
   start_time: string;
   end_time: string;
   set_type: string;
+  /** Schedule change (migration 011): 'scheduled' (default) | 'moved' | 'cancelled'. */
+  status: SetStatus;
+  /** Start before a move, ISO 8601 with offset; only on moved sets. */
+  original_start_time: string | null;
+  /** Short reason shown in the app ("Moved to Sunday (weather)"), at most 140 characters. */
+  change_note: string | null;
 }
+
+export const SET_STATUSES = ['scheduled', 'moved', 'cancelled'] as const;
+export type SetStatus = (typeof SET_STATUSES)[number];
 
 /** The festival file format (seed-data/*.json). */
 export interface FestivalSeed {

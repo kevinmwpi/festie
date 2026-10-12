@@ -6,7 +6,7 @@
     "end_date": "2026-10-11",
     "timezone": "America/Los_Angeles",
     "venue_name": "Empire Polo Club, Indio",
-    "status": "draft",
+    "status": "published",
     "is_demo": false,
     "source_url": "https://headtripindio.com/set-times/",
     "accent_color": "#E4D9FF",
@@ -83,7 +83,10 @@
       "stage_id": "8ccd3bba-9d21-510a-bae6-07d572e87b45",
       "start_time": "2026-10-10T16:30:00-07:00",
       "end_time": "2026-10-10T19:00:00-07:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": "Saturday times were adjusted for weather"
     },
     {
       "id": "e3f5e09b-9c87-5052-9d91-c8d9d7483f1a",
@@ -92,7 +95,10 @@
       "stage_id": "8ccd3bba-9d21-510a-bae6-07d572e87b45",
       "start_time": "2026-10-10T19:20:00-07:00",
       "end_time": "2026-10-10T20:50:00-07:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": "Saturday times were adjusted for weather"
     },
     {
       "id": "6cc99cbc-922b-50c7-8985-ead6ba349007",
@@ -101,25 +107,34 @@
       "stage_id": "8ccd3bba-9d21-510a-bae6-07d572e87b45",
       "start_time": "2026-10-10T21:10:00-07:00",
       "end_time": "2026-10-10T22:40:00-07:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": "Stopped around 9 PM for lightning; Saturday did not resume"
     },
     {
       "id": "d7a78947-0a4d-5f80-a039-05879861acd6",
       "festival_id": "132e6610-7242-5b9e-b8f8-2fb0c8fe58a6",
       "artist_id": "3062ccdd-b0ca-5228-be7f-7dccaa7d5bc4",
       "stage_id": "8ccd3bba-9d21-510a-bae6-07d572e87b45",
-      "start_time": "2026-10-10T23:00:00-07:00",
-      "end_time": "2026-10-11T01:00:00-07:00",
-      "set_type": "performance"
+      "start_time": "2026-10-11T21:10:00-07:00",
+      "end_time": "2026-10-11T22:40:00-07:00",
+      "set_type": "performance",
+      "status": "moved",
+      "original_start_time": "2026-10-10T23:00:00-07:00",
+      "change_note": "Moved to Sunday after Saturday was stopped for lightning"
     },
     {
       "id": "cae10a26-0acf-5ab9-8f19-125576cc27db",
       "festival_id": "132e6610-7242-5b9e-b8f8-2fb0c8fe58a6",
       "artist_id": "38f4e4f6-cad8-54d7-90e1-5720f4316ca3",
       "stage_id": "8ccd3bba-9d21-510a-bae6-07d572e87b45",
-      "start_time": "2026-10-11T15:30:00-07:00",
-      "end_time": "2026-10-11T17:00:00-07:00",
-      "set_type": "performance"
+      "start_time": "2026-10-11T15:05:00-07:00",
+      "end_time": "2026-10-11T16:35:00-07:00",
+      "set_type": "performance",
+      "status": "moved",
+      "original_start_time": "2026-10-11T15:30:00-07:00",
+      "change_note": "New Sunday schedule after the weather; end time estimated"
     },
     {
       "id": "5a5aef0f-7485-59eb-b246-15c2d97cd525",
@@ -128,34 +143,46 @@
       "stage_id": "8ccd3bba-9d21-510a-bae6-07d572e87b45",
       "start_time": "2026-10-11T17:00:00-07:00",
       "end_time": "2026-10-11T18:30:00-07:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "cancelled",
+      "original_start_time": null,
+      "change_note": "Withdrew (unforeseen circumstances); Peggy Gou reportedly stepped in"
     },
     {
       "id": "66460062-4879-5b8d-8ad7-fcf331bf0ac0",
       "festival_id": "132e6610-7242-5b9e-b8f8-2fb0c8fe58a6",
       "artist_id": "e1d094dc-d6d9-546a-b7a1-d0c75f89d7b2",
       "stage_id": "8ccd3bba-9d21-510a-bae6-07d572e87b45",
-      "start_time": "2026-10-11T18:50:00-07:00",
-      "end_time": "2026-10-11T20:20:00-07:00",
-      "set_type": "performance"
+      "start_time": "2026-10-11T18:15:00-07:00",
+      "end_time": "2026-10-11T19:35:00-07:00",
+      "set_type": "performance",
+      "status": "moved",
+      "original_start_time": "2026-10-11T18:50:00-07:00",
+      "change_note": "New Sunday schedule after the weather; end time estimated"
     },
     {
       "id": "b40f1379-cf8e-5405-a143-e531c9348f6f",
       "festival_id": "132e6610-7242-5b9e-b8f8-2fb0c8fe58a6",
       "artist_id": "b47f17ff-3a61-5ff5-9169-dac70c49207b",
       "stage_id": "8ccd3bba-9d21-510a-bae6-07d572e87b45",
-      "start_time": "2026-10-11T20:40:00-07:00",
-      "end_time": "2026-10-11T22:10:00-07:00",
-      "set_type": "performance"
+      "start_time": "2026-10-11T19:35:00-07:00",
+      "end_time": "2026-10-11T21:10:00-07:00",
+      "set_type": "performance",
+      "status": "moved",
+      "original_start_time": "2026-10-11T20:40:00-07:00",
+      "change_note": "New Sunday schedule after the weather; end time estimated"
     },
     {
       "id": "f2675bbe-59c4-5d64-a731-e88e179ac9fa",
       "festival_id": "132e6610-7242-5b9e-b8f8-2fb0c8fe58a6",
       "artist_id": "3f05419a-481b-553d-b40b-42719d94fa37",
       "stage_id": "8ccd3bba-9d21-510a-bae6-07d572e87b45",
-      "start_time": "2026-10-11T22:30:00-07:00",
+      "start_time": "2026-10-11T23:00:00-07:00",
       "end_time": "2026-10-12T00:00:00-07:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "moved",
+      "original_start_time": "2026-10-11T22:30:00-07:00",
+      "change_note": "Later start, cut to about an hour (new Sunday schedule)"
     }
   ]
 }

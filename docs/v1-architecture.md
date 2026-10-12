@@ -54,6 +54,8 @@ Global conventions:
   12. Triggers last (§2.3).
 - `008_storage_totems.sql` — all `storage.*` statements, isolated so a hosted permission quirk cannot roll back 007 (§2.8).
 - `009_seed_moderation_terms.sql` — data only (`insert ... on conflict do nothing`).
+- `010_foreign_key_indexes.sql` — indexes on foreign keys (`create index if not exists`).
+- `011_set_status.sql` — schedule changes on `sets` (§9.7). Idempotent.
 - CI grep fails on `alter table storage.`, `create (or replace )?function storage.`, `delete from storage.` in migrations.
 
 ### 2.2 Helper functions — schema `private`
@@ -404,7 +406,7 @@ Built with `@festival/ui` primitives: Profile (edit name/avatar) · Privacy (Blo
    - `auth.users` (owned by `supabase_auth_admin`, `grant select, references to postgres`), `auth.uid()/role()/jwt()` reading `request.jwt.claims` (and legacy `request.jwt.claim.sub`);
    - `storage.buckets`, `storage.objects` (with `owner`, `owner_id text`, `path_tokens`), RLS on, owned by `supabase_storage_admin`, `grant supabase_storage_admin to postgres`; `storage.foldername` exactly as Supabase defines it; a statement-level BEFORE DELETE trigger emulating `protect_delete`;
    - a minimal pgTAP-compatible shim (`plan/ok/is/throws_ok/lives_ok/finish`) unless `postgresql-16-pgtap` is installed.
-   Then: apply 001→009 as `postgres`; apply a **dirty fixture** after 006 (case-duplicate emails, 81-char name, `pending-` code, duplicate location rows, permissive dashboard-style policies on `users` and `storage.objects`) before 007; run `supabase/tests/rls.sql`; re-apply 007–009 to prove idempotency. Impersonate with `set local role authenticated` + `set_config('request.jwt.claims', json_build_object('sub', …, 'role', 'authenticated', 'email', …)::text, true)`. Every negative assertion is paired with a positive control under the same identity. Covers every row of §2.4–§2.8, the function-exposure whitelist, rate limits (11th wrong invite → `rate_limited`), wildcard codes, admin hand-off races, account-deletion cascade (`set role supabase_auth_admin; delete from auth.users ...`), and moderation-trigger-vs-cascade.
+   Then: apply 001→011 as `postgres`; apply a **dirty fixture** after 006 (case-duplicate emails, 81-char name, `pending-` code, duplicate location rows, permissive dashboard-style policies on `users` and `storage.objects`) before 007; run `supabase/tests/rls.sql`; re-apply 007–011 to prove idempotency. Impersonate with `set local role authenticated` + `set_config('request.jwt.claims', json_build_object('sub', …, 'role', 'authenticated', 'email', …)::text, true)`. Every negative assertion is paired with a positive control under the same identity. Covers every row of §2.4–§2.8, the function-exposure whitelist, rate limits (11th wrong invite → `rate_limited`), wildcard codes, admin hand-off races, account-deletion cascade (`set role supabase_auth_admin; delete from auth.users ...`), and moderation-trigger-vs-cascade.
 4. `deno check` + `deno test` for edge functions.
 5. `npx expo export --platform ios` in `apps/mobile`.
 6. `.github/workflows/ci.yml` runs gates 1–5 and the storage-SQL grep.
@@ -489,6 +491,15 @@ These record behaviour shipped after rev 2.1. Where they conflict with earlier s
 
 - `users:ban <user_id>`: `auth.admin.updateUserById(id, { ban_duration: '876000h' })` → `rpc('prepare_account_ban')` → remove the returned `totems` paths in chunks of ≤ 1000 → mark open/reviewed reports about the user `actioned`. The profile is kept and reports keep `target_snapshot`. Safe to re-run.
 - `reports:remove-content` on a photo report deletes the reported object (the path in `target_snapshot`), not the meetup's current photo. `storage:sweep-orphans` keeps photos under an open or reviewed report.
+
+### 9.7 Schedule changes (migration 011)
+
+- `sets` gains `status text not null default 'scheduled'` (`scheduled | moved | cancelled`), `original_start_time timestamptz` (only when `status = 'moved'`, optional) and `change_note text` (1–140 characters, already trimmed, any status). Covered by the existing table-level `select` grant and `sets_select_published`; written only by `festival:seed`. A cancelled set is never deleted, so picks of it survive; picks of moved and cancelled sets are never refused (a pick queued offline before the change still syncs). rls.sql section Q.
+- Clients: `SET_COLUMNS` carries the three columns; the local cache adds them in place on the next launch (cache columns are now appended with `ALTER TABLE`, and a new catalog column marks every cached bundle stale with `bundle_version = 0`, so offline data survives an app update). Unknown statuses read as `scheduled`.
+- Domain: `describeSetChange` (chip, "Was Sat 11:00 PM", note, accessibility sentence); `detectConflict`, `getConflictSetIds`, `getNextUpcomingSet` and map-utils `getNextStageSet` ignore cancelled sets.
+- Reminders: every bundle refresh runs `restoreSetReminders`, which cancels reminders of cancelled picks and moves reminders of moved picks (same lead time); My Schedule's `syncSetReminders` leaves cancelled picks out.
+- UI: Lineup, Add sets, My Schedule and Crew Schedule show a Moved (blue) or Cancelled (red, struck through) chip and the detail line; a cancelled set can be removed but not added; My Schedule lists changed picks at the top.
+- Admin tools: the validator mirrors the database checks and always emits all three fields; `sets.csv` takes `status, original_start, note`; a moved set's derived id uses the festival day of `original_start`, so it keeps its id across days. Deploy order: apply 011 before shipping a client that selects the new columns.
 
 ### 9.6 Known residual risks (accepted for v1, revisit after launch)
 

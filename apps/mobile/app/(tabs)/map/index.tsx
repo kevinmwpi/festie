@@ -322,7 +322,7 @@ function FallbackLists({
                 <Text style={styles.listTitle}>{stage.name}</Text>
                 <Text style={styles.listSub}>
                   {next
-                    ? `Next: ${artistsById.get(next.artist_id) ?? 'TBA'} · ${clock.day(next.start_time)} ${clock.time(next.start_time)}`
+                    ? `Next: ${artistsById.get(next.artist_id) ?? 'TBA'} · ${clock.day(next.start_time)} ${clock.time(next.start_time)}${next.status === 'moved' ? ' (moved)' : ''}`
                     : 'No more sets'}
                 </Text>
               </View>
@@ -512,7 +512,9 @@ export default function MapScreen() {
       const coordinate = getStageCoordinate(stage);
       if (!coordinate) return null;
       const next = getNextStageSet(stage.id, bundle.data!.sets, new Date(now));
-      const nextLabel = next ? `${artistsById.get(next.artist_id) ?? 'Next'} · ${clock.timeFrom(next.start_time, now)}` : null;
+      const nextLabel = next
+        ? `${artistsById.get(next.artist_id) ?? 'Next'} · ${clock.timeFrom(next.start_time, now)}${next.status === 'moved' ? ' (moved)' : ''}`
+        : null;
       return { id: stage.id, name: stage.name, coordinate, nextLabel };
     })
     .filter((pin): pin is { id: string; name: string; coordinate: LngLat; nextLabel: string | null } => pin !== null);

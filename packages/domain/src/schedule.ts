@@ -1,3 +1,4 @@
+import { isCancelledSet } from './set-status';
 import { DEFAULT_DAY_START_HOUR, festivalDayKey } from './time';
 
 export interface Set {
@@ -7,7 +8,11 @@ export interface Set {
   start_time: string;
   end_time: string;
   festival_id: string;
+  /** `sets.status`; missing on rows cached before it existed (read as scheduled). */
+  status?: string | null;
 }
+
+type TimedSet = Pick<Set, 'start_time' | 'end_time' | 'status'>;
 
 export interface ScheduleConflict {
   set_a: Set;
@@ -19,8 +24,14 @@ function toTime(value: string): number {
   return new Date(value).getTime();
 }
 
-/** Two sets conflict when their time ranges overlap; back-to-back sets (end == start) do not. */
-export function detectConflict(a: Pick<Set, 'start_time' | 'end_time'>, b: Pick<Set, 'start_time' | 'end_time'>): boolean {
+/**
+ * Two sets conflict when their time ranges overlap; back-to-back sets (end == start) do not, and a
+ * cancelled set conflicts with nothing.
+ */
+export function detectConflict(a: TimedSet, b: TimedSet): boolean {
+  if (isCancelledSet(a) || isCancelledSet(b)) {
+    return false;
+  }
   return toTime(a.start_time) < toTime(b.end_time) && toTime(a.end_time) > toTime(b.start_time);
 }
 
@@ -42,10 +53,11 @@ export function getSetsByDay(sets: Set[], timeZone: string, dayStartHour = DEFAU
     }, {});
 }
 
+/** The first selected set that has not started yet, skipping cancelled sets. */
 export function getNextUpcomingSet(selected: Set[], now: Date): Set | null {
   const nowMs = now.getTime();
   const ordered = [...selected].sort((left, right) => toTime(left.start_time) - toTime(right.start_time));
-  return ordered.find((set) => toTime(set.start_time) >= nowMs) ?? null;
+  return ordered.find((set) => !isCancelledSet(set) && toTime(set.start_time) >= nowMs) ?? null;
 }
 
 export function getConflictPairs(selected: Set[]): ScheduleConflict[] {

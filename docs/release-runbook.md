@@ -83,7 +83,7 @@ Never run `deno` against `supabase/` from the repo root without `--config` (it w
    restored), download its last backup from the same page and create a **new project** instead:
    - Pick the region you will name in the privacy policy (`__SUPABASE_REGION__`) and a strong database
      password (store it in your password manager).
-   - Use its ref as `<ref>` everywhere below. A fresh project gets all migrations 001–009 in §2.5.
+   - Use its ref as `<ref>` everywhere below. A fresh project gets all migrations 001–011 in §2.5.
    - Update `EXPO_PUBLIC_SUPABASE_URL` in **both** the `preview` and `production` profiles of
      `apps/mobile/eas.json` (they pin `https://lzxewkfxdibohzqbqmiu.supabase.co`) and in your EAS
      environment variables (§5.1).
@@ -145,15 +145,15 @@ npx supabase link --project-ref <ref>
 npx supabase migration list
 ```
 
-- **Expected for the existing project:** `001`–`005` are listed as applied remotely; `006`–`009` only
+- **Expected for the existing project:** `001`–`010` are listed as applied remotely; `011` only
   locally. Continue with §2.5.
 - **Remote shows versions that do not exist locally** (made in the dashboard): `db push` refuses to run.
-  Inspect them; if their effect is covered by 006–009 (they are idempotent and repair dashboard edits),
+  Inspect them; if their effect is covered by 006–011 (they are idempotent and repair dashboard edits),
   mark them reverted: `npx supabase migration repair --status reverted <version>`.
 - **Remote history is empty but the tables exist** (SQL was pasted in the dashboard): after checking that
   `public.festivals`, `public.groups` and the rate-limit table from 005 exist, record 001–005 as applied:
   `npx supabase migration repair --status applied 001 002 003 004 005`.
-- **New project:** the remote column is empty and all nine migrations will be applied.
+- **New project:** the remote column is empty and all eleven migrations will be applied.
 
 **`kevins_project` (`lzxewkfxdibohzqbqmiu`) as inspected on 2026-10-06:** the remote history holds only
 three dashboard-made versions (`20260328045611` auth trigger + invite lookup policy, `20260329180317`
@@ -172,17 +172,22 @@ npx supabase db push
 (The Supabase MCP connector cannot do this unattended: it holds every destructive statement for an
 interactive approval, and these migrations are full of them.)
 
-### 2.5 Apply migrations 006–009
+### 2.5 Apply migrations 006–011
 
 ```sh
-npx supabase db push --dry-run      # must list exactly 006, 007, 008, 009 in this order (or 001–009 on a new project)
+npx supabase db push --dry-run      # lists the migrations not applied yet, in order (011 on the existing project, 001–011 on a new one)
 npx supabase db push
 ```
+
+- **011 (set status) goes in before any app build that selects the new `sets` columns** (every build from
+  the schedule-changes release on): a newer app against a database without 011 cannot download festival
+  data. Older builds keep working after 011. Then re-seed a festival to publish moved or cancelled sets
+  (`docs/festival-data.md` §4.1).
 
 - 006 is idempotent; 007 is idempotent and safe on a database with dashboard edits or only one of the two
   historical `005` files. **The CLI does not wrap a migration file in a transaction** (it prints
   `SET LOCAL can only be used in transaction blocks`), so a failure can leave earlier statements of that
-  file applied. 006–010 are idempotent, so after fixing the cause simply re-run `db push`. A failed 005
+  file applied. 006–011 are idempotent, so after fixing the cause simply re-run `db push`. A failed 005
   rolls back cleanly only if it fails at its first statement; otherwise inspect before re-running.
 - 007 sets `lock_timeout = '5s'`. If it fails with a lock timeout, run it again at a quiet moment.
 - 008 holds all `storage.*` statements so a hosted storage-permission problem cannot roll back 007. If only
@@ -203,6 +208,7 @@ select id, public, file_size_limit, allowed_mime_types from storage.buckets wher
 -- expect: totems | false | 5242880 | {image/jpeg}
 
 select count(*) as moderation_terms from public.moderation_terms;     -- > 0 (009)
+select status, count(*) from public.sets group by status;               -- runs without error (011)
 select name, status, is_demo, source_url from public.festivals order by name;
 ```
 
@@ -281,7 +287,7 @@ The diff may contain only these changes (any of them may be absent if the hosted
 Answer **no** if the diff shows `smtp_max_frequency` (or the per-user email interval) at 1 s, changes the
 custom SMTP settings from §2.7 (`config.toml` has no `[auth.email.smtp]` block, so it should not touch
 them), turns on anything other than the confirmations and the access token hook in the table, or
-touches a setting not in the table. Apply migrations 006–009 (§2.5) first: the hook names a function
+touches a setting not in the table. Apply migrations 006–011 (§2.5) first: the hook names a function
 that 007 creates. Then either fix `config.toml` (add the
 missing key with the hosted value you want to keep) and run the push again, or skip `config push` entirely
 and set the values in the table by hand in the dashboard (Authentication → Sign In / Providers, Emails,
@@ -855,7 +861,7 @@ Legal text is not legal advice; have it reviewed if you can.
 - [ ] Hosted project restored, backed up (§2.1–2.2).
 - [ ] Railway services deleted; service-role key rotated and stored only in your local `.env`; if the
       legacy JWT keys were rotated, the new anon key is the one in EAS (§2.3).
-- [ ] Migrations 006–009 applied, cron jobs and bucket verified, Security Advisor clean (§2.4–2.6).
+- [ ] Migrations 006–011 applied, cron jobs and bucket verified, Security Advisor clean (§2.4–2.6).
 - [ ] Custom SMTP live; the hosted email templates send 8-digit codes with no links; the per-user email
       interval is 60 seconds, not 1 second (§2.7–2.8).
 - [ ] Auth audit logs no longer written to the database and `purge-auth-audit-log` scheduled (or support

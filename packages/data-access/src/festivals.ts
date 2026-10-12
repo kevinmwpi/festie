@@ -12,7 +12,12 @@ import { getSupabase, unwrapResult } from './supabase';
 export const FESTIVAL_COLUMNS =
   'id, name, start_date, end_date, timezone, venue_name, accent_color, image_url, map_asset_url, version, status, is_demo, latitude, longitude, default_zoom, bounds_sw_lat, bounds_sw_lng, bounds_ne_lat, bounds_ne_lng, source_url, updated_at';
 export const STAGE_COLUMNS = 'id, festival_id, name, zone, latitude, longitude';
-export const SET_COLUMNS = 'id, festival_id, artist_id, stage_id, start_time, end_time, set_type';
+export const SET_COLUMNS =
+  'id, festival_id, artist_id, stage_id, start_time, end_time, set_type, status, original_start_time, change_note';
+/** `SET_COLUMNS` prefixed with `sets.`, for local SQL that joins sets with other tables. */
+export const QUALIFIED_SET_COLUMNS = SET_COLUMNS.split(', ')
+  .map((column) => `sets.${column}`)
+  .join(', ');
 export const ARTIST_COLUMNS = 'id, name, image_url, genre';
 const USER_FESTIVAL_COLUMNS = 'id, user_id, festival_id, selected_at';
 const IN_FILTER_CHUNK = 150;
@@ -172,7 +177,7 @@ export async function hasCachedFestivalBundle(festivalId: string): Promise<boole
 export async function getLocalFestivalLineup(festivalId: string): Promise<FestivalLineupRow[]> {
   const db = await getDb();
   return db.getAllAsync<FestivalLineupRow>(
-    `SELECT sets.id, sets.festival_id, sets.artist_id, sets.stage_id, sets.start_time, sets.end_time, sets.set_type,
+    `SELECT ${QUALIFIED_SET_COLUMNS},
             artists.name AS artist_name, artists.image_url AS artist_image_url, artists.genre AS genre,
             stages.name AS stage_name, stages.zone AS stage_zone
      FROM sets

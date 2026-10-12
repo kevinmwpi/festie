@@ -26,17 +26,17 @@ apps/
 packages/
   data-access/         Supabase client, offline-safe session, auth, RPC wrappers, cache-first reads, photos
   sync-engine/         SQLite schema, offline write queue, flush/retry and error classification
-  domain/              Festival-time formatting, day bucketing (days start 06:00), conflicts (vitest)
+  domain/              Festival-time formatting, day bucketing (days start 06:00), conflicts, set status (vitest)
   map-utils/           Camera/bounds and stage/meetup coordinates
   notification-utils/  Local set and meetup reminders
   ui/                  Design tokens and primitives (pastel palette, accessible link colour)
 supabase/
-  migrations/          001–009 (006–009 are the v1 overhaul; 007 is idempotent)
+  migrations/          001–011 (006–009 are the v1 overhaul; 007 is idempotent; 011 set status)
   functions/           delete-account, demo-login, _shared (Deno)
   tests/               rls.sql (pgTAP-style) and local stubs, fixtures and race scripts
   templates/           Code-only sign-in email templates
   config.toml          Local config; pushed to hosted after review (runbook §2.8)
-seed-data/             Fictional demo festival (JSON + CSV) and its totem photo
+seed-data/             Fictional demo festival (JSON + CSV), its totem photo, and Head Trip 2026 (real, with schedule changes)
 scripts/db-test.sh     Throwaway Postgres 16 harness for the database tests
 docs/                  Contract, runbook, QA, festival data, App Store and legal documents, static site
 ```
@@ -83,7 +83,7 @@ request; run them locally before pushing:
 npm run build                       # turbo: package builds + mobile tsc
 npm run lint                        # turbo: tsc --noEmit everywhere
 npm run test                        # vitest: domain, sync-engine, data-access, map-utils, admin-tools
-npm run db:test                     # migrations 001–009 on a throwaway Postgres 16 + rls.sql + races
+npm run db:test                     # migrations 001–011 on a throwaway Postgres 16 + rls.sql + races
 (cd supabase/functions && deno check */index.ts && deno test && deno lint)
 node docs/legal/generate.mjs --check    # in-app legal screens and docs/site match docs/legal/*.md
 (cd apps/mobile && EXPO_PUBLIC_SUPABASE_URL=https://example.supabase.co EXPO_PUBLIC_SUPABASE_ANON_KEY=dummy \

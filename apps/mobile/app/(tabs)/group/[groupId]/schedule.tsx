@@ -1,5 +1,5 @@
 import type { CombinedSelectionRow } from '@festival/data-access';
-import { festivalDayKey, listFestivalDays } from '@festival/domain';
+import { describeSetChange, festivalDayKey, listFestivalDays, type SetChange } from '@festival/domain';
 import { Badge, Chip, colors, EmptyState, radii, SegmentedControl, spacing, useOfflineStatus } from '@festival/ui';
 import { useLocalSearchParams } from 'expo-router';
 import React from 'react';
@@ -7,9 +7,13 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 
 import { TimeZoneHint } from '@/src/components/FestivalNotes';
 import { SubScreenHeader } from '@/src/components/ScreenHeader';
+import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/components/SetChange';
 import { ErrorState, FestivalBundleState, LoadingState, StaleDataNote } from '@/src/components/StateViews';
+import { queryKeys } from '@/src/hooks/query-keys';
 import { useFestivalBundle, useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useCombinedSelections, useGroupDetail } from '@/src/hooks/use-groups';
+import { useReReadOnBundleChange } from '@/src/hooks/use-lineup';
+import { useUserKey } from '@/src/hooks/use-session';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 
 type ScheduleView = 'overlap' | 'per-person' | 'divergence';
@@ -36,6 +40,7 @@ function SetRow({
   startTime,
   endTime,
   clock,
+  change,
   footer,
   accent,
 }: {
@@ -44,15 +49,21 @@ function SetRow({
   startTime: string;
   endTime: string;
   clock: FestivalClock;
+  change?: SetChange | null;
   footer?: React.ReactNode;
   accent?: string;
 }) {
+  const cancelled = change?.status === 'cancelled';
   return (
-    <View style={[styles.setRow, accent ? { borderLeftColor: accent, borderLeftWidth: 3 } : null]}>
-      <Text style={styles.artistName}>{artistName}</Text>
-      <Text style={styles.setMeta}>
+    <View style={[styles.setRow, accent ? { borderLeftColor: cancelled ? colors.destructive : accent, borderLeftWidth: 3 } : null]}>
+      <View style={styles.artistLine}>
+        <Text style={[styles.artistName, cancelled && cancelledTextStyle]}>{artistName}</Text>
+        <SetChangeBadge change={change ?? null} />
+      </View>
+      <Text style={[styles.setMeta, cancelled && cancelledTextStyle]}>
         {`${stageName} · ${clock.day(startTime)} ${clock.range(startTime, endTime)}`.toUpperCase()}
       </Text>
+      <SetChangeDetail change={change ?? null} />
       {footer}
     </View>
   );
@@ -73,6 +84,9 @@ export default function CombinedScheduleScreen() {
   const festival = bundle.data?.festival ?? null;
   const clock = useFestivalClock(festival);
   const selections = useCombinedSelections(groupId, festivalId);
+  // A moved or cancelled set arrives with a new festival bundle; re-read the crew's picks with it.
+  const userKey = useUserKey();
+  useReReadOnBundleChange(bundle.data, [queryKeys.groupSchedule(userKey, groupId, festivalId ?? 'none')]);
   const rows = selections.data ?? NO_ROWS;
   const timeZone = festival?.timezone ?? '';
 
@@ -164,23 +178,31 @@ export default function CombinedScheduleScreen() {
       ) : (
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>SHARED SETS · {overlapRows.length}</Text>
-          {overlapRows.map((entry) => (
-            <SetRow
-              key={entry.row.set_id}
-              artistName={entry.row.artist_name}
-              stageName={entry.row.stage_name}
-              startTime={entry.row.start_time}
-              endTime={entry.row.end_time}
-              clock={clock}
-              accent={colors.success}
-              footer={
-                <>
-                  <Badge label={`${entry.userIds.size} going`} tone="success" />
-                  <NamePills names={entry.names} />
-                </>
-              }
-            />
-          ))}
+          {overlapRows.map((entry) => {
+            const change = describeSetChange(entry.row, clock.timeZone);
+            return (
+              <SetRow
+                key={entry.row.set_id}
+                artistName={entry.row.artist_name}
+                stageName={entry.row.stage_name}
+                startTime={entry.row.start_time}
+                endTime={entry.row.end_time}
+                clock={clock}
+                change={change}
+                accent={colors.success}
+                footer={
+                  <>
+                    {change?.status === 'cancelled' ? (
+                      <Badge label={`${entry.userIds.size} had picked it`} tone="neutral" />
+                    ) : (
+                      <Badge label={`${entry.userIds.size} going`} tone="success" />
+                    )}
+                    <NamePills names={entry.names} />
+                  </>
+                }
+              />
+            );
+          })}
         </View>
       );
   } else if (view === 'per-person') {
@@ -195,6 +217,7 @@ export default function CombinedScheduleScreen() {
             startTime={row.start_time}
             endTime={row.end_time}
             clock={clock}
+            change={describeSetChange(row, clock.timeZone)}
             accent={colors.primary}
           />
         ))}
@@ -205,7 +228,9 @@ export default function CombinedScheduleScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionLabel}>ALL PICKS · {bySet.length}</Text>
         {bySet.map((entry) => {
-          const meetup = nextMeetupAfter(entry.row.start_time);
+          const change = describeSetChange(entry.row, clock.timeZone);
+          // No "next meetup" hint for a set that is not happening.
+          const meetup = change?.status === 'cancelled' ? null : nextMeetupAfter(entry.row.start_time);
           return (
             <SetRow
               key={entry.row.set_id}
@@ -214,6 +239,7 @@ export default function CombinedScheduleScreen() {
               startTime={entry.row.start_time}
               endTime={entry.row.end_time}
               clock={clock}
+              change={change}
               footer={
                 <>
                   <NamePills names={entry.names} />
@@ -326,7 +352,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     alignItems: 'flex-start',
   },
-  artistName: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  artistLine: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  artistName: { color: colors.textPrimary, flexShrink: 1, fontSize: 15, fontWeight: '700' },
   setMeta: { color: colors.textSecondary, fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
   namesPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   namePill: { backgroundColor: '#F0F4FF', borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },

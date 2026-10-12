@@ -14,7 +14,7 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Two iPhones, **A** and **B**, each signed in to TestFlight; ideally one on the oldest iOS you support.
       One physical Android phone for the festival-time spot-check in §7 (release gate 7 asks for iOS and
       Android even though v1 is submitted to the App Store only).
-- [ ] The build points at the project you are testing (staging or production); migrations 006–009 are
+- [ ] The build points at the project you are testing (staging or production); migrations 006–011 are
       applied there ([`release-runbook.md`](./release-runbook.md) §2).
 - [ ] Two real mailboxes you can read on the devices (custom SMTP is configured, runbook §2.7).
 - [ ] `npm run admin -- demo:seed` has run on that project; at least one real festival is published
@@ -105,6 +105,16 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Overlapping picks show a conflict; back-to-back sets (end = next start) do not.
 - [ ] Crew schedule shows the picks of crew members for the same festival, and not those of a blocked
       member.
+- [ ] **Schedule changes** (seed a festival with one picked set marked `moved` to another day and one
+      picked set marked `cancelled`, e.g. `seed-data/head-trip-2026.json` on staging; then pull to
+      refresh):
+  - [ ] The moved set shows a blue "Moved" chip and "Was Sat 11:00 PM" (or "Sat night 1:00 AM") with
+        its note, sits under its new day in Lineup, Add sets, My Schedule and the crew schedule, and stays
+        picked.
+  - [ ] The cancelled set stays listed, struck through, with a red "Cancelled" chip and its note; it can
+        be removed but has no Add button; it causes no conflict and never shows as "Next" on the map.
+  - [ ] My Schedule shows "N of your picks changed" at the top; tapping an entry jumps to its day.
+  - [ ] VoiceOver / TalkBack reads "Moved, was …" or "Cancelled" on the set and on its add/remove button.
 
 ## 7. Time zones, late-night sets and DST
 
@@ -123,6 +133,9 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Reminders: picking a set asks for notification permission the first time; denying it keeps the
       pick and shows "Added. Turn on notifications in Settings to get set reminders."; the reminder fires
       15 minutes before the set's start.
+- [ ] Reminders after a schedule change: pick two future sets, then re-seed with one moved later and one
+      cancelled. Without opening My Schedule (stay on Lineup or Map and pull to refresh), the moved set's
+      reminder fires 15 minutes before its **new** start and the cancelled set's reminder never fires.
 - [ ] Spot-check at least five sets of each published real festival against its `source_url` on a
       physical iPhone **and** a physical Android phone. This is release gate 7 (`v1-architecture.md` §7).
       For Android, install a development build (`npx eas-cli@latest build -p android --profile

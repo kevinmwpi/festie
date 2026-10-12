@@ -1,13 +1,28 @@
 # Head Trip 2026: published schedule and weather changes
 
-`head-trip-2026-csv/` (converted to `head-trip-2026.json`) holds the schedule **as originally
-published**: one main stage, nine sets, Saturday 10 and Sunday 11 October 2026 at the Empire Polo Club
-in Indio, California (Goldenvoice). It is a draft. Publishing it shows a festival that has already
-happened, so treat it as real test data, not launch content.
+`head-trip-2026-csv/` (converted to `head-trip-2026.json`) holds the Head Trip schedule **with the weekend's
+changes marked**: one main stage, nine sets, Saturday 10 and Sunday 11 October 2026 at the Empire Polo
+Club in Indio, California (Goldenvoice). It is published so the schedule-changes feature can be tested
+against real data. The festival is over, so the app lists it with past festivals; it is test data, not
+launch content.
 
-What happened on the weekend is recorded below and is not in the file, because the app has no way to
-show a moved or cancelled set yet (see the end of this note). Times are festival local time
-(America/Los_Angeles, PDT).
+How the changes are entered (`docs/festival-data.md` §4.1; times are festival local time,
+America/Los_Angeles, PDT):
+
+| Set | In the file |
+|---|---|
+| Calvin Harris | `moved`: Sun 21:10–22:40, was Sat 23:00. Keeps the id of his Saturday slot (derived from `original_start`), so picks follow him |
+| DJ Harvey | `moved`: Sun 15:05, was 15:30; end 16:35 estimated (same length) |
+| The Blessed Madonna | `cancelled`, original slot Sun 17:00–18:30 kept |
+| Dom Dolla b2b KETTAMA | `moved`: Sun 18:15, was 18:50; end 19:35 estimated (Skrillex's new start) |
+| Skrillex | `moved`: Sun 19:35, was 20:40; end 21:10 estimated (Calvin Harris's start) |
+| Swedish House Mafia | `moved`: Sun 23:00–00:00, was 22:30 |
+| Seth Troxler b2b Ben Sterling, Peggy Gou b2b Four Tet | `scheduled` with a note: Saturday times were adjusted, the new times were not found |
+| Under Construction | `scheduled` with a note: stopped around 9 PM for lightning |
+
+Not entered: Peggy Gou's reported Sunday replacement slot (no time found) and the Sunflower Sound System
+dome (no per-act times). What the data model cannot say: an original **end** time, an original stage, or
+"cut short" as a status (the note carries it).
 
 ## Sources and how sure we are
 
@@ -35,9 +50,6 @@ official set-times page (`source_url`) or the official Head Trip app before publ
 
 ## Entering a change later
 
-Set ids come from festival + artist + festival day (`docs/festival-data.md` §2). Moving a set to
-another **day** therefore gives it a new id and deletes users' picks of the old one. To keep picks
-when an act moves days (Calvin Harris, Saturday to Sunday), put the old id in the `id` column of
-`sets.csv`. Today the app cannot show a cancelled or moved set: a moved set just shows its new time,
-and a removed set disappears together with users' picks of it. A set status and short change note
-would let it say "Moved from Saturday (weather)" or "Cancelled", which is what this festival needed.
+Mark the set in `sets.csv` (`status`, `original_start`, `note`), convert, validate and seed again
+(`docs/festival-data.md` §4.1). Never delete a cancelled set from the file: `festival:seed` deletes sets
+that are missing, together with users' picks of them.

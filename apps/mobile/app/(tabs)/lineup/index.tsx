@@ -1,4 +1,4 @@
-import { detectConflict, festivalDayKey, listFestivalDays } from '@festival/domain';
+import { describeSetChange, detectConflict, festivalDayKey, listFestivalDays } from '@festival/domain';
 import {
   Badge,
   Chip,
@@ -18,6 +18,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { ArtistMonogram } from '@/src/components/ArtistMonogram';
 import { FestivalDisclaimer, TimeZoneHint } from '@/src/components/FestivalNotes';
 import { ScreenHeader } from '@/src/components/ScreenHeader';
+import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/components/SetChange';
 import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } from '@/src/components/StateViews';
 import { formatWeekdayDayLabel } from '@/src/hooks/festival-time-labels';
 import { useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
@@ -48,31 +49,38 @@ function ArtistCard({
   const isSelected = Boolean(row.selection_id);
   const timeRange = clock.range(row.start_time, row.end_time);
   const day = clock.day(row.start_time);
+  const change = describeSetChange(row, clock.timeZone);
+  const cancelled = change?.status === 'cancelled';
+  // A cancelled set can still be removed from the schedule, but not added.
+  const canToggle = isSelected || !cancelled;
+  const changeSuffix = change ? `. ${change.accessibilityLabel}` : '';
 
   return (
     <View style={styles.artistCard}>
       <View style={styles.cardInner}>
         <View style={styles.imageWrap}>
           <ArtistMonogram name={row.artist_name} colorKey={row.artist_id} />
-          <Pressable
-            onPress={onToggle}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel={isSelected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}
-            accessibilityState={{ selected: isSelected, busy }}
-            hitSlop={4}
-            style={({ pressed }) => [
-              styles.addButton,
-              isSelected ? styles.addButtonSelected : styles.addButtonDefault,
-              pressed && { transform: [{ scale: 0.88 }] },
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
-            ) : (
-              <Ionicons name={isSelected ? 'checkmark' : 'add'} size={18} color={colors.textPrimary} />
-            )}
-          </Pressable>
+          {canToggle ? (
+            <Pressable
+              onPress={onToggle}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={`${isSelected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}${changeSuffix}`}
+              accessibilityState={{ selected: isSelected, busy }}
+              hitSlop={4}
+              style={({ pressed }) => [
+                styles.addButton,
+                isSelected ? styles.addButtonSelected : styles.addButtonDefault,
+                pressed && { transform: [{ scale: 0.88 }] },
+              ]}
+            >
+              {busy ? (
+                <ActivityIndicator size="small" color={colors.textPrimary} />
+              ) : (
+                <Ionicons name={isSelected ? 'checkmark' : 'add'} size={18} color={colors.textPrimary} />
+              )}
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.artistContent}>
@@ -83,7 +91,7 @@ function ArtistCard({
           </View>
 
           <View style={styles.nameRow}>
-            <Text style={styles.artistName} numberOfLines={2}>
+            <Text style={[styles.artistName, cancelled && cancelledTextStyle]} numberOfLines={2}>
               {row.artist_name}
             </Text>
             {isSelected ? (
@@ -92,12 +100,14 @@ function ArtistCard({
           </View>
 
           <View style={styles.badgeRow}>
+            <SetChangeBadge change={change} />
             {row.is_conflicting ? <Badge label="Conflict" tone="warning" /> : null}
             {!isSelected && overlapsPick ? <Badge label="Overlaps a pick" tone="neutral" /> : null}
             {isSelected && row.selection_pending === 1 ? <Badge label="Waiting to sync" tone="neutral" /> : null}
           </View>
 
-          <Text style={styles.artistTime}>{`${day} · ${timeRange}`.toUpperCase()}</Text>
+          <Text style={[styles.artistTime, cancelled && cancelledTextStyle]}>{`${day} · ${timeRange}`.toUpperCase()}</Text>
+          <SetChangeDetail change={change} />
         </View>
       </View>
     </View>

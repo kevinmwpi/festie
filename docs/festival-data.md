@@ -79,7 +79,16 @@ global table shared by all festivals; use the same id for the same act across fe
 and `end_time` as ISO 8601 **with an explicit offset** (`-05:00` or `Z`), `end_time` after
 `start_time`, at most 24 h long, starting on a local date between `start_date − 1 day` and
 `end_date + 1 day`. Optional `set_type` (default `performance`). Overlapping sets on one stage
-produce a warning.
+produce a warning (cancelled sets are left out of that check). Optional schedule-change fields (§4.1):
+
+| Field | Rule |
+|---|---|
+| `status` | `scheduled` (default), `moved` or `cancelled` |
+| `original_start_time` | Only when `status` is `moved`: the start before the move, ISO 8601 with an offset, inside the festival dates ±1 day. Leave it out for a stage-only move or an unknown old time (warning) |
+| `change_note` | Optional, one line, at most 140 characters after trimming: the reason shown in the app ("Moved to Sunday (weather)"). Allowed on any status, e.g. "Cut short by lightning" on a set that kept its slot |
+
+The validator always writes all three, so removing them from the file and seeding again reverts the set
+to `scheduled`.
 
 A late-night set at 00:30 belongs to the previous festival day in the app (days start at 06:00
 local time), so write the real calendar timestamp: `2027-08-08T00:30:00-05:00` for "Saturday night,
@@ -101,7 +110,7 @@ of `demo-festival.json`; a unit test keeps the two identical).
 | `festival.csv` (exactly one row) | `name, start_date, end_date, timezone` | `id, venue_name, source_url, status, is_demo, accent_color, latitude, longitude, default_zoom, bounds_sw_lat, bounds_sw_lng, bounds_ne_lat, bounds_ne_lng` |
 | `stages.csv` | `name` | `id, zone, latitude, longitude` |
 | `artists.csv` | `name` | `id, genre` |
-| `sets.csv` | `artist, stage, start, end` | `id, set_type` |
+| `sets.csv` | `artist, stage, start, end` | `id, set_type, status, original_start, note` |
 
 - Standard CSV: quote fields containing commas (`"Juniper & the Low Moons, Live"`), double inner quotes.
   Header names are case-insensitive; unknown columns are errors.
@@ -113,6 +122,11 @@ of `demo-festival.json`; a unit test keeps the two identical).
   artist ← artist name (shared across festivals); set ← festival + artist + festival day (+ an
   ordinal if the act plays twice that day). Moving a set to another time or stage keeps its id;
   renaming an artist or stage changes it. If you must rename, put the old id in the `id` column.
+- A set marked `moved` with an `original_start` takes its festival day from `original_start`, so it
+  keeps its id (and users keep their picks) even when it moves to another day (§4.1). Without
+  `original_start`, a set moved to another day gets a new id unless you put the old one in `id`.
+- `status`, `original_start` and `note` fill `status`, `original_start_time` and `change_note`
+  (`original_start` takes the same time formats as `start`).
 - Errors are reported as `file:line column: message`; the output is then validated exactly like a
   hand-written JSON file.
 
@@ -154,6 +168,32 @@ Settings, and Terms §8). Data must keep it that way:
    deleted sets are deleted with them; meetups pinned to a deleted stage lose the pin), and writes the
    bumped `version` and `status` last so clients refetch a complete bundle. Keep ids stable (§2).
 6. Unpublish: set `"status": "draft"` and seed. Groups and picks stay in the database.
+
+### 4.1 Schedule changes (moved and cancelled sets)
+
+When the organizer changes the schedule after publishing (weather, a withdrawal), **mark the set
+instead of editing it silently or deleting it** (migration 011):
+
+- **Moved:** set `status` to `moved`, put the new times in `start`/`end` and the old start in
+  `original_start` (CSV) or `original_start_time` (JSON). The app shows a "Moved" chip and "Was Sat
+  11:00 PM", lists the set under its new day, and moves users' reminders to the new time.
+- **Cancelled:** set `status` to `cancelled` and keep the set in the file with its old times. The app
+  shows it struck through with a "Cancelled" chip, cancels reminders for it, leaves it out of clash
+  and "up next" checks, and no longer offers to add it. Users keep their pick so they can see what
+  happened. **Never delete a cancelled set from the file**: `festival:seed` deletes sets that are
+  missing, and users' picks of them are deleted with them.
+- **Note:** add a short `note` / `change_note` with the reason. My Schedule lists every moved or
+  cancelled pick at the top.
+- **Replacement act:** add it as a new set (new artist row if needed). Only enter it when the slot
+  time is public.
+- **Reverting:** set `status` back to `scheduled` (or remove the three fields) and seed again.
+
+Then seed as usual (`--dry-run` shows `changes N moved, M cancelled sets`). Clients pick the change up
+only when `festivals.version` changes, which `festival:seed` does; an edit made in the Supabase table
+editor reaches no phone until the festival is seeded again. App builds released before migration 011
+show moved sets at their new time and cancelled sets as normal sets.
+[`seed-data/head-trip-2026.json`](../seed-data/head-trip-2026.json) is a real example (one act moved
+from Saturday to Sunday, one cancelled; see `head-trip-2026-changes.md`).
 
 Migration 007 sets every legacy non-demo festival without a `source_url` to draft; real festivals
 appear only after being entered through this workflow.
@@ -286,7 +326,10 @@ applied migration.
 ## 7. Troubleshooting
 
 - `Missing SUPABASE_URL …` — export both variables; the anon key is never accepted.
-- `PGRST205` / missing columns — the target project is missing migrations 006–009; apply them first.
+- `PGRST205` / missing columns — the target project is missing migrations 006–011; apply them first
+  (`Could not find the 'status' column of 'sets'` means 011 is missing).
+- `sets_status_check`, `sets_original_start_time_check`, `sets_change_note_check` — a set change the
+  database refuses; `festival:validate` reports the same rules with the file path.
 - The reviewer lands in no crew after a demo login — `demo:seed` has not run against this project
   (or ran before the `festie_demo` app_metadata marker existed); run it again.
 - `festivals_published_requires_source` — a real festival was published without `source_url`.

@@ -10,7 +10,7 @@
 -- Run with: npm run db:test
 
 begin;
-select plan(298);
+select plan(312);
 
 -- ===========================================================================
 -- Identities
@@ -2174,6 +2174,93 @@ select is(
   (select count(*)::int from public.join_group((select invite_code from public.groups where id = '90000000-0000-4000-8000-00000000000a'))),
   1,
   'P12 the new invite code works (control)'
+);
+
+-- ===========================================================================
+-- Q. Set status: moved and cancelled sets (011)
+-- ===========================================================================
+select pg_temp.become('superuser');
+select is(
+  array(select status || ':' || coalesce(original_start_time::text, '-') || ':' || coalesce(change_note, '-')
+        from public.sets where id::text like 'e5000000-%' order by id),
+  array['scheduled:-:-', 'scheduled:-:-', 'scheduled:-:-', 'scheduled:-:-'],
+  'Q1 existing sets default to scheduled with no original start or note'
+);
+
+select pg_temp.become('service_role');
+select lives_ok(
+  $$ update public.sets
+     set status = 'moved', original_start_time = '2027-05-31T23:00:00Z',
+         start_time = '2027-06-01T20:00:00Z', change_note = 'Moved to Sunday (weather)'
+     where id = 'e5000000-0000-4000-8000-000000000001';
+     update public.sets set status = 'cancelled', change_note = 'Artist withdrew'
+     where id = 'e5000000-0000-4000-8000-000000000002' $$,
+  'Q2 the service role can mark sets moved and cancelled'
+);
+select throws_ok(
+  $$ update public.sets set status = 'postponed' where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q3 an unknown status is rejected'
+);
+select throws_ok(
+  $$ update public.sets set status = null where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23502', null, 'Q4 status cannot be null'
+);
+select throws_ok(
+  $$ update public.sets set original_start_time = now() where id = 'e5000000-0000-4000-8000-000000000002' $$,
+  '23514', null, 'Q5 a cancelled set cannot carry an original start time'
+);
+select throws_ok(
+  $$ update public.sets set original_start_time = now() where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q6 a scheduled set cannot carry an original start time'
+);
+select throws_ok(
+  $$ update public.sets set change_note = '' where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q7 an empty change note is rejected'
+);
+select throws_ok(
+  $$ update public.sets set change_note = repeat('x', 141) where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q8 a change note over 140 characters is rejected'
+);
+select throws_ok(
+  $$ update public.sets set change_note = ' Weather ' where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q9 a change note with surrounding whitespace is rejected'
+);
+select lives_ok(
+  $$ update public.sets set change_note = repeat('x', 140) where id = 'e5000000-0000-4000-8000-000000000003';
+     update public.sets set change_note = null where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  'Q10 a 140-character note on a scheduled set is accepted (control)'
+);
+
+select pg_temp.become('anon');
+select is(
+  array(select status || ':' || coalesce((original_start_time = timestamptz '2027-05-31T23:00:00Z')::text, '-')
+               || ':' || coalesce(change_note, '-')
+        from public.sets where id::text like 'e5000000-%' order by id),
+  array['moved:true:Moved to Sunday (weather)', 'cancelled:-:Artist withdrew', 'scheduled:-:-'],
+  'Q11 anon reads status, original start and note of published sets'
+);
+
+select pg_temp.become('carol');
+select throws_ok(
+  $$ update public.sets set status = 'cancelled' where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '42501', null, 'Q12 authenticated users cannot change a set''s status'
+);
+
+-- Picks are never refused or removed because of a status, so a pick queued offline before a
+-- cancellation still syncs and users keep their picks of moved and cancelled sets.
+select pg_temp.become('carol');
+select lives_ok(
+  $$ insert into public.user_set_selections (id, user_id, festival_id, set_id)
+     values ('5e000000-0000-4000-8000-000000000020', 'b0000000-0000-4000-8000-000000000003',
+             'f0000000-0000-4000-8000-000000000001', 'e5000000-0000-4000-8000-000000000002') $$,
+  'Q13 a user can still pick a cancelled set'
+);
+select is(
+  array(select set_id::text from public.user_set_selections
+        where user_id = 'b0000000-0000-4000-8000-000000000003' and festival_id = 'f0000000-0000-4000-8000-000000000001'
+        order by set_id),
+  array['e5000000-0000-4000-8000-000000000001', 'e5000000-0000-4000-8000-000000000002'],
+  'Q14 the user keeps their picks of the moved and the cancelled set'
 );
 
 select * from finish();

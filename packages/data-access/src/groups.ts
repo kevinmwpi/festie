@@ -63,6 +63,10 @@ export interface CombinedSelectionRow extends UserSetSelectionRow {
   stage_name: string;
   start_time: string;
   end_time: string;
+  /** The set's schedule status: 'scheduled' | 'moved' | 'cancelled'. */
+  status: string;
+  original_start_time: string | null;
+  change_note: string | null;
   member_display_name: string;
   member_avatar_type: string;
   member_avatar_value: string;
@@ -198,6 +202,7 @@ export async function getCombinedSelections(groupId: string, festivalId: string)
             user_set_selections.selected_at, user_set_selections.note,
             artists.name AS artist_name, stages.name AS stage_name,
             sets.start_time AS start_time, sets.end_time AS end_time,
+            sets.status AS status, sets.original_start_time AS original_start_time, sets.change_note AS change_note,
             COALESCE(users.display_name, 'Festie user') AS member_display_name,
             COALESCE(users.avatar_type, 'initials') AS member_avatar_type,
             COALESCE(users.avatar_value, '') AS member_avatar_value

@@ -12,7 +12,7 @@ export interface SeedPlan {
   nextStatus: string;
   staleSetIds: string[];
   staleStageIds: string[];
-  counts: { stages: number; artists: number; sets: number };
+  counts: { stages: number; artists: number; sets: number; movedSets: number; cancelledSets: number };
 }
 
 /** Next version: always bumps past the stored one (clients refetch on change). */
@@ -30,7 +30,10 @@ function chunk<T>(items: T[], size: number): T[][] {
 
 const PAGE_SIZE = 1000;
 
-/** All ids of a festival's child rows (PostgREST caps each response at max_rows). */
+/**
+ * All ids of a festival's child rows (PostgREST caps each response at max_rows). Sets also read
+ * `status`, so a project without migration 011 fails here, during planning, before anything is written.
+ */
 async function selectIdsForFestival(
   client: SupabaseClient,
   table: 'sets' | 'stages',
@@ -38,8 +41,9 @@ async function selectIdsForFestival(
 ): Promise<Array<{ id: string }>> {
   const rows: Array<{ id: string }> = [];
   for (let from = 0; ; from += PAGE_SIZE) {
+    const query = table === 'sets' ? client.from('sets').select('id, status') : client.from('stages').select('id');
     const page = check(
-      await client.from(table).select('id').eq('festival_id', festivalId).order('id').range(from, from + PAGE_SIZE - 1),
+      await query.eq('festival_id', festivalId).order('id').range(from, from + PAGE_SIZE - 1),
       `Reading existing ${table}`,
     ) as Array<{ id: string }>;
     rows.push(...page);
@@ -71,18 +75,31 @@ export async function planFestivalSeed(client: SupabaseClient, seed: FestivalSee
     nextStatus: seed.festival.status,
     staleSetIds: storedSets.map((row) => row.id).filter((id) => !fileSetIds.has(id)),
     staleStageIds: storedStages.map((row) => row.id).filter((id) => !fileStageIds.has(id)),
-    counts: { stages: seed.stages.length, artists: seed.artists.length, sets: seed.sets.length },
+    counts: {
+      stages: seed.stages.length,
+      artists: seed.artists.length,
+      sets: seed.sets.length,
+      movedSets: seed.sets.filter((set) => set.status === 'moved').length,
+      cancelledSets: seed.sets.filter((set) => set.status === 'cancelled').length,
+    },
   };
 }
 
 export function describeSeedPlan(plan: SeedPlan): string {
-  return [
+  const lines = [
     `festival ${plan.festivalId}: ${plan.isNew ? 'create' : 'update'}`,
     `  version ${plan.currentVersion ?? '-'} -> ${plan.nextVersion}`,
     `  status  ${plan.currentStatus ?? '-'} -> ${plan.nextStatus}`,
     `  upsert  ${plan.counts.stages} stages, ${plan.counts.artists} artists, ${plan.counts.sets} sets`,
+    `  changes ${plan.counts.movedSets} moved, ${plan.counts.cancelledSets} cancelled sets`,
     `  delete  ${plan.staleSetIds.length} stale sets, ${plan.staleStageIds.length} stale stages`,
-  ].join('\n');
+  ];
+  if (plan.staleSetIds.length > 0) {
+    lines.push(
+      '  note    deleting a set also deletes users\' picks of it; to keep them, keep the set with status "cancelled"',
+    );
+  }
+  return lines.join('\n');
 }
 
 /**
