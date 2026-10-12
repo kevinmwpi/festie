@@ -866,7 +866,7 @@ values below are entered in App Store Connect, EAS and Supabase only, never in t
 
 | Placeholder | Where | What to decide |
 |---|---|---|
-| ~~`__LEGAL_NAME__`~~ | privacy policy, terms | Filled: Kevin M Pi (must match the App Store seller name) |
+| ~~`__LEGAL_NAME__`~~ | privacy policy, terms | Filled: Kevin Pi (must match the App Store seller name) |
 | ~~`__POSTAL_ADDRESS__`~~ | privacy policy, terms | Removed by decision: contact is name + support email (no home address published). Add a PO box or virtual mailbox to §12/§17 if you want one later |
 | `__SUPPORT_EMAIL__` | `supportEmail` in `docs/legal/values.json`, `EXPO_PUBLIC_SUPPORT_EMAIL`, review notes | Set: `support@joinfestie.com` (`values.json`; Cloudflare Email Routing forwards it to the owner's inbox). Use the same value for `EXPO_PUBLIC_SUPPORT_EMAIL` in EAS. The legal Markdown keeps the token; the generator and the app fill it in |
 | ~~`__SUPABASE_REGION__`~~ | privacy policy | Filled: the United States (Oregon, AWS us-west-2), the project's region. Update it if you move to a project in another region |

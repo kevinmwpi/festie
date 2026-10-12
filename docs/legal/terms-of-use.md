@@ -11,7 +11,7 @@ template variable filled in by the generator (see docs/legal/generate.mjs), not 
 
 Last updated: October 5, 2026
 
-These Terms of Use ("Terms") are an agreement between you and Kevin M Pi ("Festie", "we", "us") for using the Festie app and its services. By creating an account or using Festie you agree to these Terms and confirm you have read our [Privacy Policy](./privacy-policy.md). If you do not agree, do not use Festie.
+These Terms of Use ("Terms") are an agreement between you and Kevin Pi ("Festie", "we", "us") for using the Festie app and its services. By creating an account or using Festie you agree to these Terms and confirm you have read our [Privacy Policy](./privacy-policy.md). If you do not agree, do not use Festie.
 
 ## 1. Zero tolerance for objectionable content and abuse
 
@@ -109,6 +109,6 @@ If any part of these Terms is found unenforceable, the rest stays in effect. If 
 
 ## 17. Contact
 
-Kevin M Pi
+Kevin Pi
 
 Email: __SUPPORT_EMAIL__

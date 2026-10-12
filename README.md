@@ -78,17 +78,12 @@ Admin commands run locally with the service-role key from a git-ignored root `.e
 
 ## Running the app after a pull
 
-The mobile app bundles the shared packages (`@festival/domain`, `sync-engine`, `data-access`, `ui`,
-`map-utils`, `notification-utils`) from their compiled `dist/`, which is not committed. After `git pull`
-rebuild them before starting Metro, or you get a stale package on the phone (`X is not a function
-(it is undefined)` on a screen that uses something added since your last build):
-
-```sh
-npm run build:mobile-workspace-deps          # from the repo root
-cd apps/mobile && npm run start:dev-client    # or npm run start; both rebuild the packages first
-```
-
-`npm install` also rebuilds them (`postinstall`). Running `npx expo start` directly skips the rebuild.
+Metro bundles the shared packages (`@festival/domain`, `sync-engine`, `data-access`, `ui`, `map-utils`,
+`notification-utils`) straight from their `src/` (the `react-native` field of each `package.json`), so
+the phone always runs the code you pulled; a bare `npx expo start --clear` is enough after a pull.
+Their compiled `dist/` (not committed) serves only `tsc` and the Node test runners. `npm install`
+(`postinstall`), `npm run start`, `npm run start:dev-client` and `npm run build` rebuild it; if `tsc`
+or a test reports a missing export after a pull, run `npm run build:mobile-workspace-deps`.
 
 ## Verification gates
 
