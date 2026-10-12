@@ -76,6 +76,20 @@ Admin commands run locally with the service-role key from a git-ignored root `.e
 (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`); see [`docs/festival-data.md`](docs/festival-data.md) and
 [`docs/release-runbook.md`](docs/release-runbook.md) §1.2.
 
+## Running the app after a pull
+
+The mobile app bundles the shared packages (`@festival/domain`, `sync-engine`, `data-access`, `ui`,
+`map-utils`, `notification-utils`) from their compiled `dist/`, which is not committed. After `git pull`
+rebuild them before starting Metro, or you get a stale package on the phone (`X is not a function
+(it is undefined)` on a screen that uses something added since your last build):
+
+```sh
+npm run build:mobile-workspace-deps          # from the repo root
+cd apps/mobile && npm run start:dev-client    # or npm run start; both rebuild the packages first
+```
+
+`npm install` also rebuilds them (`postinstall`). Running `npx expo start` directly skips the rebuild.
+
 ## Verification gates
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all of these on every push and pull
