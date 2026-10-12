@@ -1,0 +1,2 @@
+name,start_date,end_date,timezone,venue_name,status,accent_color,latitude,longitude,default_zoom,bounds_sw_lat,bounds_sw_lng,bounds_ne_lat,bounds_ne_lng,source_url
+Head Trip,2026-10-10,2026-10-11,America/Los_Angeles,"Empire Polo Club, Indio",draft,#E4D9FF,33.679811,-116.237256,15,33.6705,-116.252,33.686,-116.2332,https://headtripindio.com/set-times/
