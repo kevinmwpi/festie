@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { initialsOf } from '../src/components/palette';
+import { initialsOf } from '../src/components/initials';
 
 describe('initialsOf', () => {
   it('takes one letter from each act of a pairing and skips articles and "DJ"', () => {
