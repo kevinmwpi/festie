@@ -19,6 +19,7 @@ import {
   urgencyPoints,
   type Watchlist,
   type WatchlistEntry,
+  linkWatchlistFestival,
 } from '../src/watchlist/watchlist';
 
 const TODAY = '2026-10-12';
@@ -117,6 +118,11 @@ describe('watchlist file', () => {
     expect(() => setWatchlistStatus('nope', 'dropped', root)).toThrow(/not on the watchlist/);
     expect(() => addWatchlistEntry({ name: 'X', tier: 'A', officialUrl: 'http://x.example', root })).toThrow(/https/);
     expect(() => addWatchlistEntry({ name: 'X', tier: 'A', startDate: '12/01/2027', root })).toThrow(/YYYY-MM-DD/);
+
+    // candidate:promote records the festival id (golden slug first, then the candidate's own slug).
+    expect(linkWatchlistFestival(['edc-las-vegas-2027-times-2027-05-10', 'edc-las-vegas-2027'], 'f-edc', root)).toBe('edc-las-vegas-2027');
+    expect(readWatchlist(root).festivals[0].festival_id).toBe('f-edc');
+    expect(linkWatchlistFestival(['unknown-fest'], 'f-x', root)).toBeNull();
 
     const saved = JSON.parse(readFileSync(path.join(root, 'golden', 'watchlist.json'), 'utf8')) as Watchlist;
     expect(saved.festivals).toHaveLength(1);

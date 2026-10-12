@@ -13,8 +13,12 @@ import { useUserKey } from './use-session';
  * Follow state of the signed-in user's festivals (cache first, refreshed online) and a toggle that
  * writes online, re-reads the cache and toasts the outcome. Shared by the Fests list and the
  * Lineup's "set times to be announced" notice, so following works wherever the festival is shown.
+ *
+ * `reapplyDefault` (Fests list only): after a background refresh, re-pick the default festival from
+ * the refreshed follows. Screens that show one festival pass `false` so a refresh on focus never swaps
+ * the festival under the reader; the toggle itself always re-applies the default.
  */
-export function useFollowFestivals() {
+export function useFollowFestivals({ reapplyDefault = true }: { reapplyDefault?: boolean } = {}) {
   const queryClient = useQueryClient();
   const userKey = useUserKey();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -24,7 +28,9 @@ export function useFollowFestivals() {
     readLocal: getLocalUserFestivals,
     refresh: async () => {
       await refreshUserFestivals();
-      await ensureActiveFestival();
+      if (reapplyDefault) {
+        await ensureActiveFestival();
+      }
     },
   });
 

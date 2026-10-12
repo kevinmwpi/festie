@@ -47,6 +47,7 @@ import {
   rankWatchlist,
   readWatchlist,
   removeWatchlistEntry,
+  linkWatchlistFestival,
   setWatchlistStatus,
   TIERS,
   WATCH_STATUSES,
@@ -394,6 +395,10 @@ async function candidatePromote(args: string[]): Promise<void> {
   if (values['dry-run']) {
     log('Dry run: nothing written.');
     return;
+  }
+  const linked = linkWatchlistFestival([result.goldenSlug, result.slug], result.festivalId);
+  if (linked) {
+    log(`Watchlist entry ${linked} now carries festival id ${result.festivalId} (follows count towards its score).`);
   }
   log(`Promoted ${result.slug} (${result.mediaMerged} image(s) merged). Next: npm run admin -- media:upload --dry-run, then festival:seed ${result.seedFile} --dry-run.`);
 }

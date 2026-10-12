@@ -36,7 +36,7 @@ export function LineupTbaNotice({
       </Text>
       {follow ? (
         <View style={styles.noticeAction}>
-          <SecondaryButton label={`Follow ${follow.festivalName}`} onPress={follow.onPress} disabled={follow.busy} />
+          <SecondaryButton label={`Follow ${follow.festivalName}`} onPress={follow.onPress} loading={follow.busy} />
         </View>
       ) : null}
     </View>

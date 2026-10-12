@@ -10,6 +10,10 @@
 //   hints       optional free text (organizer, venue, city, suggestion id, known sources)
 //   requestedBy 'admin' (default) or 'schedule'. A scheduled run must name a watchlist entry with
 //               scout = true (`npm run admin -- watchlist:list --json`); the Assemble step refuses otherwise.
+//   update      true for a festival already published with its lineup (watchlist status awaiting_times):
+//               the bundle is written as the change candidate `<slug>-times-<today>` (its first candidate
+//               directory is promoted and cannot be reviewed again); candidate:promote ties it to the
+//               festival by id. The watchlist slug stays `slug`.
 //   repoRoot    optional absolute path of the checkout (default: the session's working directory)
 //   scratchDir  optional scratch directory for notes (default: `scout/<slug>/` under the session scratchpad)
 export const meta = {
@@ -37,7 +41,10 @@ const hints = a.hints ? String(a.hints) : ''
 const requestedBy = a.requestedBy === 'schedule' ? 'schedule' : 'admin'
 const repoRoot = a.repoRoot ? String(a.repoRoot) : 'the current working directory (the Festie checkout)'
 const scratchDir = a.scratchDir ? String(a.scratchDir) : `a \`scout/${slug}/\` directory under your session scratchpad directory`
-const candidateDir = `seed-data/candidates/${slug}`
+const update = a.update === true || a.update === 'true'
+/** Directory slug: the festival's own for a first scout, a dated change candidate for a set-times update. */
+const bundleSlug = update ? `${slug}-times-${today}` : slug
+const candidateDir = `seed-data/candidates/${bundleSlug}`
 
 const RULES = `Repo: ${repoRoot}; run every command from the repo root. Festival: "${name}" ${year} (slug ${slug}). Today: ${today}. ${officialUrl ? `Known official URL: ${officialUrl}.` : ''} ${hints ? `Hints: ${hints}.` : ''}
 Rules (docs/agents/festival-pipeline.md §1, docs/festival-data.md §3): facts only from official public sources (organizer site or official app listing; press only to confirm); names as plain text; no artwork, logos, posters, brand colours; never invent times; record every page you tried with its URL, whether it opened (many hosts return 403 from this environment — record that), what it was used for and the access date. Never run festival:seed, demo:seed or media:upload; never write outside ${candidateDir}/. Scratch notes go in ${scratchDir} (create it).`
@@ -147,7 +154,7 @@ Inputs — sources:\n${JSON.stringify(allSources, null, 1)}\n\nExtracted:\n${JSO
 
 Steps:
 0. Scope check: run \`npm run admin -- watchlist:list --json\`. This run was requested by: ${requestedBy}. If "schedule" and the slug ${slug} is not an entry with "scout": true, STOP: write nothing and return "not scoutable on schedule: <reason>". If "admin" and the slug is not on the watchlist, add it: \`npm run admin -- watchlist:add --slug ${slug} --name "${name}" --tier A${officialUrl ? ` --url ${officialUrl}` : ''}\`.
-1. Try \`npm run admin -- candidate:new ${slug} --name "${name}"${officialUrl ? ` --source ${officialUrl}` : ''}\` to scaffold; if the command is unavailable or the dir exists, write the files yourself following docs/festival-data.md §2 and apps/admin-tools/src/candidates/types.ts.
+1. Try \`npm run admin -- candidate:new ${bundleSlug} --name "${name}"${officialUrl ? ` --source ${officialUrl}` : ''}\` to scaffold; if the command is unavailable or the dir exists, write the files yourself following docs/festival-data.md §2 and apps/admin-tools/src/candidates/types.ts.${update ? ` This is a set-times update of a published festival: copy festival.csv (keep its id column), stages.csv and artists.csv from the golden seed-data/${slug}-csv/ first, then add sets.csv; change artists.csv only when the organizer changed the lineup.` : ''}
 2. Write festival.csv (status draft, a neutral accent_color like #E4D9FF, source_url = the official schedule page), stages.csv, artists.csv (header name,genre,billing; billing only when extracted, as the poster's tier: 1 = top, acts on one tier share the number), sets.csv (header artist,stage,start,end,status,original_start,note; status/original_start/note only when a change applies; estimated ends get note "end time estimated (<how>)"; header only when no set time is published yet).
 3. Write candidate.json: version 1, slug, name, created_at ${today}T00:00:00Z (keep existing), status needs_review, trigger {kind:'manual'}, agent {tool:'claude-code workflow festival-scout', started_at}, sources (url,title,kind,accessed_at ${today},used_for,note incl. "could not open"), confidence per section (from the checks), notes, items.sets keyed "<artist>|<YYYY-MM-DD HH:MM>" → {sources:[indexes], confidence, note}, review {decisions all pending, by null, at null}.
 4. Run \`npm run admin -- festival:import-csv ${candidateDir} --out ${candidateDir}/_seed.json\` then \`npm run admin -- festival:validate ${candidateDir}/_seed.json\`; fix errors in the CSVs until there are none; keep the warnings for REVIEW.md.

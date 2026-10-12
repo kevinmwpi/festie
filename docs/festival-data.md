@@ -328,7 +328,7 @@ scout agent (`/festival-scout` in Claude Code, or the `festival-scout` workflow)
 with `candidate:new`. Review them in the local tool (`npm run admin -- review:serve`, then open
 http://127.0.0.1:8787): approve or reject each section and each image, then
 `candidate:promote <slug>` copies the approved bundle into `seed-data/` and records it in
-`seed-data/golden/index.json`. Publish as in §4. The roles, rules and the flywheel are in
+`seed-data/golden/index.json` (and the festival id on the matching watchlist entry, so follows count). Publish as in §4. The roles, rules and the flywheel are in
 [`agents/festival-pipeline.md`](./agents/festival-pipeline.md).
 
 A candidate may carry the lineup alone when set times are not out yet (§4.2): the review tool shows

@@ -322,6 +322,24 @@ export function setWatchlistStatus(slug: string, status: WatchStatus, root?: str
   return entry;
 }
 
+/**
+ * Records the festival's catalog id on its watchlist entry (matched by the golden slug, else the
+ * candidate slug), so the follows of the published festival count towards its score. Resolves the
+ * entry's slug, or null when the festival is not on the watchlist (nothing is written then).
+ */
+export function linkWatchlistFestival(slugs: readonly string[], festivalId: string, root?: string): string | null {
+  const watchlist = readWatchlist(root);
+  const entry = slugs.map((slug) => watchlist.festivals.find((item) => item.slug === slug)).find((item) => item !== undefined);
+  if (!entry) {
+    return null;
+  }
+  if (entry.festival_id !== festivalId) {
+    entry.festival_id = festivalId;
+    writeWatchlist(watchlist, root);
+  }
+  return entry.slug;
+}
+
 export function removeWatchlistEntry(slug: string, root?: string): boolean {
   const watchlist = readWatchlist(root);
   const before = watchlist.festivals.length;

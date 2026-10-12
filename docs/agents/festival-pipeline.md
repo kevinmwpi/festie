@@ -93,9 +93,9 @@ Agents do not go looking for every event. The scope is the **watchlist** (`seed-
 | Users follow it already (`user_festivals`, once it is in the catalog) | 5 each, max 50 | Keeps popular festivals maintained year to year |
 | Starts within 120 days | up to 30, more the closer | Set times land 2–7 days before; priority rises as the date nears |
 
-A **scheduled** run (a Routine) may only scout entries whose status is `watching` and whose score is
-≥ 60 (`scout = yes` in `watchlist:list`): every tier-A event, and tier-B events with user demand or a
-near date. An **admin request** (`/festival-scout <slug>` or the workflow with `requestedBy: 'admin'`)
+A **scheduled** run (a Routine) may only scout entries whose status is `watching` or `awaiting_times`
+and whose score is ≥ 60 (`scout = yes` in `watchlist:list`): every tier-A event, and tier-B events with
+user demand or a near date. An **admin request** (`/festival-scout <slug>` or the workflow with `requestedBy: 'admin'`)
 may name any watchlist entry, or add one first with `watchlist:add`. When a candidate is created the
 entry's status becomes `candidate`, then `published` after the seed; `passed` and `dropped` take it out
 of scheduling. A festival published with its lineup before set times exist is set to `awaiting_times`
@@ -190,9 +190,12 @@ Metrics worth tracking per candidate (write them in `REVIEW.md` or the review no
 | Hours from trigger to publish | The cost of a festival |
 | Post-publish corrections | What review missed |
 
-Cadence: weekly, a Routine runs `watchlist:list` and scouts the `scout = yes` entries that have no
-candidate yet (nothing else); set times land 2–7 days before most festivals, so expect a candidate
-update then; during the festival watch for changes daily.
+Cadence: weekly, a Routine runs `watchlist:list` and scouts the `scout = yes` entries (nothing else):
+`watching` entries that have no candidate directory yet, and every `awaiting_times` entry, whose first
+candidate was promoted and stays in `seed-data/candidates/<slug>/`, so the set-times run writes a change
+candidate `<slug>-times-<YYYY-MM-DD>` (workflow arg `update: true`; `candidate:promote` ties it to the
+published festival by festival id, §6 "Publishing a change"). Set times land 2–7 days before most
+festivals, so expect that run then; during the festival watch for changes daily.
 
 ## 6. Operating it
 
@@ -229,8 +232,10 @@ That is the normal order of events for flagship festivals, not an exception.
   (`.claude/workflows/festival-scout.js`): parallel source sweeps, extraction, cross-checks, media
   enrichment, assembly, validation.
 - From a Routine: a weekly prompt that runs `watchlist:list --json`, takes the entries with
-  `scout: true` and no candidate directory, and runs the workflow for each with `requestedBy:
-  'schedule'`. The Routine never adds festivals to the watchlist and still only produces candidates.
+  `scout: true` (for `watching`: only when `seed-data/candidates/<slug>/` does not exist; for
+  `awaiting_times`: always, with `update: true` so the bundle lands in `<slug>-times-<today>`), and runs
+  the workflow for each with `requestedBy: 'schedule'`. The Routine never adds festivals to the watchlist
+  and still only produces candidates.
 
 Cloud sessions reach few festival sites (the proxy returns 403 for most hosts); a run from the founder's
 machine sees more. The agent records which sources it could open either way.

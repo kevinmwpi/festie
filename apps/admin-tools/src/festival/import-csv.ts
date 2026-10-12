@@ -10,6 +10,7 @@ import {
 } from '../lib/time';
 import { FESTIE_NAMESPACE, isUuid, uuidV5 } from '../lib/uuid';
 import type { ValidationIssue } from './types';
+import { LIMITS } from './validate';
 
 /**
  * Converts the four CSV files of a festival directory into the JSON festival
@@ -182,9 +183,14 @@ export function buildSeedFromCsv(input: CsvInput): CsvImportResult {
     const rawBilling = optional(record, 'billing');
     let billing: number | null = null;
     if (rawBilling !== null) {
-      billing = /^\d+$/.test(rawBilling.trim()) ? Number(rawBilling.trim()) : Number.NaN;
-      if (!Number.isFinite(billing)) {
-        errors.push({ path: at('artists.csv', record, 'billing'), message: `"${rawBilling}" must be a whole number (1 = top billing)` });
+      const trimmed = rawBilling.trim();
+      billing = /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN;
+      if (!Number.isFinite(billing) || billing < 1 || billing > LIMITS.maxBillingOrder) {
+        billing = Number.NaN;
+        errors.push({
+          path: at('artists.csv', record, 'billing'),
+          message: `"${rawBilling}" must be a whole number between 1 and ${LIMITS.maxBillingOrder} (1 = top billing)`,
+        });
       }
     }
     return {

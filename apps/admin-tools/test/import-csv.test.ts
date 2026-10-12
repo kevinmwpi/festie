@@ -116,8 +116,12 @@ describe('buildSeedFromCsv', () => {
     expect('billing_order' in artists[2]).toBe(false);
     expect(validateFestivalSeed(built.seed).errors).toEqual([]);
 
-    const bad = buildSeedFromCsv({ ...minimal, 'artists.csv': ['name,billing', 'Artist One,top', '"Artist, Two",1'].join('\n') });
-    expect(bad.errors).toEqual([{ path: 'artists.csv:2 billing', message: '"top" must be a whole number (1 = top billing)' }]);
+    const bad = buildSeedFromCsv({ ...minimal, 'artists.csv': ['name,billing', 'Artist One,top', '"Artist, Two",0', 'Artist Three,10001'].join('\n') });
+    expect(bad.errors).toEqual([
+      { path: 'artists.csv:2 billing', message: '"top" must be a whole number between 1 and 10000 (1 = top billing)' },
+      { path: 'artists.csv:3 billing', message: '"0" must be a whole number between 1 and 10000 (1 = top billing)' },
+      { path: 'artists.csv:4 billing', message: '"10001" must be a whole number between 1 and 10000 (1 = top billing)' },
+    ]);
   });
 
   it('respects ids given in the CSV', () => {

@@ -128,14 +128,16 @@ Admin commands: [`festival-data.md`](./festival-data.md).
       monogram — never a blank tile or a broken image. A photo that has loaded once still shows after
       relaunching in airplane mode. Scrolling a long lineup never shows another artist's photo on a card.
 - [ ] VoiceOver reads each Lineup card's artist name once; the photo or monogram is not a separate element.
-- [ ] **Lineup announced, set times TBA** (`festival-data.md` §4.2): seed a copy of the demo festival
-      with `sets.csv` reduced to its header and `status` published (on staging). Lineup shows "Set times
+- [ ] **Lineup announced, set times TBA** (`festival-data.md` §4.2): copy `seed-data/demo-festival-csv/`,
+      and in its `festival.csv` give the copy a new name, `is_demo` false, any `https://` `source_url` and
+      `status` published (the demo festival itself must keep its sets); reduce `sets.csv` to its header,
+      convert with `festival:import-csv` and seed it (on staging). Lineup shows "Set times
       aren't out yet", no day or stage chips, and one card per artist ("Set time TBA", photo or monogram,
       no Add button; VoiceOver reads name and "set time to be announced" as one element). Add sets shows
       "Set times coming soon" with a working "See the lineup" button; My Schedule says set times are coming.
       Crews, chat, meetups and the map work for the festival. Then seed the full CSV again and pull to
       refresh: the timed cards appear and the TBA notice is gone, without reinstalling.
-- [ ] Partly timed lineup: seed the demo festival with the sets of one artist removed from `sets.csv`
+- [ ] Partly timed lineup: seed the same copy with the sets of one artist removed from `sets.csv`
       (keep the artist in `artists.csv`). Under "All", that artist is listed in a "Set times to be
       announced" section after the timed cards; with a day or stage chip active, a one-line footnote
       counts the acts without a time instead. Add sets lists only timed sets and the same footnote.

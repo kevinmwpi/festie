@@ -10,7 +10,7 @@
 -- Run with: npm run db:test
 
 begin;
-select plan(384);
+select plan(385);
 
 -- ===========================================================================
 -- Identities
@@ -2697,6 +2697,10 @@ select lives_ok(
              'ad000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000003',
              '2027-07-01T22:00:00Z', '2027-07-01T23:00:00Z') $$,
   'T21 the same set is accepted once the act is in the lineup (control)'
+);
+select ok(
+  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'sets_festival_id_artist_id_idx'),
+  'T22 the composite lineup foreign key on sets is indexed'
 );
 
 select * from finish();

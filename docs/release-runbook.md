@@ -153,7 +153,7 @@ npx supabase migration list
 - **Remote history is empty but the tables exist** (SQL was pasted in the dashboard): after checking that
   `public.festivals`, `public.groups` and the rate-limit table from 005 exist, record 001–005 as applied:
   `npx supabase migration repair --status applied 001 002 003 004 005`.
-- **New project:** the remote column is empty and all thirteen migrations will be applied.
+- **New project:** the remote column is empty and all fourteen migrations (001–014) will be applied.
 
 **History — done, skip on `kevins_project`:** the block below was run in October 2026; the project now
 has 001–010 applied and §2.5 only adds 011–014.

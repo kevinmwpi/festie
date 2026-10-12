@@ -79,7 +79,10 @@ on conflict (festival_id, artist_id) do nothing;
 
 -- A set's artist is always in the festival's lineup. Plain `no action` (not
 -- `restrict`): deleting a festival cascades to its sets and its lineup rows in
--- one statement, and the check runs at the end of it.
+-- one statement, and the check runs at the end of it. The composite index
+-- covers the key (Supabase advisor: unindexed_foreign_keys) and the per-festival
+-- lineup reads.
+create index if not exists sets_festival_id_artist_id_idx on public.sets (festival_id, artist_id);
 alter table public.sets
   drop constraint if exists sets_lineup_fkey,
   add constraint sets_lineup_fkey

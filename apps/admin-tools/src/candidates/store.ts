@@ -69,6 +69,9 @@ export interface LoadedCandidate {
 
 export interface PromoteResult {
   slug: string;
+  /** The festival's slug in the golden index (differs from `slug` for a change candidate). */
+  goldenSlug: string;
+  festivalId: string;
   seedFile: string;
   csvDir: string;
   /** Media entries merged into seed-data/media/registry.json (approved ones only). */
@@ -630,7 +633,7 @@ export async function promoteCandidate(slug: string, options: { dryRun: boolean;
   // 4. The candidate itself.
   actions.push(`mark candidates/${slug}/${CANDIDATE_FILE} promoted`);
 
-  const result: PromoteResult = { slug, seedFile, csvDir, mediaMerged: approvedMedia.length, actions };
+  const result: PromoteResult = { slug, goldenSlug, festivalId: seed.festival.id, seedFile, csvDir, mediaMerged: approvedMedia.length, actions };
   if (dryRun) {
     return result;
   }

@@ -154,7 +154,7 @@ beforeEach(() => {
   vi.mocked(store.saveCandidateReview).mockReset().mockImplementation(async (_slug, review) => ({ ...candidateFile(), status: 'approved', review }));
   vi.mocked(store.saveCandidateMediaReview).mockReset().mockImplementation(async (_slug, _index, review) => ({ ...mediaEntry(), review }));
   vi.mocked(store.promoteCandidate).mockReset().mockImplementation(async (slug, { dryRun }): Promise<PromoteResult> => ({
-    slug, seedFile: `seed-data/${slug}.json`, csvDir: `seed-data/${slug}-csv`, mediaMerged: 1,
+    slug, goldenSlug: slug, festivalId: '11111111-1111-4111-8111-111111111111', seedFile: `seed-data/${slug}.json`, csvDir: `seed-data/${slug}-csv`, mediaMerged: 1,
     actions: [`${dryRun ? 'would write' : 'wrote'} seed-data/${slug}.json`],
   }));
 });

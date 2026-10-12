@@ -22,8 +22,12 @@ names in this request (add it first with `npm run admin -- watchlist:add --slug 
 --tier A|B|C [--url <official url>]`, the same `<slug>` you pass to `candidate:new`, so the record exists).
 Never go looking for other events. After scaffolding, run `npm run admin -- watchlist:set-status <slug>
 candidate`. An entry whose status is `awaiting_times` is a festival already published with its lineup:
-the run is an update that adds `sets.csv` (keep `artists.csv` as published unless the organizer changed
-the lineup).
+its first candidate directory is promoted and can be neither reviewed nor promoted again, so scaffold a
+change candidate instead (`npm run admin -- candidate:new <slug>-times-<YYYY-MM-DD> --name "<name>"`),
+copy `festival.csv`, `stages.csv` and `artists.csv` from the golden `seed-data/<slug>-csv/` (keep the
+festival `id` column so the import derives the same festival id), add `sets.csv`, and change
+`artists.csv` only when the organizer changed the lineup. `candidate:promote` then overwrites the
+festival's golden files by festival id.
 
 ## Procedure
 

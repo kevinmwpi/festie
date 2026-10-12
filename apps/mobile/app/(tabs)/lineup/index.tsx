@@ -136,7 +136,7 @@ export default function LineupScreen() {
   const { bundle, lineup, unscheduled, festival } = useLineup(festivalId);
   const clock = useFestivalClock(festival);
   const { toggle, busyIds } = useSetSelection(festival);
-  const follows = useFollowFestivals();
+  const follows = useFollowFestivals({ reapplyDefault: false });
 
   const [dayFilter, setDayFilter] = React.useState<string>(ALL);
   const [stageFilter, setStageFilter] = React.useState<string>(ALL);

@@ -11,6 +11,7 @@ import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/compo
 import { ErrorState, FestivalBundleState, LoadingState, StaleDataNote } from '@/src/components/StateViews';
 import { queryKeys } from '@/src/hooks/query-keys';
 import { useFestivalBundle, useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
+import { useUnscheduledArtists } from '@/src/hooks/use-lineup';
 import { useCombinedSelections, useGroupDetail } from '@/src/hooks/use-groups';
 import { useReReadOnBundleChange } from '@/src/hooks/use-lineup';
 import { useUserKey } from '@/src/hooks/use-session';
@@ -82,6 +83,9 @@ export default function CombinedScheduleScreen() {
   const festivalId = group?.festival_id ?? null;
   const bundle = useFestivalBundle(festivalId);
   const festival = bundle.data?.festival ?? null;
+  // Announcement mode: the lineup is out (announced acts exist) but no set has a time yet.
+  const unscheduled = useUnscheduledArtists(festivalId);
+  const setTimesPending = bundle.data?.sets.length === 0 && (unscheduled.data?.length ?? 0) > 0;
   const clock = useFestivalClock(festival);
   const selections = useCombinedSelections(groupId, festivalId);
   // A moved or cancelled set arrives with a new festival bundle; re-read the crew's picks with it.
@@ -172,7 +176,7 @@ export default function CombinedScheduleScreen() {
       <EmptyState
         title="No picks yet"
         description={
-          bundle.data && bundle.data.sets.length === 0
+          setTimesPending
             ? 'The festival hasn’t published set times yet. Once it does, crew members can add sets and they show up here.'
             : 'When crew members add sets to their schedules, they show up here.'
         }
