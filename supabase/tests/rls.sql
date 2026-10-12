@@ -10,7 +10,7 @@
 -- Run with: npm run db:test
 
 begin;
-select plan(312);
+select plan(363);
 
 -- ===========================================================================
 -- Identities
@@ -236,7 +236,7 @@ select is_empty(
   $$ select tablename, policyname from pg_policies
      where schemaname = 'public'
        and tablename in ('chat_messages', 'group_invite_generations', 'auth_attempts', 'reports',
-                         'moderation_terms', 'rate_limit_events') $$,
+                         'moderation_terms', 'rate_limit_events', 'festival_suggestions') $$,
   'A2 locked tables have no policies'
 );
 
@@ -357,6 +357,7 @@ select is(
       'public.rotate_invite_code(uuid)',
       'public.share_location(uuid, double precision, double precision, double precision, double precision)',
       'public.stop_sharing_location(uuid)',
+      'public.suggest_festival(text, text, text)',
       'public.unblock_user(uuid)',
       'public.upsert_my_profile(text, text, text)'
     ]) x order by 1
@@ -2267,6 +2268,287 @@ select lives_ok(
      values ('5e000000-0000-4000-8000-000000000020', 'b0000000-0000-4000-8000-000000000006',
              'f0000000-0000-4000-8000-000000000001', 'e5000000-0000-4000-8000-000000000002') $$,
   'Q14 a user can still pick a cancelled set (an offline pick queued before the change syncs)'
+);
+
+-- ===========================================================================
+-- R. Artwork: image credits (012) and the public artwork bucket (013)
+-- ===========================================================================
+-- admin-tools (service role) uploads artwork and writes the credit columns;
+-- the fixture uses the superuser for the first row.
+select pg_temp.become('superuser');
+insert into storage.objects (bucket_id, name, owner, owner_id) values
+  ('artwork', 'artists/ad000000-0000-4000-8000-000000000001.jpg', null, null);
+update public.artists
+set image_url = 'https://cdn.example.com/storage/v1/object/public/artwork/artists/ad000000-0000-4000-8000-000000000001.jpg',
+    image_credit = 'Jane Doe / Wikimedia Commons',
+    image_license = 'CC BY-SA 4.0',
+    image_source_url = 'https://commons.wikimedia.org/wiki/File:Artist_One.jpg'
+where id = 'ad000000-0000-4000-8000-000000000001';
+
+select pg_temp.become('anon');
+select is(
+  (select count(*)::int from storage.objects where bucket_id = 'artwork'),
+  1,
+  'R1 anon can read artwork object rows (public bucket)'
+);
+select is(
+  (select image_credit || '|' || image_license || '|' || image_source_url from public.artists
+    where id = 'ad000000-0000-4000-8000-000000000001'),
+  'Jane Doe / Wikimedia Commons|CC BY-SA 4.0|https://commons.wikimedia.org/wiki/File:Artist_One.jpg',
+  'R2 anon reads an artist''s image credit, licence and source through the catalog grant'
+);
+select throws_ok(
+  $$ insert into storage.objects (bucket_id, name) values ('artwork', 'artists/ad000000-0000-4000-8000-000000000002.jpg') $$,
+  '42501', null, 'R3 anon cannot upload artwork'
+);
+
+select pg_temp.become('carol');
+select is(
+  (select count(*)::int from storage.objects where bucket_id = 'artwork'),
+  1,
+  'R4 authenticated can read artwork object rows'
+);
+select is(
+  (select image_credit || '|' || image_license from public.artists where id = 'ad000000-0000-4000-8000-000000000001'),
+  'Jane Doe / Wikimedia Commons|CC BY-SA 4.0',
+  'R5 authenticated reads an artist''s image credit and licence'
+);
+select throws_ok(
+  $$ insert into storage.objects (bucket_id, name, owner_id)
+     values ('artwork', 'artists/ad000000-0000-4000-8000-000000000002.jpg', 'a0000000-0000-4000-8000-000000000003') $$,
+  '42501', null, 'R6 authenticated cannot upload artwork'
+);
+with u as (
+  update storage.objects set metadata = '{"x":1}' where bucket_id = 'artwork' returning 1
+)
+select is(count(*)::int, 0, 'R7 authenticated cannot update artwork objects') from u;
+select set_config('storage.allow_delete_query', 'true', true);
+with d as (
+  delete from storage.objects where bucket_id = 'artwork' returning 1
+)
+select is(count(*)::int, 0, 'R8 authenticated cannot delete artwork objects') from d;
+select set_config('storage.allow_delete_query', 'false', true);
+select throws_ok(
+  $$ update public.artists set image_credit = 'me' where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '42501', null, 'R9 authenticated users cannot change image credits'
+);
+
+-- Whatever permissive (e.g. dashboard-made) policies exist, a client never writes artwork objects:
+-- a probe policy that allows everything to authenticated still leaves the artwork bucket read-only.
+select pg_temp.become('superuser');
+insert into storage.buckets (id, name) values ('rls_probe', 'rls_probe');
+create policy rls_probe_allow_all on storage.objects for all to authenticated using (true) with check (true);
+select pg_temp.become('carol');
+select lives_ok(
+  $$ insert into storage.objects (bucket_id, name, owner_id) values ('rls_probe', 'probe.jpg', 'a0000000-0000-4000-8000-000000000003') $$,
+  'R10 the probe policy does let carol write another bucket (control)'
+);
+select throws_ok(
+  $$ insert into storage.objects (bucket_id, name, owner_id)
+     values ('artwork', 'artists/ad000000-0000-4000-8000-000000000002.jpg', 'a0000000-0000-4000-8000-000000000003') $$,
+  '42501', null, 'R11 the restrictive guard still refuses an artwork upload'
+);
+with u as (
+  update storage.objects set metadata = '{"x":1}' where bucket_id = 'artwork' returning 1
+)
+select is(count(*)::int, 0, 'R12 the restrictive guard still refuses artwork updates') from u;
+select set_config('storage.allow_delete_query', 'true', true);
+with d as (
+  delete from storage.objects where bucket_id = 'artwork' returning 1
+)
+select is(count(*)::int, 0, 'R13 the restrictive guard still refuses artwork deletes') from d;
+select set_config('storage.allow_delete_query', 'false', true);
+select pg_temp.become('superuser');
+drop policy rls_probe_allow_all on storage.objects;
+
+select pg_temp.become('service_role');
+select lives_ok(
+  $$ insert into storage.objects (bucket_id, name) values ('artwork', 'festivals/f0000000-0000-4000-8000-000000000001.webp') $$,
+  'R14 the service role (admin-tools) can upload artwork'
+);
+select lives_ok(
+  $$ update public.festivals
+     set image_url = 'https://cdn.example.com/storage/v1/object/public/artwork/festivals/f0000000-0000-4000-8000-000000000001.webp',
+         image_credit = 'Festival press kit', image_license = 'Used with permission'
+     where id = 'f0000000-0000-4000-8000-000000000001' $$,
+  'R15 the service role can set a festival image with its licence (control)'
+);
+select throws_ok(
+  $$ update public.artists set image_url = 'https://cdn.example.com/x.jpg', image_license = null
+     where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R16 an artist image without a licence is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_url = 'https://cdn.example.com/x.jpg', image_license = ''
+     where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R16b an empty licence id is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_credit = repeat('x', 301) where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R17 an image credit over 300 characters is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_credit = '' where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R18 an empty image credit is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_url = 'http://cdn.example.com/x.jpg' where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R19 a non-https artist image URL is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_source_url = 'ftp://example.com/x' where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R20 a non-https image source URL is rejected'
+);
+select throws_ok(
+  $$ update public.festivals set image_url = 'https://cdn.example.com/x.jpg', image_license = null
+     where id = 'f0000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R21 a festival image without a licence is rejected'
+);
+select throws_ok(
+  $$ update public.festivals set image_url = 'http://cdn.example.com/x.jpg' where id = 'f0000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R22 a non-https festival image URL is rejected'
+);
+select lives_ok(
+  $$ update public.artists set image_credit = repeat('x', 300), image_source_url = null
+     where id = 'ad000000-0000-4000-8000-000000000001';
+     update public.artists set image_url = null, image_credit = null, image_license = null
+     where id = 'ad000000-0000-4000-8000-000000000002' $$,
+  'R23 a 300-character credit without a source and an image-less artist are accepted (control)'
+);
+select pg_temp.become('superuser');
+select ok(
+  (select public and file_size_limit = 2097152 and allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+   from storage.buckets where id = 'artwork'),
+  'R24 artwork bucket is public, 2 MiB, JPEG/PNG/WebP'
+);
+select is(
+  (select array_agg(policyname::text order by policyname) from pg_policies
+    where schemaname = 'storage' and tablename = 'objects' and policyname like 'artwork%'),
+  array['artwork_no_client_delete', 'artwork_no_client_insert', 'artwork_no_client_update', 'artwork_select_public'],
+  'R25 exactly the 013 artwork policies exist'
+);
+
+-- ===========================================================================
+-- S. Festival suggestions (012): locked table, suggest_festival RPC
+-- ===========================================================================
+select pg_temp.become('carol');
+select lives_ok(
+  $$ select public.suggest_festival('Countdown NYE', 'https://countdownnye.com', 'please') $$,
+  'S1 a user can suggest a festival'
+);
+select is(
+  public.suggest_festival('Countdown NYE', 'https://countdownnye.com', 'please'),
+  public.suggest_festival('  countdown nye  '),
+  'S2 suggesting the same name again (any case or spacing) returns the existing id'
+);
+select pg_temp.become('service_role');
+select is(
+  (select count(*)::int from public.festival_suggestions where user_id = 'b0000000-0000-4000-8000-000000000003'),
+  1,
+  'S3 a repeated suggestion inserts no second row'
+);
+select is(
+  (select name || '|' || url || '|' || note || '|' || status from public.festival_suggestions
+    where user_id = 'b0000000-0000-4000-8000-000000000003'),
+  'Countdown NYE|https://countdownnye.com|please|new',
+  'S4 the service role (admin-tools) reads suggestions; they are stored trimmed with status new'
+);
+
+select pg_temp.become('anon');
+select throws_ok(
+  $$ select public.suggest_festival('Anon Fest') $$,
+  '42501', null, 'S5 anon cannot call suggest_festival'
+);
+select throws_ok(
+  $$ select 1 from public.festival_suggestions limit 1 $$,
+  '42501', null, 'S6 anon cannot read festival_suggestions'
+);
+select pg_temp.become('nopro');
+select throws_ok(
+  $$ select public.suggest_festival('No Profile Fest') $$,
+  'P0001', 'profile_required', 'S7 an auth user without a profile cannot suggest'
+);
+
+select pg_temp.become('carol');
+select throws_ok(
+  $$ select 1 from public.festival_suggestions limit 1 $$,
+  '42501', null, 'S8 authenticated cannot read festival_suggestions directly'
+);
+select throws_ok(
+  $$ insert into public.festival_suggestions (user_id, name) values ('b0000000-0000-4000-8000-000000000003', 'Direct') $$,
+  '42501', null, 'S9 authenticated cannot insert festival_suggestions directly'
+);
+select throws_ok(
+  $$ update public.festival_suggestions set status = 'accepted' $$,
+  '42501', null, 'S10 authenticated cannot update festival_suggestions directly'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Bad URL Fest', 'http://example.com') $$,
+  'P0001', 'invalid_input', 'S11 a non-https url is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Long URL Fest', 'https://example.com/' || repeat('x', 500)) $$,
+  'P0001', 'invalid_input', 'S12 a url over 500 characters is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival('   ') $$,
+  'P0001', 'invalid_input', 'S13 a blank name is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival(repeat('x', 121)) $$,
+  'P0001', 'invalid_input', 'S14 a name over 120 characters is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Long Note Fest', null, repeat('x', 301)) $$,
+  'P0001', 'invalid_input', 'S15 a note over 300 characters is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Nazi Fest') $$,
+  'P0001', 'content_not_allowed', 'S16 a disallowed word in the name is refused'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Nice Fest', null, 'fuck this') $$,
+  'P0001', 'content_not_allowed', 'S17 a disallowed word in the note is refused'
+);
+-- Rate limit: 5 new suggestions per user per day. Countdown NYE was the first;
+-- the repeated call and the refused calls above did not count.
+select lives_ok(
+  $$ select public.suggest_festival('Fest ' || n) from generate_series(2, 5) n $$,
+  'S18 four more distinct suggestions are accepted (five in a day)'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Fest 6') $$,
+  'P0001', 'rate_limited', 'S19 the 6th new suggestion in a day is rate limited'
+);
+select lives_ok(
+  $$ select public.suggest_festival('Countdown NYE') $$,
+  'S20 a repeated name still returns its id while rate limited'
+);
+select pg_temp.become('alice');
+select lives_ok(
+  $$ select public.suggest_festival('Countdown NYE') $$,
+  'S21 another user can suggest the same festival (the limit is per user)'
+);
+
+select pg_temp.become('service_role');
+select is(
+  array(select name from public.festival_suggestions
+        where user_id = 'b0000000-0000-4000-8000-000000000003' order by name),
+  array['Countdown NYE', 'Fest 2', 'Fest 3', 'Fest 4', 'Fest 5'],
+  'S22 exactly five suggestions were stored for the rate-limited user'
+);
+select is(
+  (select count(*)::int from public.festival_suggestions where lower(name) = 'countdown nye'),
+  2,
+  'S23 the same festival is stored once per user'
+);
+select throws_ok(
+  $$ update public.festival_suggestions set status = 'maybe' where name = 'Fest 2' $$,
+  '23514', null, 'S24 an unknown suggestion status is rejected'
+);
+select lives_ok(
+  $$ update public.festival_suggestions set status = 'duplicate' where name = 'Fest 2' $$,
+  'S25 admin-tools can set a suggestion status (control)'
 );
 
 select * from finish();

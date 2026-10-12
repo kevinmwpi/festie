@@ -83,7 +83,7 @@ Never run `deno` against `supabase/` from the repo root without `--config` (it w
    restored), download its last backup from the same page and create a **new project** instead:
    - Pick the region you will name in the privacy policy (`__SUPABASE_REGION__`) and a strong database
      password (store it in your password manager).
-   - Use its ref as `<ref>` everywhere below. A fresh project gets all migrations 001–011 in §2.5.
+   - Use its ref as `<ref>` everywhere below. A fresh project gets all migrations 001–013 in §2.5.
    - Update `EXPO_PUBLIC_SUPABASE_URL` in **both** the `preview` and `production` profiles of
      `apps/mobile/eas.json` (they pin `https://lzxewkfxdibohzqbqmiu.supabase.co`) and in your EAS
      environment variables (§5.1).
@@ -145,18 +145,18 @@ npx supabase link --project-ref <ref>
 npx supabase migration list
 ```
 
-- **Expected for the existing project:** `001`–`010` are listed as applied remotely; `011` only
+- **Expected for the existing project:** `001`–`010` are listed as applied remotely; `011`–`013` only
   locally. Continue with §2.5.
 - **Remote shows versions that do not exist locally** (made in the dashboard): `db push` refuses to run.
-  Inspect them; if their effect is covered by 006–011 (they are idempotent and repair dashboard edits),
+  Inspect them; if their effect is covered by 006–013 (they are idempotent and repair dashboard edits),
   mark them reverted: `npx supabase migration repair --status reverted <version>`.
 - **Remote history is empty but the tables exist** (SQL was pasted in the dashboard): after checking that
   `public.festivals`, `public.groups` and the rate-limit table from 005 exist, record 001–005 as applied:
   `npx supabase migration repair --status applied 001 002 003 004 005`.
-- **New project:** the remote column is empty and all eleven migrations will be applied.
+- **New project:** the remote column is empty and all thirteen migrations will be applied.
 
 **History — done, skip on `kevins_project`:** the block below was run in October 2026; the project now
-has 001–010 applied and §2.5 only adds 011.
+has 001–010 applied and §2.5 only adds 011–013.
 
 **`kevins_project` (`lzxewkfxdibohzqbqmiu`) as inspected on 2026-10-06:** the remote history holds only
 three dashboard-made versions (`20260328045611` auth trigger + invite lookup policy, `20260329180317`
@@ -175,10 +175,10 @@ npx supabase db push
 (The Supabase MCP connector cannot do this unattended: it holds every destructive statement for an
 interactive approval, and these migrations are full of them.)
 
-### 2.5 Apply migrations 006–011
+### 2.5 Apply migrations 006–013
 
 ```sh
-npx supabase db push --dry-run      # lists the migrations not applied yet, in order (011 on the existing project, 001–011 on a new one)
+npx supabase db push --dry-run      # lists the migrations not applied yet, in order (011–013 on the existing project, 001–013 on a new one)
 npx supabase db push
 ```
 
@@ -186,15 +186,19 @@ npx supabase db push
   the schedule-changes release on): a newer app against a database without 011 cannot download festival
   data. Older builds keep working after 011. Then re-seed a festival to publish moved or cancelled sets
   (`docs/festival-data.md` §4.1).
+- **012 (image credits, festival suggestions) and 013 (artwork bucket) go in before any app build that
+  shows photo credits or the Suggest-a-festival form**: the app selects the new `artists`/`festivals`
+  columns and calls `suggest_festival`. 012 clears the `image_url` of any legacy row without a licence or
+  with a non-https URL (re-seed it with a credit). 013 holds only `storage.*` statements, like 008.
 
 - 006 is idempotent; 007 is idempotent and safe on a database with dashboard edits or only one of the two
   historical `005` files. **The CLI does not wrap a migration file in a transaction** (it prints
   `SET LOCAL can only be used in transaction blocks`), so a failure can leave earlier statements of that
-  file applied. 006–011 are idempotent, so after fixing the cause simply re-run `db push`. A failed 005
+  file applied. 006–013 are idempotent, so after fixing the cause simply re-run `db push`. A failed 005
   rolls back cleanly only if it fails at its first statement; otherwise inspect before re-running.
 - 007 sets `lock_timeout = '5s'`. If it fails with a lock timeout, run it again at a quiet moment.
-- 008 holds all `storage.*` statements so a hosted storage-permission problem cannot roll back 007. If only
-  008 fails, fix the reported permission problem and re-run `db push`.
+- 008 and 013 hold all `storage.*` statements so a hosted storage-permission problem cannot roll back 007
+  or 012. If only 008 or 013 fails, fix the reported permission problem and re-run `db push`.
 - 007 resets every non-demo festival without a `source_url` to `draft` and deletes all live location rows.
 
 ### 2.6 Verify the database
@@ -207,11 +211,18 @@ select jobname, schedule, command from cron.job order by jobname;
 --         purge-stale-locations    */5 * * * *   select public.purge_stale_locations()
 --         refresh-demo-crew        */5 * * * *   select private.refresh_demo_crew()
 
-select id, public, file_size_limit, allowed_mime_types from storage.buckets where id = 'totems';
--- expect: totems | false | 5242880 | {image/jpeg}
+select id, public, file_size_limit, allowed_mime_types from storage.buckets where id in ('totems', 'artwork') order by id;
+-- expect: artwork | true  | 2097152 | {image/jpeg,image/png,image/webp}
+--         totems  | false | 5242880 | {image/jpeg}
 
 select count(*) as moderation_terms from public.moderation_terms;     -- > 0 (009)
 select status, count(*) from public.sets group by status;               -- runs without error (011)
+select status, count(*) from public.festival_suggestions group by status; -- runs without error (012)
+select count(*) as images_without_licence from public.artists
+  where image_url is not null and image_license is null;                -- expect 0 (012)
+select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects'
+  and policyname like 'artwork%' order by 1;
+-- expect: artwork_no_client_delete, artwork_no_client_insert, artwork_no_client_update, artwork_select_public (013)
 select name, status, is_demo, source_url from public.festivals order by name;
 ```
 
@@ -290,7 +301,7 @@ The diff may contain only these changes (any of them may be absent if the hosted
 Answer **no** if the diff shows `smtp_max_frequency` (or the per-user email interval) at 1 s, changes the
 custom SMTP settings from §2.7 (`config.toml` has no `[auth.email.smtp]` block, so it should not touch
 them), turns on anything other than the confirmations and the access token hook in the table, or
-touches a setting not in the table. Apply migrations 006–011 (§2.5) first: the hook names a function
+touches a setting not in the table. Apply migrations 006–013 (§2.5) first: the hook names a function
 that 007 creates. Then either fix `config.toml` (add the
 missing key with the hosted value you want to keep) and run the push again, or skip `config push` entirely
 and set the values in the table by hand in the dashboard (Authentication → Sign In / Providers, Emails,
@@ -864,7 +875,7 @@ Legal text is not legal advice; have it reviewed if you can.
 - [ ] Hosted project restored, backed up (§2.1–2.2).
 - [ ] Railway services deleted; service-role key rotated and stored only in your local `.env`; if the
       legacy JWT keys were rotated, the new anon key is the one in EAS (§2.3).
-- [ ] Migrations 006–011 applied, cron jobs and bucket verified, Security Advisor clean (§2.4–2.6).
+- [ ] Migrations 006–013 applied, cron jobs and buckets verified, Security Advisor clean (§2.4–2.6).
 - [ ] Head Trip 2026 (test data) either verified against its official source and recorded in
       `seed-data/head-trip-2026-changes.md`, or set back to `draft` and seeded (`festival-data.md` §4.1).
 - [ ] Custom SMTP live; the hosted email templates send 8-digit codes with no links; the per-user email

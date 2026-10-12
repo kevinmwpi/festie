@@ -15,10 +15,10 @@
 # exit.
 #
 # Scenarios:
-#   main            001..006 -> dirty fixture -> 007..011 -> checks -> rls.sql
-#                   -> re-apply 007..011 -> checks -> rls.sql
-#   only-005-rate   001..005_rate_limiting (no 006) -> 007..011 -> rls.sql
-#   only-005-theme  001..004 + 006 (no 005_rate_limiting) -> 007..011 -> rls.sql
+#   main            001..006 -> dirty fixture -> 007..013 -> checks -> rls.sql
+#                   -> re-apply 007..013 -> checks -> rls.sql
+#   only-005-rate   001..005_rate_limiting (no 006) -> 007..013 -> rls.sql
+#   only-005-theme  001..004 + 006 (no 005_rate_limiting) -> 007..013 -> rls.sql
 #                   -> two-session races (concurrent admin departure, 50-member cap)
 #
 # Exits non-zero on any SQL error, failed assertion or pgTAP plan mismatch.
@@ -289,7 +289,7 @@ main() {
     001_initial_schema.sql 002_rls.sql 003_supporting_tables.sql 004_security_hardening.sql
     005_rate_limiting.sql 006_user_festivals_and_festival_theme.sql 007_v1_security_overhaul.sql
     008_storage_totems.sql 009_seed_moderation_terms.sql 010_foreign_key_indexes.sql
-    011_set_status.sql
+    011_set_status.sql 012_image_credits_and_suggestions.sql 013_storage_artwork.sql
   )
   for m in "${required[@]}"; do
     [[ -f "$MIGRATIONS_DIR/$m" ]] || fail "missing migration $m"
@@ -330,19 +330,19 @@ main() {
   apply_superuser_file "$db_main" "$LOCAL_DIR/dirty-fixture.sql"
   pass_line "[$db_main] 001-006 + dirty fixture applied"
   for m in 007_v1_security_overhaul.sql 008_storage_totems.sql 009_seed_moderation_terms.sql 010_foreign_key_indexes.sql \
-    011_set_status.sql; do
+    011_set_status.sql 012_image_credits_and_suggestions.sql 013_storage_artwork.sql; do
     apply_migration "$db_main" "$MIGRATIONS_DIR/$m"
   done
-  pass_line "[$db_main] 007-011 applied as postgres"
+  pass_line "[$db_main] 007-013 applied as postgres"
   run_tap "$db_main" "$LOCAL_DIR/dirty-fixture-checks.sql" "dirty fixture repaired"
   run_tap "$db_main" "$TESTS_DIR/rls.sql" "rls.sql"
 
-  step "Re-applying 007-011 (idempotency)"
+  step "Re-applying 007-013 (idempotency)"
   for m in 007_v1_security_overhaul.sql 008_storage_totems.sql 009_seed_moderation_terms.sql 010_foreign_key_indexes.sql \
-    011_set_status.sql; do
+    011_set_status.sql 012_image_credits_and_suggestions.sql 013_storage_artwork.sql; do
     apply_migration "$db_main" "$MIGRATIONS_DIR/$m" "re-apply"
   done
-  pass_line "[$db_main] 007-011 re-applied"
+  pass_line "[$db_main] 007-013 re-applied"
   run_tap "$db_main" "$LOCAL_DIR/dirty-fixture-checks.sql" "dirty fixture repaired (after re-apply)"
   run_tap "$db_main" "$TESTS_DIR/rls.sql" "rls.sql (after re-apply)"
 
@@ -353,7 +353,7 @@ main() {
   while IFS= read -r m; do
     apply_migration "$db_rate" "$m"
   done < <(migration_files 006_user_festivals_and_festival_theme.sql)
-  pass_line "[$db_rate] 001-005_rate_limiting + 007-011 applied"
+  pass_line "[$db_rate] 001-005_rate_limiting + 007-013 applied"
   run_tap "$db_rate" "$TESTS_DIR/rls.sql" "rls.sql"
 
   # ------------------------------------- hosted variant: no rate limiting
@@ -363,7 +363,7 @@ main() {
   while IFS= read -r m; do
     apply_migration "$db_theme" "$m"
   done < <(migration_files 005_rate_limiting.sql)
-  pass_line "[$db_theme] 001-004 + 006-011 applied"
+  pass_line "[$db_theme] 001-004 + 006-013 applied"
   run_tap "$db_theme" "$TESTS_DIR/rls.sql" "rls.sql"
 
   step "Concurrency races ($db_theme)"

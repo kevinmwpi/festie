@@ -84,7 +84,7 @@ jobs:
             exit 1
           fi
 
-      - name: Migrations 001–011, dirty fixture, rls.sql, idempotency, races
+      - name: Migrations 001–013, dirty fixture, rls.sql, idempotency, races
         run: npm run db:test
 
   edge-functions:

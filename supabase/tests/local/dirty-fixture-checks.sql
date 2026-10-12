@@ -1,7 +1,7 @@
--- Verifies that 007–011 repaired supabase/tests/local/dirty-fixture.sql.
--- Run after the first apply and again after re-applying 007–011.
+-- Verifies that 007–013 repaired supabase/tests/local/dirty-fixture.sql.
+-- Run after the first apply and again after re-applying 007–013.
 begin;
-select plan(43);
+select plan(44);
 
 -- Users: dedupe, backfill, orphans ------------------------------------------
 select is(
@@ -171,6 +171,12 @@ select is(
    from public.sets where id = 'd3300000-0000-4000-8000-000000000001'),
   'scheduled:-:-',
   'legacy sets read as scheduled with no original start or note (011)'
+);
+select is(
+  (select coalesce(image_credit, '-') || ':' || coalesce(image_license, '-') || ':' || coalesce(image_source_url, '-')
+   from public.artists where id = 'd3200000-0000-4000-8000-000000000001'),
+  '-:-:-',
+  'legacy artists read with no image credit, licence or source (012)'
 );
 
 -- Policies and privileges --------------------------------------------------------
