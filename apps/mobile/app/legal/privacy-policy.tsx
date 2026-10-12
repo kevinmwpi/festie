@@ -19,7 +19,7 @@ type Span =
 type Block = { type: 'h2' | 'h3' | 'p' | 'li'; spans: Span[] };
 
 const TITLE = "Privacy Policy";
-const UPDATED = "October 5, 2026";
+const UPDATED = "October 12, 2026";
 const SUPPORT_EMAIL_TOKEN = '__SUPPORT_EMAIL__';
 /** docs/legal/values.json `supportEmail`, used only when the build has no EXPO_PUBLIC_SUPPORT_EMAIL. */
 const SUPPORT_EMAIL_FALLBACK: string | null = "support@joinfestie.com";
@@ -31,7 +31,7 @@ const CONTENT: Block[] = [
     "spans": [
       {
         "kind": "text",
-        "text": "Festie is a festival planning app operated by Kevin Pi (\"Festie\", \"we\", \"us\"). This policy explains what information the Festie app and its servers handle, why, who can see it, how long we keep it and the choices you have. If you have a question, email __SUPPORT_EMAIL__."
+        "text": "Festie is a festival planning app operated by Kevin Pi. In this policy, \"we\", \"us\" and \"our\" mean Kevin Pi, and \"Festie\" means the app and its services. This policy explains what information the Festie app and its servers handle, why, who can see it, how long we keep it and the choices you have. If you have a question, email __SUPPORT_EMAIL__."
       }
     ]
   },

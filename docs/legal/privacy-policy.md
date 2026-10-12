@@ -10,9 +10,9 @@ placeholder: it stays in this file and the generator fills it in from docs/legal
 and EXPO_PUBLIC_SUPPORT_EMAIL (in-app screens).
 -->
 
-Last updated: October 5, 2026
+Last updated: October 12, 2026
 
-Festie is a festival planning app operated by Kevin Pi ("Festie", "we", "us"). This policy explains what information the Festie app and its servers handle, why, who can see it, how long we keep it and the choices you have. If you have a question, email __SUPPORT_EMAIL__.
+Festie is a festival planning app operated by Kevin Pi. In this policy, "we", "us" and "our" mean Kevin Pi, and "Festie" means the app and its services. This policy explains what information the Festie app and its servers handle, why, who can see it, how long we keep it and the choices you have. If you have a question, email __SUPPORT_EMAIL__.
 
 ## Summary
 
