@@ -1,4 +1,5 @@
-import { describeSetChange, detectConflict, festivalDayKey, listFestivalDays } from '@festival/domain';
+import { describeLineupAvailability, describeSetChange, detectConflict, festivalDayKey, listFestivalDays } from '@festival/domain';
+import type { UnscheduledArtist } from '@festival/data-access';
 import {
   Badge,
   Chip,
@@ -20,8 +21,15 @@ import { FestivalDisclaimer, TimeZoneHint } from '@/src/components/FestivalNotes
 import { ScreenHeader } from '@/src/components/ScreenHeader';
 import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/components/SetChange';
 import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } from '@/src/components/StateViews';
+import {
+  LineupTbaNotice,
+  UnscheduledArtistCard,
+  UnscheduledFootnote,
+  UnscheduledSectionHeader,
+} from '@/src/components/UnscheduledLineup';
 import { formatWeekdayDayLabel } from '@/src/hooks/festival-time-labels';
 import { useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
+import { useFollowFestivals } from '@/src/hooks/use-follow-festival';
 import { useLineup, type LineupRow } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
@@ -30,6 +38,7 @@ import { useAppStore } from '@/src/state/app-store';
 
 const ALL = 'all';
 const NO_ROWS: LineupRow[] = [];
+const NO_ARTISTS: UnscheduledArtist[] = [];
 
 /* ─── Artist Card ─────────────────────────────────────────── */
 
@@ -124,9 +133,10 @@ export default function LineupScreen() {
   useSafeAreaEdgeTint(screenBg);
   const isOffline = useOfflineStatus();
 
-  const { bundle, lineup, festival } = useLineup(festivalId);
+  const { bundle, lineup, unscheduled, festival } = useLineup(festivalId);
   const clock = useFestivalClock(festival);
   const { toggle, busyIds } = useSetSelection(festival);
+  const follows = useFollowFestivals();
 
   const [dayFilter, setDayFilter] = React.useState<string>(ALL);
   const [stageFilter, setStageFilter] = React.useState<string>(ALL);
@@ -137,6 +147,10 @@ export default function LineupScreen() {
   }, [festivalId]);
 
   const rows = React.useDeferredValue(lineup.data ?? NO_ROWS);
+  // Announced acts without a set yet (announcement mode, festival-data.md §4.2).
+  const tbaArtists = unscheduled.data ?? NO_ARTISTS;
+  const availability = describeLineupAvailability({ setCount: rows.length, unscheduledCount: tbaArtists.length });
+  const filtersActive = dayFilter !== ALL || stageFilter !== ALL;
   const timeZone = festival?.timezone ?? '';
 
   const days = React.useMemo(() => (festival ? listFestivalDays(festival, rows) : []), [festival, rows]);
@@ -215,7 +229,7 @@ export default function LineupScreen() {
     <View style={[styles.container, { backgroundColor: screenBg }]}>
       {header}
 
-      {festival ? (
+      {festival && rows.length > 0 ? (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.filterRow}>
             {[ALL, ...days].map((day) => {
@@ -268,27 +282,54 @@ export default function LineupScreen() {
 
         {festival ? (
           <>
-            <TimeZoneHint hint={clock.hint} />
-            {lineup.isLoading ? (
+            {rows.length > 0 ? <TimeZoneHint hint={clock.hint} /> : null}
+            {lineup.isLoading || unscheduled.isLoading ? (
               <LoadingState label="Loading the lineup…" />
-            ) : rows.length === 0 ? (
+            ) : availability === 'empty' ? (
               <EmptyState
                 title="Lineup coming soon"
-                description="Sets will appear here once the festival publishes its schedule."
+                description="Artists and sets will appear here once the festival announces them."
               />
-            ) : filtered.length === 0 ? (
-              <EmptyState title="No sets match" description="Try another day or stage." />
-            ) : (
-              filtered.map((row) => (
-                <ArtistCard
-                  key={row.id}
-                  row={row}
-                  clock={clock}
-                  overlapsPick={overlapIds.has(row.id)}
-                  busy={busyIds.has(row.id)}
-                  onToggle={() => void toggle(row)}
+            ) : availability === 'tba' ? (
+              <>
+                <LineupTbaNotice
+                  count={tbaArtists.length}
+                  follow={
+                    follows.following.data && !follows.followingIds.has(festival.id)
+                      ? { festivalName: festival.name, busy: follows.busyId === festival.id, onPress: () => void follows.toggle(festival) }
+                      : undefined
+                  }
                 />
-              ))
+                {tbaArtists.map((artist) => (
+                  <UnscheduledArtistCard key={artist.id} artist={artist} />
+                ))}
+              </>
+            ) : (
+              <>
+                {filtered.length === 0 ? (
+                  <EmptyState title="No sets match" description="Try another day or stage." />
+                ) : (
+                  filtered.map((row) => (
+                    <ArtistCard
+                      key={row.id}
+                      row={row}
+                      clock={clock}
+                      overlapsPick={overlapIds.has(row.id)}
+                      busy={busyIds.has(row.id)}
+                      onToggle={() => void toggle(row)}
+                    />
+                  ))
+                )}
+                {availability === 'partial' && !filtersActive ? (
+                  <>
+                    <UnscheduledSectionHeader count={tbaArtists.length} />
+                    {tbaArtists.map((artist) => (
+                      <UnscheduledArtistCard key={artist.id} artist={artist} />
+                    ))}
+                  </>
+                ) : null}
+                {availability === 'partial' && filtersActive ? <UnscheduledFootnote count={tbaArtists.length} where="filters" /> : null}
+              </>
             )}
             <StaleDataNote error={bundle.refreshError ?? lineup.refreshError} />
           </>

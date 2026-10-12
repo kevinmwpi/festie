@@ -103,6 +103,8 @@ export interface EvalReport {
   stages: { precision: number; recall: number; missing: string[]; extra: string[] };
   artists: { precision: number; recall: number; missing: string[]; extra: string[] };
   sets: {
+    /** True when the candidate has no sets (set times not published yet): precision/recall are 0 and say nothing. */
+    lineup_only: boolean;
     precision: number;
     recall: number;
     /** Matched by artist + festival day; a set matches when start and end are within `tolerance_minutes`. */

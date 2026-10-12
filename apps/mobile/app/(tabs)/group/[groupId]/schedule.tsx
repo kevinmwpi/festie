@@ -169,7 +169,14 @@ export default function CombinedScheduleScreen() {
     content = detail.refreshError && !detail.hasRefreshed ? (
       <ErrorState error={detail.refreshError} onRetry={() => void detail.refetch()} />
     ) : (
-      <EmptyState title="No picks yet" description="When crew members add sets to their schedules, they show up here." />
+      <EmptyState
+        title="No picks yet"
+        description={
+          bundle.data && bundle.data.sets.length === 0
+            ? 'The festival hasn’t published set times yet. Once it does, crew members can add sets and they show up here.'
+            : 'When crew members add sets to their schedules, they show up here.'
+        }
+      />
     );
   } else if (view === 'overlap') {
     content =

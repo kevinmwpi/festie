@@ -33,7 +33,7 @@ export const CSV_SCHEMAS = {
     ],
   },
   'stages.csv': { required: ['name'], optional: ['id', 'zone', 'latitude', 'longitude'] },
-  'artists.csv': { required: ['name'], optional: ['id', 'genre'] },
+  'artists.csv': { required: ['name'], optional: ['id', 'genre', 'billing'] },
   'sets.csv': {
     required: ['artist', 'stage', 'start', 'end'],
     optional: ['id', 'set_type', 'status', 'original_start', 'note'],
@@ -177,7 +177,22 @@ export function buildSeedFromCsv(input: CsvInput): CsvImportResult {
     ).toLowerCase();
     artistIdsByKey.set(nameKey(record.values.name), id);
     artistIdsByKey.set(id, id);
-    return { id, name: record.values.name, genre: optional(record, 'genre') };
+    // `billing`: 1 = top billing as the organizer lists the lineup. Left out of the JSON when empty
+    // so files without billing stay as they were. The validator checks the range.
+    const rawBilling = optional(record, 'billing');
+    let billing: number | null = null;
+    if (rawBilling !== null) {
+      billing = /^\d+$/.test(rawBilling.trim()) ? Number(rawBilling.trim()) : Number.NaN;
+      if (!Number.isFinite(billing)) {
+        errors.push({ path: at('artists.csv', record, 'billing'), message: `"${rawBilling}" must be a whole number (1 = top billing)` });
+      }
+    }
+    return {
+      id,
+      name: record.values.name,
+      genre: optional(record, 'genre'),
+      ...(billing === null || !Number.isFinite(billing) ? {} : { billing_order: billing }),
+    };
   });
 
   // sets.csv --------------------------------------------------------------

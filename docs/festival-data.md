@@ -71,9 +71,14 @@ Validation is strict — unknown fields are errors, so typos never silently drop
 `latitude`/`longitude` (inside the festival bounds when bounds are set). Stages without
 coordinates still work but do not get a map pin. `festival_id` may be omitted.
 
-**artists**: `id` (UUID), `name` (≤ 120, unique in the file), optional `genre` (≤ 60). Artists are a
-global table shared by all festivals; use the same id for the same act across festivals
-(the CSV importer does this automatically). No `image_url`.
+**artists**: `id` (UUID), `name` (≤ 120, unique in the file), optional `genre` (≤ 60), optional
+`billing_order` (integer 1–10000: the position or tier as the organizer lists the lineup, 1 = top;
+acts sharing a number are shown alphabetically within it, so a poster's tiers map to 1, 2, 3…; left
+out = alphabetical). Artists are a global table shared by all festivals; use the
+same id for the same act across festivals (the CSV importer does this automatically). No `image_url`.
+The file's `artists` are the festival's **announced lineup** (`festival_artists`, migration 014): every
+artist is listed in the app whether or not it has a set yet (§4.2), and `billing_order` is stored per
+festival, not on the artist.
 
 **sets**: `id` (UUID), `artist_id` and `stage_id` referencing entries in the same file, `start_time`
 and `end_time` as ISO 8601 **with an explicit offset** (`-05:00` or `Z`), `end_time` after
@@ -109,7 +114,7 @@ of `demo-festival.json`; a unit test keeps the two identical).
 |---|---|---|
 | `festival.csv` (exactly one row) | `name, start_date, end_date, timezone` | `id, venue_name, source_url, status, is_demo, accent_color, latitude, longitude, default_zoom, bounds_sw_lat, bounds_sw_lng, bounds_ne_lat, bounds_ne_lng` |
 | `stages.csv` | `name` | `id, zone, latitude, longitude` |
-| `artists.csv` | `name` | `id, genre` |
+| `artists.csv` | `name` | `id, genre, billing` |
 | `sets.csv` | `artist, stage, start, end` | `id, set_type, status, original_start, note` |
 
 - Standard CSV: quote fields containing commas (`"Juniper & the Low Moons, Live"`), double inner quotes.
@@ -127,6 +132,9 @@ of `demo-festival.json`; a unit test keeps the two identical).
   `original_start`, a set moved to another day gets a new id unless you put the old one in `id`.
 - `status`, `original_start` and `note` fill `status`, `original_start_time` and `change_note`
   (`original_start` takes the same time formats as `start`).
+- `billing` in `artists.csv` fills `billing_order` (a whole number: position or tier as the organizer
+  lists the lineup, 1 = top; acts may share a number); leave it empty for alphabetical order. `sets.csv`
+  may hold only its header when set times are not out yet (§4.2).
 - Errors are reported as `file:line column: message`; the output is then validated exactly like a
   hand-written JSON file.
 
@@ -162,12 +170,13 @@ Settings, and Terms §8). Data must keep it that way:
 3. Review the data in the Supabase table editor against `source_url` (spot-check times in the
    festival time zone, stage names, late-night sets).
 4. Publish: set `"status": "published"` in the file and seed again. The validator refuses to publish a
-   real festival without `source_url` or without sets, and the database enforces
-   `status = 'draft' or is_demo or source_url is not null`.
-5. Updates: edit the file and seed again. `festival:seed` upserts the festival, artists, stages and
-   sets, **deletes sets and stages of that festival that are no longer in the file** (users' picks of
-   deleted sets are deleted with them; meetups pinned to a deleted stage lose the pin), and writes the
-   bumped `version` and `status` last so clients refetch a complete bundle. Keep ids stable (§2).
+   real festival without `source_url` or without a lineup (at least one artist; set times may follow,
+   §4.2), and the database enforces `status = 'draft' or is_demo or source_url is not null`.
+5. Updates: edit the file and seed again. `festival:seed` upserts the festival, artists, the lineup
+   (`festival_artists`), stages and sets, **deletes sets, stages and lineup rows of that festival that
+   are no longer in the file** (users' picks of deleted sets are deleted with them; meetups pinned to a
+   deleted stage lose the pin), and writes the bumped `version` and `status` last so clients refetch a
+   complete bundle. Keep ids stable (§2).
 6. Unpublish: set `"status": "draft"` and seed. Groups and picks stay in the database.
 
 ### 4.1 Schedule changes (moved and cancelled sets)
@@ -195,6 +204,37 @@ editor reaches no phone until the festival is seeded again. App builds released 
 show moved sets at their new time and cancelled sets as normal sets.
 [`seed-data/head-trip-2026.json`](../seed-data/head-trip-2026.json) is a real example (one act moved
 from Saturday to Sunday, one cancelled; see `head-trip-2026-changes.md`).
+
+### 4.2 Lineup announced, set times to be announced
+
+Most festivals announce who plays months before they publish when. A festival can be published as soon
+as the lineup is official (migration 014):
+
+- Enter the festival and its `artists` as usual and leave `sets` empty (`sets.csv` with only its header).
+  `festival:validate` warns `no set times yet: the app shows the lineup as "set times to be announced"`
+  and otherwise treats the file like any other; `festival:seed` writes one `festival_artists` row per
+  artist and the dry run reports `lineup N artists, N without a set`.
+- Use `billing` / `billing_order` to keep the organizer's billing (1 = top; acts on the same poster
+  tier share a number and sort alphabetically within it). Without it the app lists the acts
+  alphabetically. Names and their order are facts; poster artwork is not (§3).
+- Only from a lineup the organizer has published: artists are a global, public table, so even a
+  **draft** seed makes new artist names readable to any client (not which festival they play).
+- The demo festival is the exception: it must keep its sets (`demo:seed` builds the sample crew's picks
+  and meetups from them); the validator refuses an `is_demo` file without sets.
+- In the app, the Lineup tab lists every announced act with "Set time TBA" and no Add button; Add sets
+  and My Schedule say that set times are coming. Crews, chat, meetups and the map already work, so people
+  can follow the festival and form crews months ahead.
+- When set times arrive, add the sets (all at once or stage by stage, day by day) and seed again. Acts
+  that have a set move into the timed list; the rest stay under "Set times to be announced". An act
+  removed from the lineup disappears from the app on the next seed (its `festival_artists` row is
+  deleted); an act that was announced and then cancelled before any set time existed is simply removed.
+- Every set's artist must be in `artists` (the validator checks it and the database enforces it with
+  `sets_lineup_fkey`), so the lineup never lags the schedule. A project without migration 014 fails
+  `festival:seed` and `demo:seed` during planning, before any write (`--dry-run` with credentials too).
+- On the watchlist (§7), set the festival to `awaiting_times` after publishing the lineup
+  (`npm run admin -- watchlist:set-status <slug> awaiting_times`): scheduled scouting then keeps looking
+  for the set times, and the urgency score rises as the dates near. Set it to `published` with the seed
+  that carries the set times.
 
 Migration 007 sets every legacy non-demo festival without a `source_url` to draft; real festivals
 appear only after being entered through this workflow.
@@ -290,6 +330,10 @@ http://127.0.0.1:8787): approve or reject each section and each image, then
 `seed-data/golden/index.json`. Publish as in §4. The roles, rules and the flywheel are in
 [`agents/festival-pipeline.md`](./agents/festival-pipeline.md).
 
+A candidate may carry the lineup alone when set times are not out yet (§4.2): the review tool shows
+"N artists without set times", the published festival is set to `awaiting_times` on the watchlist and
+the scout runs again when the organizer publishes the times.
+
 Which festivals get scouted is decided by the watchlist (`seed-data/golden/watchlist.json`:
 `watchlist:list`, `watchlist:add`), not by sweeping every event: flagship tier, user demand, or an admin
 request. User suggestions from the app ("Suggest a festival") land in `festival_suggestions`
@@ -367,7 +411,10 @@ applied migration.
 ## 9. Troubleshooting
 
 - `Missing SUPABASE_URL …` — export both variables; the anon key is never accepted.
-- `PGRST205` / missing columns — the target project is missing migrations 006–013; apply them first.
+- `PGRST205` / missing columns — the target project is missing migrations 006–014; apply them first.
+  Migration 014 is missing when `festival:seed` or `demo:seed` (also their `--dry-run` with credentials)
+  stops with `Reading the existing lineup (festival_artists; apply migration 014 …) failed (PGRST205)`,
+  or when the app cannot download any festival bundle (it selects `festival_artists` with every bundle).
   Migration 012 is missing when the app or `festival:seed` reports an unknown `image_credit` /
   `image_license` / `image_source_url` column (42703 / PGRST204) or `suggest_festival` is not found; 013
   when `media:upload` cannot find the `artwork` bucket.
@@ -379,4 +426,9 @@ applied migration.
 - The reviewer lands in no crew after a demo login — `demo:seed` has not run against this project
   (or ran before the `festie_demo` app_metadata marker existed); run it again.
 - `festivals_published_requires_source` — a real festival was published without `source_url`.
+- `festival_artists_billing_order_check` — `billing_order` outside 1–10000; `festival:validate` reports
+  the same rule with the file path.
+- `sets_lineup_fkey` — a set was written for an artist that is not in the festival's lineup, or a lineup
+  row was deleted while a set still referenced it. Seed through `festival:seed` (it writes the lineup
+  before the sets and removes dropped acts after their stale sets) instead of editing tables by hand.
 - Local schema tests: `npm run db:test` (throwaway Postgres 16; see `scripts/db-test.sh`).

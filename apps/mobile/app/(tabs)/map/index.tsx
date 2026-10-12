@@ -323,7 +323,9 @@ function FallbackLists({
                 <Text style={styles.listSub}>
                   {next
                     ? `Next: ${artistsById.get(next.artist_id) ?? 'TBA'} · ${clock.day(next.start_time)} ${clock.time(next.start_time)}${next.status === 'moved' ? ' (moved)' : ''}`
-                    : 'No more sets'}
+                    : bundle.sets.length === 0
+                      ? 'Set times to be announced'
+                      : 'No more sets'}
                 </Text>
               </View>
             </View>

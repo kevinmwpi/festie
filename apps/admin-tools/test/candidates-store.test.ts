@@ -745,6 +745,16 @@ describe('evaluateCandidate', () => {
     expect(text).toContain('- Artist Five @ 2027-08-07T19:00:00-05:00 on Main');
   });
 
+  it('reports a lineup-only candidate as such instead of 0% recall', async () => {
+    writeCandidate('riverside', { ...candidateCsv, 'sets.csv': 'artist,stage,start,end\n' });
+    const report = await evaluateCandidate('riverside', goldenFile(), { root });
+    expect(report.sets.lineup_only).toBe(true);
+    expect(report.sets.missing).toHaveLength(6);
+    const text = formatEvalReport(report);
+    expect(text).toContain('Sets: none in the candidate (set times to be announced); golden has 6');
+    expect(text).not.toContain('recall 0%');
+  });
+
   it('honours the tolerance', async () => {
     writeCandidate('riverside', candidateCsv);
     const report = await evaluateCandidate('riverside', goldenFile(), { root, toleranceMinutes: 30 });

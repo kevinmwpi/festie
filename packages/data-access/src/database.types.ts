@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Hand-maintained to match supabase/migrations through 013 (docs/v1-architecture.md §2.9).
+// Hand-maintained to match supabase/migrations through 014 (docs/v1-architecture.md §2.9).
 // `users.Row` lists only the columns `authenticated` may select; `users` has no client writes.
 // Regenerate with `supabase gen types typescript` and re-apply those two rules when the schema changes.
 export type Database = {
@@ -112,6 +112,39 @@ export type Database = {
             columns: ["sender_user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      festival_artists: {
+        Row: {
+          artist_id: string
+          billing_order: number | null
+          festival_id: string
+        }
+        Insert: {
+          artist_id: string
+          billing_order?: number | null
+          festival_id: string
+        }
+        Update: {
+          artist_id?: string
+          billing_order?: number | null
+          festival_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_artists_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_artists_festival_id_fkey"
+            columns: ["festival_id"]
+            isOneToOne: false
+            referencedRelation: "festivals"
             referencedColumns: ["id"]
           },
         ]

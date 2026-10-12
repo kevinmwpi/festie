@@ -613,10 +613,16 @@ describe('local schema v2', () => {
     expect(await db.getFirstAsync('SELECT value FROM app_meta WHERE key = ?;', ['schema_version'])).toEqual({ value: '2' });
   });
 
-  /** The previous release's cache: today's schema minus the given columns, at the current version. */
+  /**
+   * The previous release's cache: today's schema minus the given columns (and minus whole tables
+   * listed under `missing['*']`), at the current version.
+   */
   async function previousReleaseCache(missing: Record<string, readonly string[]>): Promise<LocalDatabase> {
     const database = await createSqlJsDatabase();
     for (const [name, definition] of Object.entries(CACHE_TABLES) as Array<[string, TableDefinition]>) {
+      if ((missing['*'] ?? []).includes(name)) {
+        continue;
+      }
       const columns = definition.columns.filter(([column]) => !(missing[name] ?? []).includes(column));
       await database.execAsync(createTableSql(name, { ...definition, columns }));
     }
@@ -673,6 +679,27 @@ describe('local schema v2', () => {
       { id: 'f1', image_credit: null, image_source_url: null, bundle_version: 0 },
       { id: 'f2', image_credit: null, image_source_url: null, bundle_version: null },
     ]);
+  });
+
+  it('creates the lineup table in place on upgrade and marks bundles stale', async () => {
+    // Exactly what the release before migration 014 had on devices: no festival_artists table.
+    const existing = await previousReleaseCache({ '*': ['festival_artists'] });
+    setDatabaseFactoryForTests(async () => existing);
+
+    const db = await getDb();
+    expect(await db.getAllAsync('SELECT * FROM festival_artists;')).toEqual([]);
+    expect(await db.getAllAsync('SELECT id, bundle_version FROM festivals ORDER BY id;')).toEqual([
+      { id: 'f1', bundle_version: 0 },
+      { id: 'f2', bundle_version: null },
+    ]);
+    expect(await db.getAllAsync('SELECT id FROM sets;')).toEqual([{ id: 's1' }]);
+
+    // The table exists on the next launch: bundles fetched since are not marked stale again.
+    await db.runAsync('UPDATE festivals SET bundle_version = 6 WHERE id = ?;', ['f1']);
+    resetDbForTests();
+    setDatabaseFactoryForTests(async () => existing);
+    const reopened = await getDb();
+    expect(await reopened.getFirstAsync('SELECT bundle_version FROM festivals WHERE id = ?;', ['f1'])).toEqual({ bundle_version: 6 });
   });
 
   it('keeps bundles current when only a non-catalog cache table gains a column', async () => {

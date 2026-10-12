@@ -3,7 +3,17 @@ import { getDb, replaceRowsForFestival, upsertRows, withDbTransaction, type Loca
 import { createChangeTracker, withRefreshGuard } from './cache';
 import { getErrorCode } from './errors';
 import { createId } from './ids';
-import type { Artist, Festival, FestivalBundle, FestivalLineupRow, FestivalSet, LocalUserFestival, Stage } from './models';
+import type {
+  Artist,
+  Festival,
+  FestivalArtist,
+  FestivalBundle,
+  FestivalLineupRow,
+  FestivalSet,
+  LocalUserFestival,
+  Stage,
+  UnscheduledArtist,
+} from './models';
 import { readOptionalRow, selectAllRows, selectAllRowsIn } from './paging';
 import { getCachedProfile, requireCachedProfile } from './profile';
 import { requireStoredSession } from './session';
@@ -19,6 +29,8 @@ export const QUALIFIED_SET_COLUMNS = SET_COLUMNS.split(', ')
   .map((column) => `sets.${column}`)
   .join(', ');
 export const ARTIST_COLUMNS = 'id, name, image_url, image_credit, image_license, image_source_url, genre';
+/** `festival_artists` (migration 014): the announced lineup, with or without set times. */
+export const LINEUP_COLUMNS = 'festival_id, artist_id, billing_order';
 const USER_FESTIVAL_COLUMNS = 'id, user_id, festival_id, selected_at';
 const IN_FILTER_CHUNK = 150;
 
@@ -45,10 +57,15 @@ async function deleteFestivalsLocally(db: LocalDatabase, festivalIds: string[]):
   for (const ids of chunk(festivalIds, IN_FILTER_CHUNK)) {
     const marks = placeholders(ids.length);
     await db.runAsync(`DELETE FROM sets WHERE festival_id IN (${marks});`, ids);
+    await db.runAsync(`DELETE FROM festival_artists WHERE festival_id IN (${marks});`, ids);
     await db.runAsync(`DELETE FROM stages WHERE festival_id IN (${marks});`, ids);
     await db.runAsync(`DELETE FROM festivals WHERE id IN (${marks});`, ids);
   }
-  await db.runAsync('DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM sets);');
+  await db.runAsync(
+    `DELETE FROM artists
+     WHERE id NOT IN (SELECT DISTINCT artist_id FROM sets)
+       AND id NOT IN (SELECT DISTINCT artist_id FROM festival_artists);`,
+  );
 }
 
 /** Cached festivals (published as of the last refresh); demo festivals sort last. */
@@ -95,7 +112,20 @@ async function fetchArtists(artistIds: string[]): Promise<Artist[]> {
 }
 
 /**
- * Makes sure the full bundle (stages, sets, artists) of a festival is cached. A light
+ * The festival's announced lineup (`festival_artists`, migration 014). A server without the relation
+ * fails the whole bundle fetch (PostgREST `PGRST205`), like a server without the `sets` columns of 011:
+ * the cached bundle stays as it was and the runbook applies 014 before any build that reads it. A
+ * silent empty lineup would be cached under the current version and never corrected.
+ */
+async function fetchLineup(festivalId: string): Promise<FestivalArtist[]> {
+  const client = getSupabase();
+  return selectAllRows<FestivalArtist>((options) =>
+    client.from('festival_artists').select(LINEUP_COLUMNS, options).eq('festival_id', festivalId).order('artist_id', { ascending: true }),
+  );
+}
+
+/**
+ * Makes sure the full bundle (stages, sets, lineup, artists) of a festival is cached. A light
  * `select id, version` runs first; the bundle is downloaded only when the version changed. Resolves the
  * cached bundle, or `null` when the festival is no longer published (it is then removed locally).
  */
@@ -136,12 +166,16 @@ export async function fetchAndCacheFestival(festivalId: string): Promise<Festiva
   const sets = await selectAllRows<FestivalSet>((options) =>
     client.from('sets').select(SET_COLUMNS, options).eq('festival_id', festivalId).order('id', { ascending: true }),
   );
-  const artists = await fetchArtists([...new Set(sets.map((set) => set.artist_id))]);
+  const lineup = await fetchLineup(festivalId);
+  // Artists come from the lineup and from the sets: a set's artist is always billed, but legacy data
+  // (or a dashboard edit) may lack the lineup row, and a billed artist may have no set yet.
+  const artists = await fetchArtists([...new Set([...lineup.map((row) => row.artist_id), ...sets.map((set) => set.artist_id)])]);
 
   await withDbTransaction(async (tx) => {
     await upsertRows('festivals', [{ ...festival, bundle_version: festival.version }], tx);
     await replaceRowsForFestival('stages', festivalId, stages as unknown as Array<Record<string, unknown>>, tx);
     await replaceRowsForFestival('sets', festivalId, sets as unknown as Array<Record<string, unknown>>, tx);
+    await replaceRowsForFestival('festival_artists', festivalId, lineup as unknown as Array<Record<string, unknown>>, tx);
     await upsertRows('artists', artists as unknown as Array<Record<string, unknown>>, tx);
   });
 
@@ -160,11 +194,35 @@ export async function getLocalFestivalBundle(festivalId: string): Promise<Festiv
     festivalId,
   ]);
   const artists = await db.getAllAsync<Artist>(
-    `SELECT ${ARTIST_COLUMNS} FROM artists WHERE id IN (SELECT DISTINCT artist_id FROM sets WHERE festival_id = ?) ORDER BY name ASC;`,
-    [festivalId],
+    `SELECT ${ARTIST_COLUMNS} FROM artists
+     WHERE id IN (SELECT artist_id FROM festival_artists WHERE festival_id = ?)
+        OR id IN (SELECT DISTINCT artist_id FROM sets WHERE festival_id = ?)
+     ORDER BY name ASC;`,
+    [festivalId, festivalId],
   );
 
   return { festival: toFestival(festivalRow), stages, artists, sets };
+}
+
+/**
+ * Announced artists that have no set in this festival yet (a cancelled set still counts as a set:
+ * the artist is cancelled, not waiting for a time). Billing order first, then alphabetical.
+ */
+export async function getLocalUnscheduledArtists(festivalId: string): Promise<UnscheduledArtist[]> {
+  const db = await getDb();
+  return db.getAllAsync<UnscheduledArtist>(
+    `SELECT ${ARTIST_COLUMNS.split(', ')
+      .map((column) => `artists.${column}`)
+      .join(', ')}, festival_artists.billing_order AS billing_order
+     FROM festival_artists
+     INNER JOIN artists ON artists.id = festival_artists.artist_id
+     WHERE festival_artists.festival_id = ?
+       AND NOT EXISTS (
+         SELECT 1 FROM sets WHERE sets.festival_id = festival_artists.festival_id AND sets.artist_id = festival_artists.artist_id
+       )
+     ORDER BY festival_artists.billing_order IS NULL, festival_artists.billing_order ASC, artists.name COLLATE NOCASE ASC;`,
+    [festivalId],
+  );
 }
 
 /** True once the festival's stages/sets have been cached at least once. */

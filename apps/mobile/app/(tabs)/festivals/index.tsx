@@ -1,12 +1,4 @@
-import {
-  getLocalFestivals,
-  getLocalUserFestivals,
-  refreshFestivalCatalog,
-  refreshUserFestivals,
-  toggleUserFestival,
-  toUserMessage,
-  type Festival,
-} from '@festival/data-access';
+import { getLocalFestivals, refreshFestivalCatalog, type Festival } from '@festival/data-access';
 import {
   Badge,
   colors,
@@ -16,13 +8,11 @@ import {
   layout,
   radii,
   SecondaryButton,
-  showToast,
   spacing,
   TextLink,
   useOfflineStatus,
 } from '@festival/ui';
 import { Ionicons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -36,7 +26,7 @@ import { queryKeys } from '@/src/hooks/query-keys';
 import { useCacheFirstQuery } from '@/src/hooks/use-cache-first-query';
 import { useCurrentProfile } from '@/src/hooks/use-current-profile';
 import { formatFestivalDateRange } from '@/src/hooks/use-festival';
-import { useUserKey } from '@/src/hooks/use-session';
+import { useFollowFestivals } from '@/src/hooks/use-follow-festival';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { ensureActiveFestival, useAppStore } from '@/src/state/app-store';
@@ -137,8 +127,6 @@ function FestivalCard({
 
 export default function FestivalsScreen() {
   const tabBarClearance = useTabBarClearance();
-  const queryClient = useQueryClient();
-  const userKey = useUserKey();
   const isOffline = useOfflineStatus();
   const profile = useCurrentProfile().data;
   const activeFestivalId = useAppStore((s) => s.activeFestivalId);
@@ -146,7 +134,6 @@ export default function FestivalsScreen() {
   const activeFestivalAccent = useAppStore((s) => s.activeFestivalAccent);
   const screenBg = deriveAccentColors(activeFestivalAccent).bgTint;
   useSafeAreaEdgeTint(screenBg);
-  const [busyId, setBusyId] = React.useState<string | null>(null);
 
   const catalog = useCacheFirstQuery({
     queryKey: queryKeys.festivals(),
@@ -157,40 +144,11 @@ export default function FestivalsScreen() {
     },
   });
 
-  const following = useCacheFirstQuery({
-    queryKey: queryKeys.userFestivals(userKey),
-    readLocal: getLocalUserFestivals,
-    refresh: async () => {
-      await refreshUserFestivals();
-      await ensureActiveFestival();
-    },
-  });
+  const { following, followingIds, busyId, toggle: handleToggle } = useFollowFestivals();
 
   const today = localTodayKey();
   // Upcoming and current festivals first, then ended ones, then demo ("Sample") festivals.
   const festivals = React.useMemo(() => orderFestivalsForList(catalog.data ?? [], today), [catalog.data, today]);
-
-  const followingIds = React.useMemo(
-    () => new Set((following.data ?? []).map((row) => row.festival_id)),
-    [following.data],
-  );
-
-  const handleToggle = React.useCallback(
-    async (festival: Festival) => {
-      setBusyId(festival.id);
-      try {
-        const nowFollowing = await toggleUserFestival(festival.id);
-        await queryClient.invalidateQueries({ queryKey: queryKeys.userFestivals(userKey) });
-        await ensureActiveFestival();
-        showToast(nowFollowing ? `Following ${festival.name}.` : `Unfollowed ${festival.name}.`);
-      } catch (error) {
-        showToast(toUserMessage(error), 'error');
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [queryClient, userKey],
-  );
 
   const handleSelect = React.useCallback(
     (festival: Festival) => {
@@ -228,7 +186,7 @@ export default function FestivalsScreen() {
       emptyContent = (
         <EmptyState
           title="No festivals yet"
-          description="Festivals appear here as soon as their schedules are published. Pull down to check again, or tell us which festival you'd like to see."
+          description="Festivals appear here as soon as their lineups are announced. Pull down to check again, or tell us which festival you'd like to see."
           action={<SecondaryButton label="Suggest a festival" onPress={openSuggest} />}
         />
       );

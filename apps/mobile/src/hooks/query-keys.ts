@@ -15,6 +15,8 @@ export const queryKeys = {
   profile: (uid: string) => ['profile', uid] as const,
   festivals: () => ['festivals'] as const,
   festivalBundle: (festivalId: string) => ['festival-bundle', festivalId] as const,
+  /** Announced artists without a set yet (public catalog data, derived from the bundle). */
+  unscheduledArtists: (festivalId: string) => ['unscheduled-artists', festivalId] as const,
   imageCredits: () => ['image-credits'] as const,
   userFestivals: (uid: string) => ['user-festivals', uid] as const,
   lineup: (uid: string, festivalId: string) => ['lineup', uid, festivalId] as const,

@@ -31,7 +31,7 @@ packages/
   notification-utils/  Local set and meetup reminders
   ui/                  Design tokens and primitives (pastel palette, accessible link colour)
 supabase/
-  migrations/          001–013 (006–009 are the v1 overhaul; 007 is idempotent; 011 set status; 012–013 image credits, festival suggestions, artwork bucket)
+  migrations/          001–014 (006–009 are the v1 overhaul; 007 is idempotent; 011 set status; 012–013 image credits, festival suggestions, artwork bucket; 014 announced lineup)
   functions/           delete-account, demo-login, _shared (Deno)
   tests/               rls.sql (pgTAP-style) and local stubs, fixtures and race scripts
   templates/           Code-only sign-in email templates
@@ -85,7 +85,7 @@ request; run them locally before pushing:
 npm run build                       # turbo: package builds + mobile tsc
 npm run lint                        # turbo: tsc --noEmit everywhere
 npm run test                        # vitest: domain, sync-engine, data-access, map-utils, admin-tools
-npm run db:test                     # migrations 001–013 on a throwaway Postgres 16 + rls.sql + races
+npm run db:test                     # migrations 001–014 on a throwaway Postgres 16 + rls.sql + races
 (cd supabase/functions && deno check */index.ts && deno test && deno lint)
 node docs/legal/generate.mjs --check    # in-app legal screens and docs/site match docs/legal/*.md
 (cd apps/mobile && EXPO_PUBLIC_SUPABASE_URL=https://example.supabase.co EXPO_PUBLIC_SUPABASE_ANON_KEY=dummy \

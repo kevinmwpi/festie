@@ -98,7 +98,9 @@ A **scheduled** run (a Routine) may only scout entries whose status is `watching
 near date. An **admin request** (`/festival-scout <slug>` or the workflow with `requestedBy: 'admin'`)
 may name any watchlist entry, or add one first with `watchlist:add`. When a candidate is created the
 entry's status becomes `candidate`, then `published` after the seed; `passed` and `dropped` take it out
-of scheduling. Adjust the weights in `apps/admin-tools/src/watchlist/watchlist.ts` and this table
+of scheduling. A festival published with its lineup before set times exist is set to `awaiting_times`
+instead of `published`: it is scouted again on schedule like a `watching` entry (the urgency score rises
+as the dates near) until the seed that carries set times moves it to `published`. Adjust the weights in `apps/admin-tools/src/watchlist/watchlist.ts` and this table
 together.
 
 ## 3. The golden database
@@ -112,7 +114,7 @@ every change is reviewed and reversible:
 | `seed-data/<slug>-csv/`, `seed-data/<slug>.json` | The festival bundles (`festival-data.md` §1–§2) |
 | `seed-data/media/registry.json` + `seed-data/media/<file>` | Approved images with source, licence, attribution and the sha256 of the stored file |
 | `seed-data/golden/index.json` | One row per golden festival: slug, id, files, which candidate it came from, when it was promoted, and `verified` (the last human check against the official source: when, by whom, which page) |
-| Supabase (`festivals`, `stages`, `artists`, `sets`, the `artwork` bucket) | The published copy, written only by `festival:seed` and `media:upload` from the files above |
+| Supabase (`festivals`, `stages`, `artists`, `festival_artists`, `sets`, the `artwork` bucket) | The published copy, written only by `festival:seed` and `media:upload` from the files above |
 
 Rules:
 
@@ -210,8 +212,14 @@ npm run admin -- festival:seed seed-data/<slug>.json --dry-run
 npm run admin -- festival:seed seed-data/<slug>.json
 ```
 
-Order matters for the database: migrations 012–013 before `media:upload`; `media:upload` before the
-festival seed that should show the images (the seed bumps the version clients refetch on).
+Order matters for the database: migrations 012–014 before `media:upload` and `festival:seed`;
+`media:upload` before the festival seed that should show the images (the seed bumps the version clients
+refetch on).
+
+A festival whose lineup is official but whose set times are not (`festival-data.md` §4.2) goes through
+the same steps with an empty `sets.csv`: review the artists, publish, and re-run the scout when the
+organizer posts set times (usually 2–7 days out; the watchlist's urgency score rises as the date nears).
+That is the normal order of events for flagship festivals, not an exception.
 
 ### Running the scout
 
@@ -233,8 +241,10 @@ machine sees more. The agent records which sources it could open either way.
    do not approve `sets` from press copies alone.
 2. Festival: dates, time zone, venue, status `draft` (always; publishing is a separate seed).
 3. Stages: names exactly as the organizer writes them; coordinates from public map data or empty.
-4. Artists: names as announced (b2b sets as one name); check the photo, its licence id and attribution;
-   reject anything not clearly the artist.
+4. Artists: names as announced (b2b sets as one name); `billing` only when the official lineup page
+   shows an order; check the photo, its licence id and attribution; reject anything not clearly the
+   artist. A candidate with artists and no sets is a lineup-only candidate: approve `artists` and `sets`
+   (an empty section) when the organizer has not published times yet, and say so in the notes.
 5. Sets: spot-check at least five per day against the source, all headliners, every set after midnight
    (festival days start at 06:00: a 1:00 AM set belongs to the previous day), and every row the agent
    marked `estimated` or `low`. Overlaps on one stage are warnings for a reason.
@@ -268,7 +278,8 @@ and it refuses a candidate slug that is already golden under a different festiva
   - Set times published only as an image; the agent reads a press copy instead. Record it.
   - Two weekends with one lineup (Coachella, EDC Las Vegas 2027): two festivals, shared artist ids.
   - After-midnight sets written on the next calendar date; late-night day bucketing.
-  - "TBA" times: do not invent; leave the set out and say so (lineup-only support is a product gap, §8).
+  - "TBA" times: do not invent; leave the set out, keep the act in `artists.csv`, and say so. The app
+    lists it under "set times to be announced" (`festival-data.md` §4.2).
   - b2b / "presents" / "vs" naming: one artist row per billed act, named as billed.
   - Replacement acts with no slot time; cancelled acts deleted instead of marked `cancelled`.
   - Stage names that differ between the map and the schedule.
@@ -277,10 +288,12 @@ and it refuses a candidate slug that is already golden under a different festiva
 
 ## 8. Limits and open items
 
-- **Lineup announced, times TBA.** Most festivals announce the lineup months before set times, but the
-  schema requires set times, so the app can only publish once times exist (2–7 days before). This is
-  the biggest gap for the flywheel: an announcement mode (artists without sets) is the next data
-  feature.
+- **Set times arrive late.** The lineup can be published months ahead (`festival_artists`, migration
+  014, `festival-data.md` §4.2), but set times still land 2–7 days before the festival, so the scout has
+  to run twice per edition (lineup, then times) and the second run is time-critical. A Routine keyed on
+  the watchlist's urgency score covers it; a "set times are out" notification to followers does not
+  exist yet. Letting people mark artists before times exist (and adding their sets automatically when
+  they arrive) is the next product step on top of this.
 - **Cloud network access.** Scouting from a cloud session is partly blind; the review step compensates,
   and runs from a local machine see more.
 - **Image terms.** The Commons path is automatable and license-aware; Spotify/Apple paths need a terms

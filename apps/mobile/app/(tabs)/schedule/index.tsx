@@ -211,7 +211,9 @@ export default function PersonalScheduleScreen() {
   useSafeAreaEdgeTint(screenBg);
   const isOffline = useOfflineStatus();
 
-  const { bundle, schedule, festival } = useMySchedule(festivalId);
+  const { bundle, schedule, unscheduled, festival } = useMySchedule(festivalId);
+  // Announcement mode: the lineup is out but no set has a time yet, so there is nothing to pick.
+  const setTimesPending = bundle.data?.sets.length === 0 && (unscheduled.data?.length ?? 0) > 0;
   const clock = useFestivalClock(festival);
   const { toggle } = useSetSelection(festival);
   const rows = schedule.data ?? NO_ROWS;
@@ -294,7 +296,11 @@ export default function PersonalScheduleScreen() {
       crumbs={['My Schedule', festival?.name]}
       right={
         festival ? (
-          <IconButton icon="+" accessibilityLabel="Add sets from the lineup" onPress={() => router.push('/(tabs)/schedule/browse')} />
+          <IconButton
+            icon="+"
+            accessibilityLabel={setTimesPending ? 'See the lineup (set times to be announced)' : 'Add sets from the lineup'}
+            onPress={() => router.push(setTimesPending ? '/(tabs)/lineup' : '/(tabs)/schedule/browse')}
+          />
         ) : undefined
       }
     />
@@ -357,14 +363,22 @@ export default function PersonalScheduleScreen() {
         />
 
         {festival ? (
-          schedule.isLoading ? (
+          schedule.isLoading || unscheduled.isLoading ? (
             <LoadingState label="Loading your schedule…" />
           ) : !hasPicks ? (
-            <EmptyState
-              title="No sets yet"
-              description="Add artists from the lineup and they'll show up here as a timeline, with a reminder before each set."
-              action={<SecondaryButton label="Browse lineup" onPress={() => router.navigate('/(tabs)/lineup')} />}
-            />
+            setTimesPending ? (
+              <EmptyState
+                title="Set times coming soon"
+                description="The lineup is announced, but the festival hasn’t published set times yet. Your picks and reminders start here once it does."
+                action={<SecondaryButton label="See the lineup" onPress={() => router.navigate('/(tabs)/lineup')} />}
+              />
+            ) : (
+              <EmptyState
+                title="No sets yet"
+                description="Add artists from the lineup and they'll show up here as a timeline, with a reminder before each set."
+                action={<SecondaryButton label="Browse lineup" onPress={() => router.navigate('/(tabs)/lineup')} />}
+              />
+            )
           ) : (
             <>
               <View style={styles.infoRow}>

@@ -1,7 +1,7 @@
--- Verifies that 007–013 repaired supabase/tests/local/dirty-fixture.sql.
--- Run after the first apply and again after re-applying 007–013.
+-- Verifies that 007–014 repaired supabase/tests/local/dirty-fixture.sql.
+-- Run after the first apply and again after re-applying 007–014.
 begin;
-select plan(44);
+select plan(46);
 
 -- Users: dedupe, backfill, orphans ------------------------------------------
 select is(
@@ -177,6 +177,18 @@ select is(
    from public.artists where id = 'd3200000-0000-4000-8000-000000000001'),
   '-:-:-',
   'legacy artists read with no image credit, licence or source (012)'
+);
+select is(
+  (select count(*)::int from public.festival_artists
+    where festival_id = 'd3000000-0000-4000-8000-000000000001'
+      and artist_id = 'd3200000-0000-4000-8000-000000000001'),
+  1,
+  'the artist of a legacy set is backfilled into the festival lineup (014)'
+);
+select is(
+  (select count(*)::int from public.festival_artists),
+  (select count(distinct (festival_id, artist_id))::int from public.sets),
+  'the backfilled lineup is exactly the distinct (festival, artist) pairs of the legacy sets (014)'
 );
 
 -- Policies and privileges --------------------------------------------------------

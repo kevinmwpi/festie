@@ -838,6 +838,7 @@ export function compareSeeds(
     stages,
     artists,
     sets: {
+      lineup_only: candidateSeed.sets.length === 0,
       precision: ratio(matched, candidateSeed.sets.length),
       recall: ratio(matched, goldenSeed.sets.length),
       exact,
@@ -903,6 +904,10 @@ export function formatEvalReport(report: EvalReport): string {
   }
   const sets = report.sets;
   lines.push('');
+  if (sets.lineup_only) {
+    lines.push(`Sets: none in the candidate (set times to be announced); golden has ${sets.missing.length}`);
+    return lines.join('\n');
+  }
   lines.push(`Sets: precision ${percent(sets.precision)}, recall ${percent(sets.recall)}, exact ${sets.exact} (matched by artist + day; start and end within tolerance)`);
   lines.push(
     ...list(

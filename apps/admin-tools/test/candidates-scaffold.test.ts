@@ -38,7 +38,7 @@ describe('scaffoldCandidate', () => {
       'name,start_date,end_date,timezone,venue_name,source_url,status,is_demo,accent_color,latitude,longitude,default_zoom,bounds_sw_lat,bounds_sw_lng,bounds_ne_lat,bounds_ne_lng,id\n',
     );
     expect(readFileSync(path.join(result.dir, 'stages.csv'), 'utf8')).toBe('name,zone,latitude,longitude,id\n');
-    expect(readFileSync(path.join(result.dir, 'artists.csv'), 'utf8')).toBe('name,genre,id\n');
+    expect(readFileSync(path.join(result.dir, 'artists.csv'), 'utf8')).toBe('name,genre,billing,id\n');
     expect(readFileSync(path.join(result.dir, 'sets.csv'), 'utf8')).toBe('artist,stage,start,end,set_type,status,original_start,note,id\n');
 
     const file = JSON.parse(readFileSync(path.join(result.dir, 'candidate.json'), 'utf8'));

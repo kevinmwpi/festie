@@ -204,7 +204,7 @@ describe('buildCandidateView', () => {
       start: { date: '2026-10-11', time: '00:30', label: '12:30 AM' },
       end: { time: '02:00', label: '2:00 AM' },
     });
-    expect(view.counts).toEqual({ stages: 2, artists: 3, sets: 4, days: 3 });
+    expect(view.counts).toEqual({ stages: 2, artists: 3, sets: 4, days: 3, unscheduled: 0 });
   });
 
   it('carries set status, original start and change note, and finds provenance by current or original start', () => {
@@ -271,6 +271,6 @@ describe('buildCandidateView', () => {
     expect(broken.seedSource).toBe('none');
     expect(broken.festival).toBeNull();
     expect(broken.days).toEqual([]);
-    expect(broken.counts).toEqual({ stages: 0, artists: 0, sets: 0, days: 0 });
+    expect(broken.counts).toEqual({ stages: 0, artists: 0, sets: 0, days: 0, unscheduled: 0 });
   });
 });

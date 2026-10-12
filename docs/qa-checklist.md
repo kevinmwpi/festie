@@ -14,7 +14,7 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Two iPhones, **A** and **B**, each signed in to TestFlight; ideally one on the oldest iOS you support.
       One physical Android phone for the festival-time spot-check in §7 (release gate 7 asks for iOS and
       Android even though v1 is submitted to the App Store only).
-- [ ] The build points at the project you are testing (staging or production); migrations 006–013 are
+- [ ] The build points at the project you are testing (staging or production); migrations 006–014 are
       applied there ([`release-runbook.md`](./release-runbook.md) §2).
 - [ ] Two real mailboxes you can read on the devices (custom SMTP is configured, runbook §2.7).
 - [ ] `npm run admin -- demo:seed` has run on that project; at least one real festival is published
@@ -128,6 +128,18 @@ Admin commands: [`festival-data.md`](./festival-data.md).
       monogram — never a blank tile or a broken image. A photo that has loaded once still shows after
       relaunching in airplane mode. Scrolling a long lineup never shows another artist's photo on a card.
 - [ ] VoiceOver reads each Lineup card's artist name once; the photo or monogram is not a separate element.
+- [ ] **Lineup announced, set times TBA** (`festival-data.md` §4.2): seed a copy of the demo festival
+      with `sets.csv` reduced to its header and `status` published (on staging). Lineup shows "Set times
+      aren't out yet", no day or stage chips, and one card per artist ("Set time TBA", photo or monogram,
+      no Add button; VoiceOver reads name and "set time to be announced" as one element). Add sets shows
+      "Set times coming soon" with a working "See the lineup" button; My Schedule says set times are coming.
+      Crews, chat, meetups and the map work for the festival. Then seed the full CSV again and pull to
+      refresh: the timed cards appear and the TBA notice is gone, without reinstalling.
+- [ ] Partly timed lineup: seed the demo festival with the sets of one artist removed from `sets.csv`
+      (keep the artist in `artists.csv`). Under "All", that artist is listed in a "Set times to be
+      announced" section after the timed cards; with a day or stage chip active, a one-line footnote
+      counts the acts without a time instead. Add sets lists only timed sets and the same footnote.
+- [ ] With `billing` set in `artists.csv` (1 = top), the TBA acts list in that order, then alphabetically.
 - [ ] Every artist and festival photo visible in the app is listed under Settings → Photo credits with
       its credit line (§13).
 - [ ] **Schedule changes**, on future data so picks can be made before the change: shift the demo

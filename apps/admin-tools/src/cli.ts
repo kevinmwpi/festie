@@ -80,7 +80,8 @@ Storage
 Watchlist (which festivals the scout may work on: flagship tier, user demand, or an admin request)
   watchlist:list [--json]                          Priority order; "scout = yes" is what a scheduled run may take
   watchlist:add --name <name> --tier A|B|C [--slug <slug>] [--year <n>] [--url <official>] [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--note <text>]
-  watchlist:set-status <slug> watching|candidate|published|passed|dropped
+  watchlist:set-status <slug> watching|candidate|awaiting_times|published|passed|dropped
+                                                   (awaiting_times: published with the lineup only; scouted again for set times)
   watchlist:remove <slug>
   suggestions:ranking [--json]                     What users ask for most, with watchlist/golden matches
 
@@ -141,8 +142,11 @@ function loadValidSeed(fileArgument: string): { seed: FestivalSeed; filePath: st
 
 function summarizeSeed(seed: FestivalSeed): string {
   const f = seed.festival;
+  const scheduled = new Set(seed.sets.map((set) => set.artist_id));
+  const unscheduled = seed.artists.filter((artist) => !scheduled.has(artist.id)).length;
   return `${f.name} (${f.id}) ${f.start_date}..${f.end_date} ${f.timezone}, ${f.status}${f.is_demo ? ', demo' : ''}: ` +
-    `${seed.stages.length} stages, ${seed.artists.length} artists, ${seed.sets.length} sets`;
+    `${seed.stages.length} stages, ${seed.artists.length} artists, ${seed.sets.length} sets` +
+    (unscheduled > 0 ? ` (${unscheduled} artists without set times)` : '');
 }
 
 function writeSeedFile(filePath: string, seed: unknown): void {

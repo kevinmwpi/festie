@@ -1,4 +1,4 @@
-import { describeSetChange, festivalDayKey, listFestivalDays } from '@festival/domain';
+import { describeLineupAvailability, describeSetChange, festivalDayKey, listFestivalDays } from '@festival/domain';
 import {
   Badge,
   Chip,
@@ -8,6 +8,7 @@ import {
   FieldInput,
   layout,
   radii,
+  SecondaryButton,
   spacing,
   useOfflineStatus,
 } from '@festival/ui';
@@ -20,6 +21,7 @@ import { FestivalDisclaimer, TimeZoneHint } from '@/src/components/FestivalNotes
 import { SubScreenHeader } from '@/src/components/ScreenHeader';
 import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/components/SetChange';
 import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } from '@/src/components/StateViews';
+import { UnscheduledFootnote } from '@/src/components/UnscheduledLineup';
 import { useFestivalClock } from '@/src/hooks/use-festival';
 import { useLineup, type LineupRow } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
@@ -39,7 +41,7 @@ export default function BrowseScheduleScreen() {
   useSafeAreaEdgeTint(screenBg);
   const isOffline = useOfflineStatus();
 
-  const { bundle, lineup, festival } = useLineup(festivalId);
+  const { bundle, lineup, unscheduled, festival } = useLineup(festivalId);
   const clock = useFestivalClock(festival);
   const { toggle, busyIds } = useSetSelection(festival);
   const [dayFilter, setDayFilter] = React.useState<string>(ALL);
@@ -47,6 +49,8 @@ export default function BrowseScheduleScreen() {
   const deferredSearch = React.useDeferredValue(search.trim().toLowerCase());
 
   const rows = lineup.data ?? NO_ROWS;
+  const unscheduledCount = unscheduled.data?.length ?? 0;
+  const availability = describeLineupAvailability({ setCount: rows.length, unscheduledCount });
   const timeZone = festival?.timezone ?? '';
   const days = React.useMemo(() => (festival ? listFestivalDays(festival, rows) : []), [festival, rows]);
 
@@ -109,29 +113,39 @@ export default function BrowseScheduleScreen() {
 
         {festival ? (
           <>
-            <FieldInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search artists or stages"
-              autoCorrect={false}
-              returnKeyType="search"
-              accessibilityLabel="Search artists or stages"
-            />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.filterRow}>
-              {[ALL, ...days].map((day) => (
-                <Chip
-                  key={day}
-                  active={dayFilter === day}
-                  accentColor={accent}
-                  onPress={() => setDayFilter(day)}
-                  label={day === ALL ? 'All days' : clock.date(day)}
+            {rows.length > 0 ? (
+              <>
+                <FieldInput
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search artists or stages"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  accessibilityLabel="Search artists or stages"
                 />
-              ))}
-            </ScrollView>
-            <TimeZoneHint hint={clock.hint} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.filterRow}>
+                  {[ALL, ...days].map((day) => (
+                    <Chip
+                      key={day}
+                      active={dayFilter === day}
+                      accentColor={accent}
+                      onPress={() => setDayFilter(day)}
+                      label={day === ALL ? 'All days' : clock.date(day)}
+                    />
+                  ))}
+                </ScrollView>
+                <TimeZoneHint hint={clock.hint} />
+              </>
+            ) : null}
 
-            {lineup.isLoading ? (
+            {lineup.isLoading || unscheduled.isLoading ? (
               <LoadingState label="Loading the lineup…" />
+            ) : availability === 'tba' ? (
+              <EmptyState
+                title="Set times coming soon"
+                description="The lineup is out, but the festival hasn’t published set times yet. You can add sets here once it does."
+                action={<SecondaryButton label="See the lineup" onPress={() => router.navigate('/(tabs)/lineup')} />}
+              />
             ) : rows.length === 0 ? (
               <EmptyState title="Lineup coming soon" description="Sets will appear here once the festival publishes its schedule." />
             ) : filteredRows.length === 0 ? (
@@ -183,6 +197,7 @@ export default function BrowseScheduleScreen() {
                 })}
               </View>
             )}
+            {availability === 'partial' ? <UnscheduledFootnote count={unscheduledCount} where="lineup" /> : null}
             <StaleDataNote error={bundle.refreshError ?? lineup.refreshError} />
           </>
         ) : null}

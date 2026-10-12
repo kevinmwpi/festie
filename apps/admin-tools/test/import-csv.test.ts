@@ -32,6 +32,9 @@ describe('buildSeedFromCsv', () => {
     const validated = validateFestivalSeed(built.seed);
     expect(validated.errors).toEqual([]);
     expect(validated.seed).toEqual(demoFestivalJson());
+    // Byte for byte, as festival:import-csv writes it: an optional field that is left out (billing)
+    // must stay left out, or every re-import would rewrite the golden file.
+    expect(`${JSON.stringify(validated.seed, null, 2)}\n`).toBe(readRepoFile('seed-data/demo-festival.json'));
   });
 
   it('converts local times with the festival offset and matches names case-insensitively', () => {
@@ -100,6 +103,21 @@ describe('buildSeedFromCsv', () => {
     // Calvin Harris moved from Saturday 23:00 to Sunday and keeps the id of his Saturday slot.
     const calvin = seed.sets.find((set) => set.original_start_time === '2026-10-10T23:00:00-07:00');
     expect(calvin).toMatchObject({ id: 'd7a78947-0a4d-5f80-a039-05879861acd6', status: 'moved', start_time: '2026-10-11T21:10:00-07:00' });
+  });
+
+  it('reads billing from artists.csv and leaves it out of the JSON when empty', () => {
+    const built = buildSeedFromCsv({
+      ...minimal,
+      'artists.csv': ['name,genre,billing', 'Artist One,Rock,2', '"Artist, Two",,1', 'Artist Three,,'].join('\n'),
+    });
+    expect(built.errors).toEqual([]);
+    const artists = (built.seed as { artists: Array<Record<string, unknown>> }).artists;
+    expect(artists.map((artist) => artist.billing_order)).toEqual([2, 1, undefined]);
+    expect('billing_order' in artists[2]).toBe(false);
+    expect(validateFestivalSeed(built.seed).errors).toEqual([]);
+
+    const bad = buildSeedFromCsv({ ...minimal, 'artists.csv': ['name,billing', 'Artist One,top', '"Artist, Two",1'].join('\n') });
+    expect(bad.errors).toEqual([{ path: 'artists.csv:2 billing', message: '"top" must be a whole number (1 = top billing)' }]);
   });
 
   it('respects ids given in the CSV', () => {

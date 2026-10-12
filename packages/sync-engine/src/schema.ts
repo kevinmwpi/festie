@@ -3,7 +3,8 @@
  *
  * Cache tables mirror the server rows the app renders offline. A column appended to a cache table
  * is added in place on the next launch, so an app update never empties the offline cache (a new
- * catalog column also marks every cached festival bundle stale, so it is refetched once online).
+ * catalog column or table also marks every cached festival bundle stale, so it is refetched once
+ * online).
  * Append new columns with a default or as nullable. Bump `LOCAL_SCHEMA_VERSION` only for changes
  * that cannot be made in place (a removed, renamed or retyped column, or a new primary key): that
  * drops and recreates every cache table on the next launch and the app refetches. The persistent
@@ -104,6 +105,17 @@ export const CACHE_TABLES = {
     primaryKey: ['id'],
     indexes: ['CREATE INDEX IF NOT EXISTS sets_festival_idx ON sets (festival_id, start_time);'],
   },
+  // The festival's announced lineup (server migration 014): every billed act, with or without a set.
+  festival_artists: {
+    columns: [
+      ['festival_id', 'TEXT NOT NULL'],
+      ['artist_id', 'TEXT NOT NULL'],
+      // 1 = top billing; null = alphabetical.
+      ['billing_order', 'INTEGER'],
+    ],
+    // The primary key's index serves every per-festival read.
+    primaryKey: ['festival_id', 'artist_id'],
+  },
   user_festivals: {
     columns: [
       ['id', 'TEXT NOT NULL'],
@@ -184,7 +196,7 @@ export const CACHE_TABLES = {
 } as const satisfies Record<string, TableDefinition>;
 
 /** Festival catalog tables, refreshed per festival bundle (`festivals.bundle_version`). */
-export const CATALOG_TABLES: ReadonlySet<string> = new Set(['festivals', 'stages', 'sets', 'artists']);
+export const CATALOG_TABLES: ReadonlySet<string> = new Set(['festivals', 'stages', 'sets', 'artists', 'festival_artists']);
 
 export const PERSISTENT_TABLES = {
   sync_queue: {

@@ -31,7 +31,7 @@ const FESTIVAL_KEYS = [
   'bounds_ne_lng', 'version', 'image_url', 'map_asset_url',
 ] as const;
 const STAGE_KEYS = ['id', 'festival_id', 'name', 'zone', 'latitude', 'longitude'] as const;
-const ARTIST_KEYS = ['id', 'name', 'genre', 'image_url'] as const;
+const ARTIST_KEYS = ['id', 'name', 'genre', 'image_url', 'billing_order'] as const;
 const SET_KEYS = [
   'id', 'festival_id', 'artist_id', 'stage_id', 'start_time', 'end_time', 'set_type', 'status', 'original_start_time',
   'change_note',
@@ -48,6 +48,7 @@ export const LIMITS = {
   setType: 40,
   changeNote: 140,
   maxSetHours: 24,
+  maxBillingOrder: 10000,
 } as const;
 
 const ACCENT_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
@@ -402,7 +403,25 @@ function validateArtists(c: Collector, raw: unknown): ArtistRecord[] {
     }
     names.set(key, index);
     c.mustBeAbsent(a.image_url, `${path}.image_url`, 'must be null: do not use artist photos or artwork');
-    return [{ id, name, genre: c.optionalText(a.genre, `${path}.genre`, LIMITS.genre) }];
+
+    // Position or tier as the organizer lists the lineup; acts sharing a number sort alphabetically
+    // within it, so a repeated value is normal (a poster's tiers), not a mistake.
+    let billingOrder: number | undefined;
+    if (a.billing_order !== undefined && a.billing_order !== null) {
+      if (typeof a.billing_order !== 'number' || !Number.isInteger(a.billing_order) || a.billing_order < 1 || a.billing_order > LIMITS.maxBillingOrder) {
+        c.error(`${path}.billing_order`, `must be an integer between 1 and ${LIMITS.maxBillingOrder} (1 = top billing)`);
+      } else {
+        billingOrder = a.billing_order;
+      }
+    }
+    return [
+      {
+        id,
+        name,
+        genre: c.optionalText(a.genre, `${path}.genre`, LIMITS.genre),
+        ...(billingOrder === undefined ? {} : { billing_order: billingOrder }),
+      },
+    ];
   });
 }
 
@@ -588,8 +607,24 @@ export function validateFestivalSeed(input: unknown): ValidationResult {
   const artists = validateArtists(c, root.artists);
   const sets = validateSets(c, root.sets, festival, stages, artists);
 
-  if (festival && festival.status === 'published' && sets.length === 0) {
-    c.error('sets', 'a published festival needs at least one set');
+  // Announcement mode (migration 014): a festival can be published once its lineup is official,
+  // before set times exist. The app then lists the acts under "set times to be announced".
+  if (festival && festival.status === 'published' && artists.length === 0) {
+    c.error('artists', 'a published festival needs a lineup: at least one artist (set times can follow later)');
+  }
+  const unscheduled = artists.filter((artist) => !sets.some((set) => set.artist_id === artist.id));
+  if (festival?.is_demo && sets.length === 0) {
+    c.error('sets', "the demo festival needs set times: demo:seed builds the sample crew's picks and meetups from them");
+  } else if (artists.length > 0 && sets.length === 0) {
+    c.warn('sets', 'no set times yet: the app shows the lineup as "set times to be announced"');
+  } else if (unscheduled.length > 0) {
+    c.warn(
+      'artists',
+      `${unscheduled.length} of ${artists.length} artists have no set yet (${unscheduled
+        .slice(0, 5)
+        .map((artist) => artist.name)
+        .join(', ')}${unscheduled.length > 5 ? ', …' : ''}): the app lists them under "set times to be announced"`,
+    );
   }
 
   if (c.errors.length > 0 || !festival) {

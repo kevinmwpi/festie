@@ -36,6 +36,12 @@ export interface ArtistRecord {
   id: string;
   name: string;
   genre: string | null;
+  /**
+   * Position in the festival's announced lineup (migration 014, `festival_artists.billing_order`):
+   * 1 = top billing as the organizer lists it. Omitted = alphabetical. Per festival, not a column of
+   * the global artists table.
+   */
+  billing_order?: number;
 }
 
 export interface SetRecord {
@@ -58,7 +64,10 @@ export interface SetRecord {
 export const SET_STATUSES = ['scheduled', 'moved', 'cancelled'] as const;
 export type SetStatus = (typeof SET_STATUSES)[number];
 
-/** The festival file format (seed-data/*.json). */
+/**
+ * The festival file format (seed-data/*.json). `artists` is the festival's announced lineup; a
+ * festival can be published with artists and no sets ("set times to be announced").
+ */
 export interface FestivalSeed {
   festival: FestivalRecord;
   stages: StageRecord[];

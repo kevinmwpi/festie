@@ -10,7 +10,7 @@
 -- Run with: npm run db:test
 
 begin;
-select plan(363);
+select plan(384);
 
 -- ===========================================================================
 -- Identities
@@ -130,7 +130,17 @@ insert into public.stages (id, festival_id, name, latitude, longitude) values
 
 insert into public.artists (id, name) values
   ('ad000000-0000-4000-8000-000000000001', 'Artist One'),
-  ('ad000000-0000-4000-8000-000000000002', 'Artist Two');
+  ('ad000000-0000-4000-8000-000000000002', 'Artist Two'),
+  ('ad000000-0000-4000-8000-000000000003', 'Artist Three');
+
+-- The announced lineup (014): every set's artist must be in it (sets_lineup_fkey). Artist Three is
+-- announced for Published One without a set yet ("set times to be announced").
+insert into public.festival_artists (festival_id, artist_id, billing_order) values
+  ('f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000001', 1),
+  ('f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000002', 2),
+  ('f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000003', null),
+  ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000001', null),
+  ('f0000000-0000-4000-8000-000000000003', 'ad000000-0000-4000-8000-000000000002', 1);
 
 insert into public.sets (id, festival_id, artist_id, stage_id, start_time, end_time) values
   ('e5000000-0000-4000-8000-000000000001', 'f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', '2027-06-01T20:00:00Z', '2027-06-01T21:00:00Z'),
@@ -250,7 +260,7 @@ select is(
       and has_table_privilege('anon', c.oid, p.priv)
     order by 1
   ),
-  array['artists:SELECT', 'festivals:SELECT', 'sets:SELECT', 'stages:SELECT'],
+  array['artists:SELECT', 'festival_artists:SELECT', 'festivals:SELECT', 'sets:SELECT', 'stages:SELECT'],
   'A3 anon table privileges are exactly the public catalog'
 );
 
@@ -265,7 +275,7 @@ select is(
     order by 1
   ),
   array[
-    'artists:SELECT', 'festivals:SELECT', 'group_members:SELECT', 'groups:DELETE', 'groups:SELECT',
+    'artists:SELECT', 'festival_artists:SELECT', 'festivals:SELECT', 'group_members:SELECT', 'groups:DELETE', 'groups:SELECT',
     'location_shares:SELECT', 'meetups:DELETE', 'meetups:INSERT', 'meetups:SELECT', 'meetups:UPDATE',
     'sets:SELECT', 'stages:SELECT', 'user_blocks:SELECT', 'user_festivals:DELETE', 'user_festivals:INSERT',
     'user_festivals:SELECT', 'user_set_selections:DELETE', 'user_set_selections:INSERT',
@@ -442,8 +452,8 @@ select is(
 );
 select is(
   (select count(*)::int from public.artists where id::text like 'ad000000-%'),
-  2,
-  'B4 anon sees artists'
+  3,
+  'B4 anon sees artists (every artist, including one announced without a set)'
 );
 select throws_ok(
   $$ insert into public.festivals (name, start_date, end_date, timezone) values ('x', '2027-01-01', '2027-01-02', 'UTC') $$,
@@ -2549,6 +2559,144 @@ select throws_ok(
 select lives_ok(
   $$ update public.festival_suggestions set status = 'duplicate' where name = 'Fest 2' $$,
   'S25 admin-tools can set a suggestion status (control)'
+);
+
+-- ===========================================================================
+-- T. Festival lineup: announced acts with or without a set (014)
+-- ===========================================================================
+-- festival:seed (service role) writes the lineup; the fixture (top of this file) uses the superuser.
+-- Artist Three is announced for Published One but has no set yet ("set times to be announced").
+select pg_temp.become('superuser');
+-- Scenario main also carries the dirty fixture's backfilled Legacy Fest row: count only this fixture.
+select is(
+  (select count(*)::int from public.festival_artists where festival_id::text like 'f0000000-%'),
+  5,
+  'T1 the lineup fixture is in place (control)'
+);
+
+select pg_temp.become('anon');
+select is(
+  array(select right(festival_id::text, 1) || ':' || right(artist_id::text, 1) || ':' || coalesce(billing_order::text, '-')
+        from public.festival_artists order by festival_id, artist_id),
+  array['1:1:1', '1:2:2', '1:3:-', '2:1:-'],
+  'T2 anon reads the lineup of published festivals, including an act without a set, but not of a draft'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000002') $$,
+  '42501', null, 'T3 anon cannot add an act to a lineup'
+);
+
+select pg_temp.become('carol');
+select is(
+  (select count(*)::int from public.festival_artists where festival_id::text like 'f0000000-%'),
+  4,
+  'T4 a signed-in user reads the same four published lineup rows'
+);
+select is(
+  (select count(*)::int from public.festival_artists where festival_id = 'f0000000-0000-4000-8000-000000000003'),
+  0,
+  'T5 a signed-in user sees no lineup row of a draft festival'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000002') $$,
+  '42501', null, 'T6 a signed-in user cannot add an act to a lineup'
+);
+select throws_ok(
+  $$ update public.festival_artists set billing_order = 9
+     where festival_id = 'f0000000-0000-4000-8000-000000000001' $$,
+  '42501', null, 'T7 a signed-in user cannot change billing'
+);
+select throws_ok(
+  $$ delete from public.festival_artists where festival_id = 'f0000000-0000-4000-8000-000000000001' $$,
+  '42501', null, 'T8 a signed-in user cannot remove an act from a lineup'
+);
+
+select pg_temp.become('service_role');
+select lives_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id, billing_order)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000003', 10000);
+     update public.festival_artists set billing_order = null
+     where festival_id = 'f0000000-0000-4000-8000-000000000002' and artist_id = 'ad000000-0000-4000-8000-000000000003';
+     delete from public.festival_artists
+     where festival_id = 'f0000000-0000-4000-8000-000000000002' and artist_id = 'ad000000-0000-4000-8000-000000000003' $$,
+  'T9 the service role (festival:seed) adds, re-bills and removes acts (control)'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000001') $$,
+  '23505', null, 'T10 an act is listed once per festival'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id, billing_order)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000003', 0) $$,
+  '23514', null, 'T11 billing starts at 1'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id, billing_order)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000003', 10001) $$,
+  '23514', null, 'T12 billing is capped at 10000'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-0000000000ee') $$,
+  '23503', null, 'T13 a lineup row needs an existing artist'
+);
+select throws_ok(
+  $$ delete from public.artists where id = 'ad000000-0000-4000-8000-000000000003' $$,
+  '23503', null, 'T14 an artist that is in a lineup cannot be deleted (like one with a set)'
+);
+
+select pg_temp.become('superuser');
+insert into public.festivals (id, name, start_date, end_date, timezone, status)
+values ('f0000000-0000-4000-8000-0000000000ee', 'Throwaway', '2027-10-01', '2027-10-02', 'UTC', 'draft');
+insert into public.festival_artists (festival_id, artist_id)
+values ('f0000000-0000-4000-8000-0000000000ee', 'ad000000-0000-4000-8000-000000000003');
+delete from public.festivals where id = 'f0000000-0000-4000-8000-0000000000ee';
+select is(
+  (select count(*)::int from public.festival_artists where festival_id = 'f0000000-0000-4000-8000-0000000000ee'),
+  0,
+  'T15 deleting a festival deletes its lineup rows'
+);
+select is(
+  (select count(*)::int from public.artists where id = 'ad000000-0000-4000-8000-000000000003'),
+  1,
+  'T16 the artist survives the festival (artists are global)'
+);
+select ok(
+  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'festival_artists_artist_id_idx'),
+  'T17 the artist foreign key is indexed'
+);
+select is(
+  (select array_agg(policyname::text order by policyname) from pg_policies
+    where schemaname = 'public' and tablename = 'festival_artists'),
+  array['festival_artists_select_published'],
+  'T18 exactly the 014 lineup policy exists on festival_artists'
+);
+-- The lineup never lags the schedule: a set needs its artist in the festival's lineup, and an act with
+-- a set cannot be dropped from the lineup (festival:seed deletes stale sets first).
+select pg_temp.become('service_role');
+select throws_ok(
+  $$ insert into public.sets (id, festival_id, artist_id, stage_id, start_time, end_time)
+     values ('e5000000-0000-4000-8000-0000000000ee', 'f0000000-0000-4000-8000-000000000002',
+             'ad000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000003',
+             '2027-07-01T22:00:00Z', '2027-07-01T23:00:00Z') $$,
+  '23503', null, 'T19 a set whose artist is not in the festival''s lineup is refused'
+);
+select throws_ok(
+  $$ delete from public.festival_artists
+     where festival_id = 'f0000000-0000-4000-8000-000000000001' and artist_id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23503', null, 'T20 an act that still has a set cannot be dropped from the lineup'
+);
+select lives_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000003');
+     insert into public.sets (id, festival_id, artist_id, stage_id, start_time, end_time)
+     values ('e5000000-0000-4000-8000-0000000000ee', 'f0000000-0000-4000-8000-000000000002',
+             'ad000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000003',
+             '2027-07-01T22:00:00Z', '2027-07-01T23:00:00Z') $$,
+  'T21 the same set is accepted once the act is in the lineup (control)'
 );
 
 select * from finish();

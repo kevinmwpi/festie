@@ -18,6 +18,7 @@ export {
   accessibleAccent,
   colors,
   deriveAccentColors,
+  HEADING_FONT,
   layout,
   MIN_ACCENT_LUMINANCE,
   radii,

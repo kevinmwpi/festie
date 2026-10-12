@@ -117,7 +117,8 @@ export interface CandidateView {
   notes: string;
   review: CandidateReview;
   reviewMarkdown: string | null;
-  counts: { stages: number; artists: number; sets: number; days: number };
+  /** `unscheduled`: artists without a set ("set times to be announced", docs/festival-data.md §4.2). */
+  counts: { stages: number; artists: number; sets: number; days: number; unscheduled: number };
 }
 
 const UNKNOWN_DAY = 'unknown';
@@ -318,6 +319,12 @@ export function buildCandidateView(loaded: LoadedCandidate): CandidateView {
     notes: file.notes,
     review: file.review,
     reviewMarkdown: loaded.reviewMarkdown,
-    counts: { stages: seed?.stages.length ?? 0, artists: artists.length, sets: sets.length, days: days.length },
+    counts: {
+      stages: seed?.stages.length ?? 0,
+      artists: artists.length,
+      sets: sets.length,
+      days: days.length,
+      unscheduled: artists.filter((artist) => artist.setCount === 0).length,
+    },
   };
 }

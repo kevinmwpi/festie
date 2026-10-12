@@ -25,8 +25,15 @@ export const TIERS = ['A', 'B', 'C'] as const;
 /** A: flagship (scouted as soon as a lineup is out). B: regional major. C: tracked, scouted only on request. */
 export type Tier = (typeof TIERS)[number];
 
-export const WATCH_STATUSES = ['watching', 'candidate', 'published', 'passed', 'dropped'] as const;
+/**
+ * `watching` → `candidate` (a bundle awaits review) → `published`. A festival published with its
+ * lineup but no set times (festival-data.md §4.2) is `awaiting_times`: scouted again on schedule, like
+ * `watching`, until a seed with set times moves it to `published`. `passed` and `dropped` leave scheduling.
+ */
+export const WATCH_STATUSES = ['watching', 'candidate', 'awaiting_times', 'published', 'passed', 'dropped'] as const;
 export type WatchStatus = (typeof WATCH_STATUSES)[number];
+/** Statuses a scheduled run may scout (given the score). */
+export const SCOUTABLE_STATUSES: ReadonlySet<WatchStatus> = new Set<WatchStatus>(['watching', 'awaiting_times']);
 
 export interface WatchlistEntry {
   slug: string;
@@ -74,7 +81,7 @@ export interface ScoredEntry extends WatchlistEntry {
   follows: number;
   urgency: number;
   score: number;
-  /** True when a scheduled run may scout it (status watching and score ≥ threshold). */
+  /** True when a scheduled run may scout it (status watching or awaiting_times, and score ≥ threshold). */
   scout: boolean;
 }
 
@@ -173,7 +180,7 @@ export function scoreEntry(entry: WatchlistEntry, signals: Signals, today: strin
     Math.min(SUGGESTION_CAP, suggestions * SUGGESTION_POINTS) +
     Math.min(FOLLOW_CAP, follows * FOLLOW_POINTS) +
     urgency;
-  return { ...entry, suggestions, follows, urgency, score, scout: entry.status === 'watching' && score >= SCOUT_THRESHOLD };
+  return { ...entry, suggestions, follows, urgency, score, scout: SCOUTABLE_STATUSES.has(entry.status) && score >= SCOUT_THRESHOLD };
 }
 
 /** Highest score first; ties by soonest start, then name. */
@@ -333,10 +340,10 @@ export function formatWatchlistTable(entries: ScoredEntry[], options: { signalsL
   if (entries.length === 0) {
     return 'Watchlist is empty. Add one: npm run admin -- watchlist:add --name "<festival>" --tier A [--url <official>] [--start YYYY-MM-DD]';
   }
-  const header = `${pad('score', 6)}${pad('scout', 6)}${pad('tier', 5)}${pad('status', 10)}${pad('slug', 28)}${pad('start', 11)}${pad('asks', 5)}${pad('follows', 8)}name`;
+  const header = `${pad('score', 6)}${pad('scout', 6)}${pad('tier', 5)}${pad('status', 16)}${pad('slug', 28)}${pad('start', 11)}${pad('asks', 5)}${pad('follows', 8)}name`;
   const lines = entries.map(
     (entry) =>
-      `${pad(entry.score, 6)}${pad(entry.scout ? 'yes' : '-', 6)}${pad(entry.tier, 5)}${pad(entry.status, 10)}${pad(entry.slug, 28)}${pad(entry.start_date ?? '-', 11)}${pad(entry.suggestions, 5)}${pad(entry.follows, 8)}${entry.name}`,
+      `${pad(entry.score, 6)}${pad(entry.scout ? 'yes' : '-', 6)}${pad(entry.tier, 5)}${pad(entry.status, 16)}${pad(entry.slug, 28)}${pad(entry.start_date ?? '-', 11)}${pad(entry.suggestions, 5)}${pad(entry.follows, 8)}${entry.name}`,
   );
   const note = options.signalsLoaded
     ? `Scheduled scouting takes "scout = yes" (score ≥ ${SCOUT_THRESHOLD}); an admin request may name any slug.`

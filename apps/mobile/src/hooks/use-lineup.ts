@@ -1,9 +1,11 @@
 import {
   getLineupWithConflicts,
+  getLocalUnscheduledArtists,
   getSelectedSchedule,
   refreshSchedule,
   refreshUserSelections,
   type ScheduleRow,
+  type UnscheduledArtist,
 } from '@festival/data-access';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
@@ -46,7 +48,22 @@ async function refreshPicksAndReminders(festivalId: string, refresh: (festivalId
   void restoreSetReminders(festivalId);
 }
 
-/** Full lineup of a festival with the user's picks and conflicts (cache first; picks refresh online). */
+/**
+ * Announced artists of a festival that have no set yet ("set times to be announced"). Cache only: the
+ * rows arrive with the festival bundle, so `useReReadOnBundleChange` re-reads them when it changes.
+ */
+export function useUnscheduledArtists(festivalId: string | null) {
+  return useCacheFirstQuery<UnscheduledArtist[]>({
+    queryKey: queryKeys.unscheduledArtists(festivalId ?? 'none'),
+    readLocal: () => (festivalId ? getLocalUnscheduledArtists(festivalId) : Promise.resolve([])),
+    enabled: Boolean(festivalId),
+  });
+}
+
+/**
+ * Full lineup of a festival with the user's picks and conflicts (cache first; picks refresh online),
+ * plus the announced artists that have no set yet.
+ */
 export function useLineup(festivalId: string | null) {
   const userKey = useUserKey();
   const bundle = useFestivalBundle(festivalId);
@@ -57,8 +74,9 @@ export function useLineup(festivalId: string | null) {
     refresh: festivalId ? () => refreshPicksAndReminders(festivalId, refreshUserSelections) : undefined,
     enabled: Boolean(festivalId),
   });
-  useReReadOnBundleChange(bundle.data, [key]);
-  return { bundle, lineup, festival: bundle.data?.festival ?? null };
+  const unscheduled = useUnscheduledArtists(festivalId);
+  useReReadOnBundleChange(bundle.data, [key, queryKeys.unscheduledArtists(festivalId ?? 'none')]);
+  return { bundle, lineup, unscheduled, festival: bundle.data?.festival ?? null };
 }
 
 /** The user's picked sets (cache first; queued changes flush, then picks refresh online). */
@@ -72,6 +90,7 @@ export function useMySchedule(festivalId: string | null) {
     refresh: festivalId ? () => refreshPicksAndReminders(festivalId, refreshSchedule) : undefined,
     enabled: Boolean(festivalId),
   });
-  useReReadOnBundleChange(bundle.data, [key]);
-  return { bundle, schedule, festival: bundle.data?.festival ?? null };
+  const unscheduled = useUnscheduledArtists(festivalId);
+  useReReadOnBundleChange(bundle.data, [key, queryKeys.unscheduledArtists(festivalId ?? 'none')]);
+  return { bundle, schedule, unscheduled, festival: bundle.data?.festival ?? null };
 }

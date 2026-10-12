@@ -288,7 +288,8 @@
   function renderHeader(v) {
     const f = v.festival;
     const facts = f
-      ? [`${f.start_date} → ${f.end_date}`, f.timezone, f.venue_name, `festival ${f.status}`, `${plural(v.counts.stages, 'stage')}, ${plural(v.counts.artists, 'artist')}, ${plural(v.counts.sets, 'set')}`].filter(Boolean)
+      ? [`${f.start_date} → ${f.end_date}`, f.timezone, f.venue_name, `festival ${f.status}`, `${plural(v.counts.stages, 'stage')}, ${plural(v.counts.artists, 'artist')}, ${plural(v.counts.sets, 'set')}`,
+         v.counts.unscheduled ? `${plural(v.counts.unscheduled, 'artist')} without set times (shown as "set times to be announced")` : null].filter(Boolean)
       : ['festival.csv could not be read (see validation)'];
     return h('section', { class: 'card' },
       h('div', { class: 'row wrap' }, h('h2', { class: 'title' }, v.name), pill(label(v.status), STATUS_TONE[v.status]), h('code', { class: 'muted' }, v.slug),
@@ -334,7 +335,7 @@
       ...[['pending', 'Pending'], ['approved', 'Approve'], ['rejected', 'Reject']].map(([value, text]) =>
         h('button', { type: 'button', class: `seg ${value}${current === value ? ' on' : ''}`, 'aria-pressed': current === value ? 'true' : 'false', onclick: () => setDecision(key, value) }, text)));
     return h('section', { class: 'card section', id: `section-${key}` },
-      h('div', { class: 'section-head' }, h('h3', null, `${SECTION_TITLES[key]}${count}`),
+      h('div', { class: 'section-head' }, h('h3', null, `${SECTION_TITLES[key]}${count}${key === 'sets' && v.counts.sets === 0 && v.counts.artists > 0 ? ' — set times to be announced' : ''}`),
         h('span', { class: 'muted small' }, 'confidence '), pill(v.confidence && v.confidence[key] || 'unknown', CONF_TONE[v.confidence && v.confidence[key]]), group),
       body);
   }
@@ -365,7 +366,7 @@
 
   function renderArtists(v) {
     if (v.artists.length === 0) return h('p', { class: 'muted' }, 'No artists.');
-    const grid = h('div', { class: 'artist-grid' }, ...v.artists.map((a) => renderArtistCard(a.name, `${a.genre || 'genre unknown'} · ${plural(a.setCount, 'set')}`, a.media, a.provenance)));
+    const grid = h('div', { class: 'artist-grid' }, ...v.artists.map((a) => renderArtistCard(a.name, `${a.genre || 'genre unknown'} · ${a.setCount === 0 ? 'set times TBA' : plural(a.setCount, 'set')}`, a.media, a.provenance)));
     const extra = v.media.unmatched.length
       ? [h('h4', null, `Other images in the registry (${v.media.unmatched.length})`),
         h('div', { class: 'artist-grid' }, ...v.media.unmatched.map((m) => renderArtistCard(m.subject_name, `${m.subject_type} · not matched to a row`, m, null)))]

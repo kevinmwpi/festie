@@ -210,10 +210,27 @@ describe('validateFestivalSeed', () => {
     );
   });
 
-  it('requires sets before publishing and warns about overlaps', () => {
-    expect(errorsOf(mutate((file) => { file.festival.status = 'published'; file.sets = []; }))).toContain(
-      'sets: a published festival needs at least one set',
+  it('publishes a lineup without set times, but never an empty one, and warns about overlaps', () => {
+    // Announcement mode: artists announced, set times to be announced.
+    const lineupOnly = validateFestivalSeed(mutate((file) => { file.festival.status = 'published'; file.sets = []; }));
+    expect(lineupOnly.errors).toEqual([]);
+    expect(lineupOnly.seed?.artists).toHaveLength(2);
+    expect(lineupOnly.warnings.map((warning) => `${warning.path}: ${warning.message}`)).toContain(
+      'sets: no set times yet: the app shows the lineup as "set times to be announced"',
     );
+    expect(errorsOf(mutate((file) => { file.festival.status = 'published'; file.sets = []; file.artists = []; }))).toEqual([
+      'artists: a published festival needs a lineup: at least one artist (set times can follow later)',
+    ]);
+    // A draft may be empty.
+    expect(errorsOf(mutate((file) => { file.sets = []; file.artists = []; }))).toEqual([]);
+
+    // Partly timed: the acts still waiting are named.
+    const partial = validateFestivalSeed(mutate((file) => { file.sets.pop(); }));
+    expect(partial.errors).toEqual([]);
+    expect(partial.warnings.map((warning) => `${warning.path}: ${warning.message}`)).toContain(
+      'artists: 1 of 2 artists have no set yet (Artist Two): the app lists them under "set times to be announced"',
+    );
+
     const overlapping = mutate((file) => {
       file.sets[1].stage_id = file.sets[0].stage_id;
       file.sets[1].start_time = '2027-08-06T19:30:00-05:00';
@@ -222,6 +239,33 @@ describe('validateFestivalSeed', () => {
     const result = validateFestivalSeed(overlapping);
     expect(result.errors).toEqual([]);
     expect(result.warnings.map((warning) => warning.message)).toContain('overlaps sets[0] on the same stage');
+  });
+
+  it('accepts billing order per artist and reports the database range', () => {
+    const billed = validateFestivalSeed(mutate((file) => { file.artists[0].billing_order = 2; file.artists[1].billing_order = 1; }));
+    expect(billed.errors).toEqual([]);
+    expect(billed.seed?.artists.map((artist) => artist.billing_order)).toEqual([2, 1]);
+    // Left out when not given, so files without billing round-trip unchanged.
+    expect('billing_order' in validateFestivalSeed(realFestival()).seed!.artists[0]).toBe(false);
+    expect(errorsOf(mutate((file) => (file.artists[0].billing_order = 0)))).toEqual([
+      'artists[0].billing_order: must be an integer between 1 and 10000 (1 = top billing)',
+    ]);
+    expect(errorsOf(mutate((file) => (file.artists[0].billing_order = 1.5)))).toEqual([
+      'artists[0].billing_order: must be an integer between 1 and 10000 (1 = top billing)',
+    ]);
+    expect(errorsOf(mutate((file) => (file.artists[0].billing_order = '1')))).toEqual([
+      'artists[0].billing_order: must be an integer between 1 and 10000 (1 = top billing)',
+    ]);
+    // A poster's tiers: several acts share a number and sort alphabetically within it.
+    const tiered = validateFestivalSeed(mutate((file) => { file.artists[0].billing_order = 1; file.artists[1].billing_order = 1; }));
+    expect(tiered.errors).toEqual([]);
+    expect(tiered.warnings.map((warning) => warning.path)).not.toContain('artists[1].billing_order');
+  });
+
+  it('never lets the demo festival go without set times', () => {
+    const demo = demoFestivalJson();
+    demo.sets = [];
+    expect(errorsOf(demo)).toEqual(["sets: the demo festival needs set times: demo:seed builds the sample crew's picks and meetups from them"]);
   });
 
   it('rejects non-object input', () => {

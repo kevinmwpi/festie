@@ -79,6 +79,11 @@ describe('watchlist scoring', () => {
     }
   });
 
+  it('keeps scouting a festival published with its lineup only, until its set times are in', () => {
+    expect(scoreEntry(entry({ tier: 'A', status: 'awaiting_times' }), noSignals(), TODAY).scout).toBe(true);
+    expect(scoreEntry(entry({ tier: 'B', status: 'awaiting_times' }), noSignals(), TODAY).scout).toBe(false);
+  });
+
   it('ranks by score, then soonest start, then name', () => {
     const list: Watchlist = {
       version: 1,
