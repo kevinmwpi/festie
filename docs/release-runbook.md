@@ -649,7 +649,11 @@ external assets) and `apps/mobile/app/legal/*.tsx`.
 
 2. Publish `docs/site/` on any static host:
    - **Cloudflare Workers (what Festie uses, on `joinfestie.com`)**: `wrangler.jsonc` at the repository
-     root publishes `docs/site/` as a static-assets Worker named `festie`. Cloudflare dashboard →
+     root publishes `docs/site/` as a static-assets Worker named `festie`. **The site changes only when
+     the Worker's production branch (`main`) receives a push**: a commit on a feature branch, a database
+     `supabase db push` or an app build never republishes it. Merge the branch into `main`, wait for
+     Cloudflare → Workers & Pages → festie → Deployments to show that commit as succeeded, then hard-refresh
+     `https://joinfestie.com/privacy` (purge the Cloudflare cache if the old text lingers). Cloudflare dashboard →
      Workers & Pages → Create → import this GitHub repository; project name `festie` (must match `name`
      in `wrangler.jsonc`); build command empty; deploy command `npx wrangler deploy`; preview builds off;
      build variable `SKIP_DEPENDENCY_INSTALL=true` (without it Cloudflare runs `npm ci` and the

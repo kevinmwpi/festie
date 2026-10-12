@@ -31,7 +31,7 @@ const CONTENT: Block[] = [
     "spans": [
       {
         "kind": "text",
-        "text": "These Terms of Use are an agreement between you and Kevin Pi, who operates the Festie app and its services. In these Terms, \"we\", \"us\" and \"our\" mean Kevin Pi, and \"Festie\" means the app and its services. By creating an account or using Festie you agree to these Terms and confirm you have read our "
+        "text": "These Terms of Use are an agreement between you and Kevin Pi, who operates the Festie app and its services. In these Terms, \"we\", \"us\" and \"our\" mean Kevin Pi, and \"Festie\" means the app and its services. By creating an account or using Festie, you agree to these Terms and confirm you have read our "
       },
       {
         "kind": "route",
@@ -58,7 +58,7 @@ const CONTENT: Block[] = [
     "spans": [
       {
         "kind": "text",
-        "text": "Festie has zero tolerance for objectionable content or abusive users; we act on reports within 24 hours by removing content and ejecting offenders. You can report any person, crew, meetup or photo and block any person from within the app."
+        "text": "We have zero tolerance for objectionable content or abusive users: we act on reports within 24 hours by removing content and ejecting offenders. You can report any person, crew, meetup or photo and block any person from within the app."
       }
     ]
   },
@@ -76,7 +76,7 @@ const CONTENT: Block[] = [
     "spans": [
       {
         "kind": "text",
-        "text": "You must be at least 13 years old. If you are under the age of majority where you live, you may use Festie only with the permission of a parent or guardian, who agrees to these Terms for you."
+        "text": "You must be at least 13 years old. If you are under the age of majority where you live (18 in most places), you may use Festie only with the permission of a parent or guardian, who agrees to these Terms for you."
       }
     ]
   },

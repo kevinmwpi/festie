@@ -288,8 +288,29 @@ function renderHtml(doc, key, values) {
   parts.push('</article>');
   const firstParagraph = doc.blocks.find((b) => b.type === 'p');
   const plain = firstParagraph ? firstParagraph.spans.map((s) => s.v).join('') : doc.title;
-  const description = (values.supportEmail ? plain.split(SUPPORT_EMAIL_TOKEN).join(values.supportEmail) : plain).slice(0, 155);
+  const description = snippet(values.supportEmail ? plain.split(SUPPORT_EMAIL_TOKEN).join(values.supportEmail) : plain);
   return pageShell({ key, title: doc.title, description, body: parts.join('\n') });
+}
+
+/**
+ * The page's meta description (search results, link previews): the opening sentences that fit in
+ * `limit` characters, whole; never a cut mid-word or mid-name. Falls back to a word boundary with an
+ * ellipsis when even the first sentence is too long.
+ */
+function snippet(text, limit = 155) {
+  // A sentence ends at . ! or ? followed by whitespace, so the dot of an email address or a domain
+  // inside a sentence does not count.
+  const sentences = text.trim().split(/(?<=[.!?])\s+/);
+  let out = '';
+  for (const sentence of sentences) {
+    const next = out ? `${out} ${sentence}` : sentence;
+    if (next.length > limit) break;
+    out = next;
+  }
+  if (out) return out;
+  const cut = text.slice(0, limit);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 0 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
 function renderIndex() {
