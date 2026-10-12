@@ -26,6 +26,7 @@
     "@festival/ui": "*",
     "@react-native-community/datetimepicker": "8.6.0",
     "@react-native-community/netinfo": "11.5.2",
+    "@react-navigation/elements": "^2.9.11",
     "@react-navigation/native": "^7.1.33",
     "@rnmapbox/maps": "^10.2.10",
     "@supabase/supabase-js": "^2.99.3",

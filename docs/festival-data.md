@@ -144,8 +144,9 @@ Settings, and Terms §8). Data must keep it that way:
    and corrected later.
 3. **Nominative names only.** Use names as plain text to identify the festival, stages and artists.
    No logos, wordmarks, posters, artwork, official maps, photos or brand colours copied from the
-   festival — `image_url` and `map_asset_url` are rejected by the validator. Pick your own neutral
-   `accent_color`.
+   festival — `image_url` and `map_asset_url` are rejected by the validator in festival files. Pick your
+   own neutral `accent_color`. Images reach the app only through the media registry (§6): licensed
+   artist photos with attribution, and festival marks only with the organizer's permission.
 4. **Coordinates** come from public map data (e.g. the venue's public address/park outline on
    OpenStreetMap), not from the festival's site map artwork.
 5. **Keep it current.** Schedules change; re-check the source before the festival and update
@@ -254,7 +255,45 @@ reviewer), and live locations are only ever written for the fake members. After 
 build that seeded the demo before this marker existed, run `demo:seed` again (it adds the marker to
 the existing fake users and replaces the guessable invite code).
 
-## 6. Moderation
+## 6. Images: the media registry
+
+Festival files never carry images. Approved, licensed images live in `seed-data/media/registry.json`
+(one entry per artist or festival: the stored file, its sha256, where it came from, the licence, the
+attribution text, and who approved it) with the files next to it. `media:validate` checks the registry
+against the rules (allowed licences, attribution present where the licence requires it, file hashes,
+subjects that exist). `media:upload` pushes approved files to the public `artwork` storage bucket
+(migration 013) and writes `image_url`, `image_credit`, `image_license` and `image_source_url` on the
+artist or festival row (migration 012), then bumps the version of every published festival that uses a
+changed artist so phones refetch. The app shows every credit under Settings → Photo credits.
+
+- **Artists:** `npm run admin -- media:fetch-commons --artist "<name>" --artist-id <uuid>` (or
+  `--seed <festival.json>` for every artist of a festival) fetches a Wikimedia Commons photo through
+  Wikidata and records its licence. Only `CC0`, public domain, `CC BY` and `CC BY-SA` are accepted
+  (`NC`: commercial app; `ND`: we crop). Entries start as `pending`; approve them in the review tool
+  or by editing `review.status`.
+- **Festivals:** no posters or poster cut-outs. An official logo only with `organizer-permission` or
+  `press-kit-editorial` recorded in the entry (link the permission or kit), never scraped.
+- **Removal:** set `review.status` to `rejected` and run `media:upload`: it clears the row and deletes
+  the object.
+
+`seed-data/media/README.md` has the entry format. The reasoning is in
+[`agents/festival-pipeline.md`](./agents/festival-pipeline.md) §4.
+
+## 7. Candidates, review and the scout agent
+
+New festivals arrive as **candidates** in `seed-data/candidates/<slug>/` (the four CSVs, a
+`candidate.json` with sources and confidence, optional `media/`, and a `REVIEW.md`), written by the
+scout agent (`/festival-scout` in Claude Code, or the `festival-scout` workflow) or scaffolded by hand
+with `candidate:new`. Review them in the local tool (`npm run admin -- review:serve`, then open
+http://127.0.0.1:8787): approve or reject each section and each image, then
+`candidate:promote <slug>` copies the approved bundle into `seed-data/` and records it in
+`seed-data/golden/index.json`. Publish as in §4. The roles, rules and the flywheel are in
+[`agents/festival-pipeline.md`](./agents/festival-pipeline.md).
+
+User suggestions from the app ("Suggest a festival") land in `festival_suggestions` (migration 012):
+`suggestions:list`, `suggestions:to-candidate <id>`.
+
+## 8. Moderation
 
 Users report profiles, groups, meetups and photos in the app (reasons: spam, harassment, hate,
 sexual, violence, impersonation, other) and are told "we'll review this within 24 hours". Reports
@@ -323,7 +362,7 @@ an addition part of every fresh environment, also append it to a new migration
 (`insert into public.moderation_terms (term) values (...) on conflict do nothing;`) — never edit an
 applied migration.
 
-## 7. Troubleshooting
+## 9. Troubleshooting
 
 - `Missing SUPABASE_URL …` — export both variables; the anon key is never accepted.
 - `PGRST205` / missing columns — the target project is missing migrations 006–011; apply them first.

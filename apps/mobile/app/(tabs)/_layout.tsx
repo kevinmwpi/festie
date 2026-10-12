@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { configureReminderNotifications } from '@festival/notification-utils';
 import { colors } from '@festival/ui';
+import { PlatformPressable } from '@react-navigation/elements';
+import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -41,6 +43,15 @@ const TAB_CONFIG: Record<string, { icon: IoniconName; iconFocused: IoniconName; 
   map:       { icon: 'map-outline',           iconFocused: 'map',            label: 'Map'      },
 };
 
+/**
+ * React Navigation puts `tabBarItemStyle` on a wrapper View, while the pressable inside it fills that
+ * wrapper top-aligned with 5 pt of padding (`tabVerticalUiKit`). Centring the wrapper therefore moves
+ * nothing, and the icon stack sits about 8 pt above the middle of the pill. Centre the pressable itself.
+ */
+function TabButton(props: BottomTabBarButtonProps) {
+  return <PlatformPressable {...props} style={[props.style, styles.tabButton]} />;
+}
+
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const cfg = TAB_CONFIG[name];
   if (!cfg) return null;
@@ -72,8 +83,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        // Centre each tab (React Navigation top-aligns them) in the full height of the pill.
-        tabBarItemStyle: { justifyContent: 'center', paddingVertical: 0 },
+        tabBarButton: TabButton,
         tabBarIconStyle: { width: '100%', height: TAB_ICON_BOX_HEIGHT },
         tabBarStyle: {
           backgroundColor: accent,
@@ -107,6 +117,8 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  // Overrides the library's `justifyContent: 'flex-start', padding: 5` on the tab pressable.
+  tabButton: { justifyContent: 'center', padding: 0 },
   iconContainer: {
     alignItems: 'center',
     gap: 4,
