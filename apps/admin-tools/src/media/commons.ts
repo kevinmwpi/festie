@@ -4,6 +4,10 @@
  * `media:upload` touches anything. Only CC0, public domain, CC BY and CC BY-SA are accepted — NC forbids
  * a commercial app, ND forbids the crop, anything unknown is refused rather than guessed.
  *
+ * The attribution names Commons' `Artist` only. `Credit` is the Information template's *source* ("Own
+ * work", "Flickr", a URL), not an author: it is kept in `source.note` for the reviewer, and a CC BY or
+ * CC BY-SA file without an Artist is refused rather than credited to its source.
+ *
  * Wikimedia asks API clients for a descriptive User-Agent and a gentle request rate; `CommonsClient`
  * sends the agent on every call and waits at least `minIntervalMs` between calls.
  */
@@ -11,7 +15,15 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { extensionFor, imageDimensions, sha256Of, sniffMime } from './registry';
-import { ALLOWED_LICENSES, ARTWORK_MAX_BYTES, ARTWORK_MAX_SIDE, IMAGE_CREDIT_MAX_LENGTH, type LicenseId, type MediaEntry } from './types';
+import {
+  ALLOWED_LICENSES,
+  ARTWORK_MAX_BYTES,
+  ARTWORK_MAX_SIDE,
+  ATTRIBUTION_REQUIRED,
+  IMAGE_CREDIT_MAX_LENGTH,
+  type LicenseId,
+  type MediaEntry,
+} from './types';
 
 export const DEFAULT_USER_AGENT = 'Festie-admin-tools/0.1 (+https://joinfestie.com; support@joinfestie.com)';
 export const WIKIDATA_API = 'https://www.wikidata.org/w/api.php';
@@ -405,8 +417,9 @@ export async function fetchCommonsCandidate(options: FetchCommonsCandidateOption
   if (!license.ok) {
     return fail('license', license.reason, { wikidataId, fileName: entity.fileName, license: info.licenseShortName ?? info.license });
   }
-  const author = info.artist ?? info.credit;
-  if (!author && (license.id.startsWith('CC-BY'))) {
+  // Only `Artist` names the author. `Credit` is the source ("Own work", "Flickr"): never credited as one.
+  const author = info.artist;
+  if (!author && ATTRIBUTION_REQUIRED.includes(license.id)) {
     return fail('license', `${license.label} requires attribution but Commons lists no author`, {
       wikidataId,
       fileName: entity.fileName,
@@ -439,7 +452,7 @@ export async function fetchCommonsCandidate(options: FetchCommonsCandidateOption
 
   const notes = [
     searchNote ?? `Wikidata ${wikidataId}`,
-    info.credit && info.credit !== author ? `Commons credit: ${info.credit}` : null,
+    info.credit ? `Commons credit: ${info.credit}` : null,
     info.restrictions ? `Commons restrictions: ${info.restrictions}` : null,
     entity.musicbrainzId ? `MusicBrainz ${entity.musicbrainzId}` : null,
     info.licenseShortName && license.label !== info.licenseShortName ? `Commons licence: ${info.licenseShortName}` : null,

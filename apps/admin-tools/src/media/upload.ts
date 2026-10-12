@@ -3,7 +3,8 @@
  * writes the subject rows' image columns (migration 012), clears subjects that lost their approval, and
  * bumps `festivals.version` so clients refetch (they only refetch a festival's artists when its version
  * changes). Planning is read-only; `applyMediaUpload` performs the plan in a safe order:
- * uploads, row updates, row clears, object removals, version bumps.
+ * uploads, row updates, row clears, version bumps, then object removals (a failed removal is a warning,
+ * not an error: the next run plans it again from the bucket listing).
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -127,6 +128,8 @@ export interface MediaApplyResult {
   cleared: number;
   removed: number;
   bumped: Array<{ festivalId: string; from: number; to: number }>;
+  /** Removal batches that failed; their objects stay in the bucket until the next run removes them. */
+  removalFailures: Array<{ paths: string[]; message: string }>;
 }
 
 /** What `media:upload` writes on the subject row for an approved entry. */
@@ -548,15 +551,18 @@ export function describeMediaPlan(plan: MediaUploadPlan): string {
 }
 
 /**
- * Performs the plan. Order matters for clients: objects exist before rows point at them, rows stop
- * pointing at objects before those are removed, and versions bump last so a refetch sees everything.
+ * Performs the plan. Order matters for clients: objects exist before rows point at them, and versions
+ * bump as soon as the rows are written so a refetch sees everything. Object removals come last and never
+ * fail the run: a re-run plans them again from the bucket listing, whereas it would NOT plan the bumps
+ * again (the rows are already current), so a failure between the first row write and the last bump
+ * names the festivals left to bump by hand.
  */
 export async function applyMediaUpload(
   client: SupabaseClient,
   plan: MediaUploadPlan,
   log: (line: string) => void = () => {},
 ): Promise<MediaApplyResult> {
-  const result: MediaApplyResult = { uploaded: 0, updated: 0, cleared: 0, removed: 0, bumped: [] };
+  const result: MediaApplyResult = { uploaded: 0, updated: 0, cleared: 0, removed: 0, bumped: [], removalFailures: [] };
   const storage = client.storage.from(plan.bucket);
 
   for (const upload of plan.uploads) {
@@ -572,55 +578,93 @@ export async function applyMediaUpload(
     log(`Uploaded ${upload.path} (${upload.entry.subject_name}).`);
   }
 
-  for (const update of plan.rowUpdates) {
-    check(await client.from(update.table).update(update.after).eq('id', update.id), `Updating ${update.table} ${update.id}`);
-    result.updated += 1;
-  }
-  if (plan.rowUpdates.length > 0) {
-    log(`Updated ${plan.rowUpdates.length} row(s).`);
-  }
+  // From the first row write on, a failure leaves rows current but festivals unbumped (see withUnbumped).
+  let rowsWritten = false;
+  const settledBumps = new Set<string>();
+  try {
+    for (const update of plan.rowUpdates) {
+      check(await client.from(update.table).update(update.after).eq('id', update.id), `Updating ${update.table} ${update.id}`);
+      rowsWritten = true;
+      result.updated += 1;
+    }
+    if (plan.rowUpdates.length > 0) {
+      log(`Updated ${plan.rowUpdates.length} row(s).`);
+    }
 
-  for (const clear of plan.clears) {
-    check(
-      await client.from(clear.table).update({ ...CLEARED_IMAGE_COLUMNS }).eq('id', clear.id),
-      `Clearing image of ${clear.table} ${clear.id}`,
-    );
-    result.cleared += 1;
-  }
-  if (plan.clears.length > 0) {
-    log(`Cleared ${plan.clears.length} row(s).`);
+    for (const clear of plan.clears) {
+      check(
+        await client.from(clear.table).update({ ...CLEARED_IMAGE_COLUMNS }).eq('id', clear.id),
+        `Clearing image of ${clear.table} ${clear.id}`,
+      );
+      rowsWritten = true;
+      result.cleared += 1;
+    }
+    if (plan.clears.length > 0) {
+      log(`Cleared ${plan.clears.length} row(s).`);
+    }
+
+    for (const bump of plan.bumps) {
+      const current = check(
+        await client.from('festivals').select('id, version').eq('id', bump.festivalId).maybeSingle(),
+        `Reading festival ${bump.festivalId}`,
+      ) as { id: string; version: number } | null;
+      if (!current) {
+        log(`Festival ${bump.festivalId} no longer exists; not bumped.`);
+        settledBumps.add(bump.festivalId);
+        continue;
+      }
+      const next = (current.version ?? 0) + 1;
+      check(
+        await client
+          .from('festivals')
+          .update({ version: next, updated_at: new Date().toISOString() })
+          .eq('id', bump.festivalId),
+        `Bumping festival ${bump.festivalId}`,
+      );
+      result.bumped.push({ festivalId: bump.festivalId, from: current.version, to: next });
+      settledBumps.add(bump.festivalId);
+      log(`Bumped ${bump.name} to version ${next}.`);
+    }
+  } catch (error) {
+    throw rowsWritten ? withUnbumped(error, plan, settledBumps) : error;
   }
 
   for (const [index, batch] of chunk(plan.removals, REMOVE_BATCH_SIZE).entries()) {
-    const { data, error } = await storage.remove(batch);
-    if (error) {
-      throw new Error(`Removing objects (batch ${index + 1}) failed after ${result.removed} removal(s): ${error.message}`);
+    let failure: string | null = null;
+    try {
+      const { data, error } = await storage.remove(batch);
+      if (error) {
+        failure = error.message;
+      } else {
+        result.removed += data?.length ?? batch.length;
+      }
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
     }
-    result.removed += data?.length ?? batch.length;
+    if (failure !== null) {
+      result.removalFailures.push({ paths: batch, message: failure });
+      log(`WARNING could not remove ${batch.length} object(s) (batch ${index + 1}): ${failure}; the next media:upload retries.`);
+    }
   }
-  if (plan.removals.length > 0) {
+  if (result.removed > 0) {
     log(`Removed ${result.removed} object(s).`);
   }
-
-  for (const bump of plan.bumps) {
-    const current = check(
-      await client.from('festivals').select('id, version').eq('id', bump.festivalId).maybeSingle(),
-      `Reading festival ${bump.festivalId}`,
-    ) as { id: string; version: number } | null;
-    if (!current) {
-      log(`Festival ${bump.festivalId} no longer exists; not bumped.`);
-      continue;
-    }
-    const next = (current.version ?? 0) + 1;
-    check(
-      await client
-        .from('festivals')
-        .update({ version: next, updated_at: new Date().toISOString() })
-        .eq('id', bump.festivalId),
-      `Bumping festival ${bump.festivalId}`,
-    );
-    result.bumped.push({ festivalId: bump.festivalId, from: current.version, to: next });
-    log(`Bumped ${bump.name} to version ${next}.`);
-  }
   return result;
+}
+
+/**
+ * The planned bumps a failed run did not reach, appended to its error: the rows are already current, so
+ * re-running media:upload plans no bump for them; festival:seed always bumps.
+ */
+function withUnbumped(error: unknown, plan: MediaUploadPlan, settled: ReadonlySet<string>): unknown {
+  const left = plan.bumps.filter((bump) => !settled.has(bump.festivalId));
+  if (left.length === 0) {
+    return error;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return new Error(
+    `${message}\nVersions not bumped for: ${left.map((bump) => `${bump.name} (${bump.festivalId})`).join(', ')} — ` +
+      're-running media:upload will not bump them (their rows are already current); run festival:seed seed-data/<slug>.json for each (it always bumps).',
+    { cause: error },
+  );
 }

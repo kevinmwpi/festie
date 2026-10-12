@@ -89,10 +89,15 @@ for every `CC-BY*` licence and is at most 300 characters.
 
    For every approved entry: uploads the file to the public `artwork` bucket (migration 013) at the
    same path when the object is missing or its checksum differs, writes the row's image columns when
-   they differ, clears rows whose image points at the bucket without an approved entry (and removes
-   the object), removes objects no approved entry references, then bumps `festivals.version` on every
-   published festival whose own image changed or that has a set by an artist whose image changed, so
-   clients refetch. Re-run after rejecting an entry to take its image down.
+   they differ, clears rows whose image points at the bucket without an approved entry, bumps
+   `festivals.version` on every published festival whose own image changed or that has a set by an
+   artist whose image changed (so clients refetch), and finally removes the cleared subjects' objects
+   and any object no approved entry references. Re-run after rejecting an entry to take its image down.
+
+   The bumps come before the removals on purpose. A re-run derives the removals again from the bucket
+   listing (a failed removal is only a warning), but it would not plan the bumps again once the rows
+   are current. If a run fails between its first row write and its last bump, the error lists the
+   festivals left to bump; `festival:seed seed-data/<slug>.json` bumps each of them.
 
    Re-uploading under the same path keeps the same URL; the Supabase CDN may serve the previous bytes
    for up to an hour (`cache-control: max-age=3600`).

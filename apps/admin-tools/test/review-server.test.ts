@@ -30,6 +30,7 @@ let tmp: string;
 let candidateDir: string;
 let server: ReviewServer;
 let base: string;
+const logs: string[] = [];
 
 function candidateFile(): CandidateFile {
   return {
@@ -107,10 +108,13 @@ function postJson(pathname: string, body: unknown, headers: Record<string, strin
   return getJson(pathname, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
 }
 
-/** A request whose path is sent verbatim (fetch would normalise `..` away before it reaches the server). */
-function rawGet(pathname: string): Promise<{ status: number; body: Buffer }> {
+/**
+ * A request whose path and headers are sent verbatim (fetch normalises `..` away before it reaches the
+ * server and refuses to set Host).
+ */
+function rawGet(pathname: string, headers: Record<string, string> = {}): Promise<{ status: number; body: Buffer }> {
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port: new URL(base).port, path: pathname, method: 'GET' }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port: new URL(base).port, path: pathname, method: 'GET', headers }, (res) => {
       const chunks: Buffer[] = [];
       res.on('data', (chunk) => chunks.push(chunk));
       res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks) }));
@@ -129,7 +133,7 @@ beforeAll(async () => {
   writeFileSync(path.join(candidateDir, 'secret.jpg'), SECRET);
   writeFileSync(path.join(tmp, 'secret.jpg'), SECRET);
   symlinkSync(path.join(tmp, 'secret.jpg'), path.join(candidateDir, 'media', 'escape.jpg'));
-  server = await startReviewServer({ port: 0, root: ROOT });
+  server = await startReviewServer({ port: 0, root: ROOT, log: (line) => logs.push(line) });
   base = server.url.replace(/\/$/, '');
 });
 
@@ -142,7 +146,8 @@ beforeEach(() => {
   vi.mocked(store.listCandidates).mockReset().mockResolvedValue([summary]);
   vi.mocked(store.loadCandidate).mockReset().mockImplementation(async (slug: string) => {
     if (slug !== SLUG) {
-      throw new Error(`Candidate "${slug}" not found`);
+      // The real store names the missing file, i.e. a path under the repository.
+      throw new Error(`Candidate "${slug}" not found (no ${path.join(ROOT, 'candidates', slug, 'candidate.json')})`);
     }
     return loadedCandidate();
   });
@@ -190,6 +195,7 @@ describe('review server', () => {
     expect(status).toBe(200);
     expect(store.loadCandidate).toHaveBeenCalledWith(SLUG, ROOT);
     expect(body.file.slug).toBe(SLUG);
+    expect(body).not.toHaveProperty('dir'); // a file-system path stays server-side
     expect(body.reviewMarkdown).toContain('Looks right');
     expect(body.view.festival.timezone).toBe('America/Los_Angeles');
     expect(body.view.days.map((day: any) => day.date)).toEqual(['2026-10-10', '2026-10-11']);
@@ -212,9 +218,15 @@ describe('review server', () => {
     expect((await rawGet('/api/candidates/%2e%2e')).status).toBe(404);
     expect((await rawGet('/api/candidates/../../etc')).status).toBe(404);
     expect(store.loadCandidate).not.toHaveBeenCalled();
+    logs.length = 0;
     const missing = await getJson('/api/candidates/nope-2027');
     expect(missing.status).toBe(404);
-    expect(missing.body.error).toContain('not found');
+    expect(missing.body).toEqual({ error: 'Candidate not found' });
+    expect(JSON.stringify(missing.body)).not.toContain(ROOT); // the store's message names the path; the log gets it
+    expect(logs.some((line) => line.includes('nope-2027') && line.includes(ROOT))).toBe(true);
+    const missingImage = await getJson('/media/nope-2027/artists/seth.jpg');
+    expect(missingImage.status).toBe(404);
+    expect(JSON.stringify(missingImage.body)).not.toContain(ROOT);
   });
 
   it('forwards a review to the store, stamping the time', async () => {
@@ -240,6 +252,8 @@ describe('review server', () => {
       [{ decisions: good, notes: ['x'] }, /notes must be/],
       [{ decisions: 'approved' }, /decisions must be/],
       [[], /JSON object/],
+      [{ decisions: good }, /by is required to approve a section \(fill in the Reviewer field\)/],
+      [{ decisions: good, by: '   ' }, /by is required to approve a section/],
     ];
     for (const [payload, pattern] of cases) {
       const { status, body } = await postJson(`/api/candidates/${SLUG}/review`, payload);
@@ -252,20 +266,69 @@ describe('review server', () => {
     const wrongType = await getJson(`/api/candidates/${SLUG}/review`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ decisions: good }) });
     expect(wrongType.status).toBe(415);
     expect(store.saveCandidateReview).not.toHaveBeenCalled();
-    expect(parseReviewBody({ decisions: good, by: '', notes: null })).toMatchObject({ decisions: good, by: null, notes: null });
+    // Without an approval the reviewer name stays optional.
+    const noApproval = { festival: 'pending', stages: 'pending', artists: 'rejected', sets: 'pending' };
+    expect(parseReviewBody({ decisions: noApproval, by: '', notes: null })).toMatchObject({ decisions: noApproval, by: null, notes: null });
+    expect(() => parseReviewBody({ decisions: good, by: null })).toThrow(/by is required to approve a section/);
   });
 
   it('refuses writes that do not come from the page itself', async () => {
     const decisions = { festival: 'approved', stages: 'approved', artists: 'approved', sets: 'approved' };
-    const foreignOrigin = await postJson(`/api/candidates/${SLUG}/review`, { decisions }, { Origin: 'http://evil.example' });
+    const body = { decisions, by: 'kevin' };
+    const foreignOrigin = await postJson(`/api/candidates/${SLUG}/review`, body, { Origin: 'http://evil.example' });
     expect(foreignOrigin.status).toBe(403);
-    const crossSite = await postJson(`/api/candidates/${SLUG}/review`, { decisions }, { 'Sec-Fetch-Site': 'cross-site' });
+    const crossSite = await postJson(`/api/candidates/${SLUG}/review`, body, { 'Sec-Fetch-Site': 'cross-site' });
     expect(crossSite.status).toBe(403);
-    const otherPort = await postJson(`/api/candidates/${SLUG}/review`, { decisions }, { Origin: 'http://127.0.0.1:1' });
+    const otherPort = await postJson(`/api/candidates/${SLUG}/review`, body, { Origin: 'http://127.0.0.1:1' });
     expect(otherPort.status).toBe(403);
-    const ownOrigin = await postJson(`/api/candidates/${SLUG}/review`, { decisions }, { Origin: base, 'Sec-Fetch-Site': 'same-origin' });
+    const ownOrigin = await postJson(`/api/candidates/${SLUG}/review`, body, { Origin: base, 'Sec-Fetch-Site': 'same-origin' });
     expect(ownOrigin.status).toBe(200);
     expect(store.saveCandidateReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses reads whose Host or Origin is not this server (DNS rebinding)', async () => {
+    const port = new URL(base).port;
+    const rebound = await rawGet('/api/candidates', { Host: `evil.example:${port}` });
+    expect(rebound.status).toBe(403);
+    expect(JSON.parse(rebound.body.toString()).error).toMatch(/must come from http:\/\/127\.0\.0\.1/);
+    expect(store.listCandidates).not.toHaveBeenCalled();
+    const image = await rawGet(`/media/${SLUG}/artists/seth.jpg`, { Host: `evil.example:${port}` });
+    expect(image.status).toBe(403);
+    expect(image.body.equals(JPEG)).toBe(false);
+    expect((await rawGet(`/api/candidates/${SLUG}`, { Host: '127.0.0.1:1' })).status).toBe(403);
+    expect((await rawGet('/', { Host: `evil.example:${port}` })).status).toBe(403);
+    expect((await rawGet('/api/candidates', { Origin: 'http://evil.example' })).status).toBe(403);
+    expect(store.loadCandidate).not.toHaveBeenCalled();
+    // The page's own names for this server, and a navigation from a link elsewhere, keep working.
+    expect((await rawGet('/api/candidates', { Host: `localhost:${port}` })).status).toBe(200);
+    expect((await rawGet('/api/candidates', { Host: `[::1]:${port}` })).status).toBe(200);
+    expect((await fetch(`${base}/`, { headers: { 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(200);
+  });
+
+  it('requires a reviewer name to approve, but not to reject', async () => {
+    const anonymous = await postJson(`/api/candidates/${SLUG}/media/0`, { status: 'approved', by: null });
+    expect(anonymous.status).toBe(400);
+    expect(anonymous.body.error).toBe('by is required to approve an image (fill in the Reviewer field)');
+    expect((await postJson(`/api/candidates/${SLUG}/media/0`, { status: 'approved', by: '  ' })).status).toBe(400);
+    expect(store.saveCandidateMediaReview).not.toHaveBeenCalled();
+
+    const rejected = await postJson(`/api/candidates/${SLUG}/media/0`, { status: 'rejected', by: null });
+    expect(rejected.status).toBe(200);
+    const signed = await postJson(`/api/candidates/${SLUG}/media/0`, { status: 'approved', by: 'kevin' });
+    expect(signed.status).toBe(200);
+    expect(vi.mocked(store.saveCandidateMediaReview).mock.calls.map(([, , review]) => [review.status, review.by])).toEqual([
+      ['rejected', null],
+      ['approved', 'kevin'],
+    ]);
+
+    const decisions = { festival: 'approved', stages: 'pending', artists: 'pending', sets: 'pending' };
+    const section = await postJson(`/api/candidates/${SLUG}/review`, { decisions, by: null });
+    expect(section.status).toBe(400);
+    expect(section.body.error).toBe('by is required to approve a section (fill in the Reviewer field)');
+    expect(store.saveCandidateReview).not.toHaveBeenCalled();
+    expect((await postJson(`/api/candidates/${SLUG}/review`, { decisions: { ...decisions, festival: 'rejected' }, by: null })).status).toBe(200);
+    expect((await postJson(`/api/candidates/${SLUG}/review`, { decisions, by: 'kevin' })).status).toBe(200);
+    expect(store.saveCandidateReview).toHaveBeenCalledTimes(2);
   });
 
   it('forwards an image decision by registry index', async () => {

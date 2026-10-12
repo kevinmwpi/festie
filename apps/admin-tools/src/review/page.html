@@ -151,11 +151,14 @@
   const CONF_TONE = { high: 'green', medium: 'amber', low: 'red' };
   const DECISION_TONE = { pending: 'gray', approved: 'green', rejected: 'red' };
   const SET_TONE = { scheduled: 'gray', moved: 'amber', cancelled: 'red' };
+  const NEED_REVIEWER = 'Enter your name in Reviewer to approve';
 
   const state = {
     list: [], slug: null, detail: null, decisions: null, notes: '', dirty: false,
     flags: {}, by: '', promote: null, busy: false, error: null,
   };
+  // Approvals are signed: the server refuses them without a reviewer name, so the page greys them out.
+  const noReviewer = () => state.by === '';
 
   const $ = (selector) => document.querySelector(selector);
   const store = {
@@ -389,7 +392,7 @@
           m.license.url ? [' · ', h('a', { href: m.license.url, target: '_blank', rel: 'noopener noreferrer' }, 'licence')] : null),
         m.source.note ? h('div', { class: 'note small' }, m.source.note) : null,
         h('div', { class: 'row' },
-          h('button', { type: 'button', class: 'btn small ok', 'aria-pressed': m.review.status === 'approved' ? 'true' : 'false', 'aria-label': `Approve image for ${name}`, disabled: state.busy || null, onclick: () => reviewImage(m.index, 'approved') }, 'Approve image'),
+          h('button', { type: 'button', class: 'btn small ok', 'aria-pressed': m.review.status === 'approved' ? 'true' : 'false', 'aria-label': `Approve image for ${name}`, disabled: (state.busy || noReviewer()) || null, title: noReviewer() ? NEED_REVIEWER : null, onclick: () => reviewImage(m.index, 'approved') }, 'Approve image'),
           h('button', { type: 'button', class: 'btn small no', 'aria-pressed': m.review.status === 'rejected' ? 'true' : 'false', 'aria-label': `Reject image for ${name}`, disabled: state.busy || null, onclick: () => reviewImage(m.index, 'rejected') }, 'Reject image')),
         m.review.at ? h('div', { class: 'muted small' }, `${m.review.status} by ${m.review.by || 'unknown'} ${fmtDate(m.review.at)}${m.review.note ? ` — ${m.review.note}` : ''}`) : null);
     }
@@ -446,11 +449,12 @@
         h('textarea', { id: 'notes', rows: 3, placeholder: 'What you checked, what to fix…', oninput: (event) => { state.notes = event.target.value; markDirty(); } }, state.notes)),
       h('div', { class: 'muted small' }, review.at ? `Last saved ${fmtDate(review.at)} by ${review.by || 'unknown'}` : 'Not reviewed yet'),
       h('div', { class: 'row wrap actions' },
-        h('button', { type: 'button', class: 'btn primary', disabled: state.busy || null, onclick: saveReview }, 'Save review'),
+        h('button', { type: 'button', class: 'btn primary', disabled: (state.busy || noReviewer()) || null, title: noReviewer() ? NEED_REVIEWER : null, onclick: saveReview }, 'Save review'),
         h('span', { id: 'save-status', class: state.dirty ? 'dirty' : 'muted' }, state.dirty ? 'Unsaved changes' : 'Saved'),
+        noReviewer() ? h('span', { class: 'muted small' }, NEED_REVIEWER) : null,
         h('span', { class: 'spacer' }),
         h('button', { type: 'button', class: 'btn', disabled: state.busy || null, onclick: () => promote(true) }, 'Promote (dry run)'),
-        h('button', { type: 'button', class: 'btn danger', disabled: (!canPromote || state.busy) || null, title: canPromote ? 'Write seed-data files' : 'Save a review with every section approved first', onclick: () => promote(false) }, 'Promote')),
+        h('button', { type: 'button', class: 'btn danger', disabled: (!canPromote || state.busy || noReviewer()) || null, title: noReviewer() ? NEED_REVIEWER : canPromote ? 'Write seed-data files' : 'Save a review with every section approved first', onclick: () => promote(false) }, 'Promote')),
       state.promote ? renderPromoteResult(state.promote) : null);
   }
 
@@ -534,7 +538,12 @@
   const reviewer = $('#reviewer');
   state.by = store.get('festie-review:by') || '';
   reviewer.value = state.by;
-  reviewer.addEventListener('input', () => { state.by = reviewer.value.trim(); store.set('festie-review:by', state.by); });
+  reviewer.addEventListener('input', () => {
+    const wasEmpty = noReviewer();
+    state.by = reviewer.value.trim();
+    store.set('festie-review:by', state.by);
+    if (wasEmpty !== noReviewer()) renderMain(); // the approve buttons follow the field
+  });
   $('#refresh').addEventListener('click', () => loadList());
 
   document.addEventListener('keydown', (event) => {

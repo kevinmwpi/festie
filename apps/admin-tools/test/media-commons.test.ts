@@ -52,6 +52,9 @@ function fakeFetch(): { fetch: FetchLike; calls: Call[] } {
       if (search === 'Imageless') {
         return json({ search: [{ id: 'Q2', label: 'Imageless', description: 'DJ and producer' }] });
       }
+      if (search === 'Own Work Band') {
+        return json({ search: [{ id: 'Q5', label: 'Own Work Band', description: 'indie band' }] });
+      }
       if (search === 'Nobody') {
         return json({ search: [{ id: 'Q9', label: 'Nobody', description: 'village in Poland' }, { id: 'Q10', label: 'Nobody' }] });
       }
@@ -65,6 +68,7 @@ function fakeFetch(): { fetch: FetchLike; calls: Call[] } {
         Q2: { claims: { P434: [{ mainsnak: { datavalue: { value: 'x' } } }] } },
         Q3: { claims: { P18: [{ mainsnak: { datavalue: { value: 'NC photo.jpg' } } }] } },
         Q4: { claims: { P18: [{ mainsnak: { datavalue: { value: 'PD photo.png' } } }] } },
+        Q5: { claims: { P18: [{ mainsnak: { datavalue: { value: 'Own work photo.jpg' } } }] } },
       };
       return json({ entities: { [id as string]: entities[id as string] ?? { id, missing: '' } } });
     }
@@ -112,11 +116,27 @@ function fakeFetch(): { fetch: FetchLike; calls: Call[] } {
         });
       }
       if (title === 'File:PD photo.png') {
+        // No Artist, only a Credit (the source): fine for public domain, nothing to attribute.
         return json({
           query: {
             pages: {
               '10': {
-                imageinfo: [{ thumburl: 'https://upload.wikimedia.org/x/512px-PD_photo.png', extmetadata: { LicenseShortName: { value: 'Public domain' } } }],
+                imageinfo: [{ thumburl: 'https://upload.wikimedia.org/x/512px-PD_photo.png', extmetadata: { LicenseShortName: { value: 'Public domain' }, Credit: { value: '<span class="int-own-work">Own work</span>' } } }],
+              },
+            },
+          },
+        });
+      }
+      if (title === 'File:Own work photo.jpg') {
+        // A CC BY-SA file whose uploader filled in the source but not the author.
+        return json({
+          query: {
+            pages: {
+              '11': {
+                imageinfo: [{
+                  thumburl: 'https://upload.wikimedia.org/x/512px-Own_work_photo.jpg',
+                  extmetadata: { LicenseShortName: { value: 'CC BY-SA 4.0' }, License: { value: 'cc-by-sa-4.0' }, Credit: { value: '<span class="int-own-work">Own work</span>' }, AttributionRequired: { value: 'true' } },
+                }],
               },
             },
           },
@@ -282,7 +302,25 @@ describe('fetchCommonsCandidate', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.entry).toMatchObject({ file: `artists/${A4}.png`, mime: 'image/png', width: 300, height: 200, license: { id: 'public-domain', url: null, attribution: 'Photo: Public domain, via Wikimedia Commons' } });
+      // The Credit ("Own work") is the source, not an author: noted for the reviewer, never credited.
+      expect(result.entry.license.attribution).not.toContain('Own work');
+      expect(result.entry.source.note).toBe('Wikidata Q4; Commons credit: Own work');
     }
+  });
+
+  it('refuses a CC BY-SA file whose only "author" would be the Credit source ("Own work")', async () => {
+    const { fetch } = fakeFetch();
+    const into = tempDir();
+    const result = await fetchCommonsCandidate({ artistName: 'Own Work Band', artistId: A2, into, client: client(fetch) });
+    expect(result).toEqual({
+      ok: false,
+      stage: 'license',
+      reason: 'CC BY-SA 4.0 requires attribution but Commons lists no author',
+      wikidataId: 'Q5',
+      fileName: 'Own work photo.jpg',
+      license: 'CC BY-SA 4.0',
+    });
+    expect(existsSync(path.join(into, 'artists'))).toBe(false);
   });
 
   it('fails loudly on HTTP errors and insists on a fetch implementation', async () => {

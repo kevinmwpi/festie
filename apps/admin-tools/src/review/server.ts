@@ -3,7 +3,9 @@
  * `node:http` server on 127.0.0.1 that lists the candidates under seed-data/candidates/, shows each
  * one next to its sources, and records the reviewer's decisions through ../candidates/store. It has
  * write access to the repository, so it binds to the loopback interface only, serves no CORS headers,
- * rejects cross-origin writes, and only ever reads image files from a candidate's media/ directory.
+ * answers only requests whose Host/Origin name this server (a DNS-rebound page cannot read candidates),
+ * rejects cross-site writes, keeps file-system paths out of responses, and only ever reads image files
+ * from a candidate's media/ directory.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, promises as fs } from 'node:fs';
@@ -61,8 +63,8 @@ export interface ReviewServer {
   close(): Promise<void>;
 }
 
-/** What `GET /api/candidates/:slug` returns. */
-export interface CandidateDetail extends LoadedCandidate {
+/** What `GET /api/candidates/:slug` returns: the bundle without its directory (a file-system path) plus the derived view. */
+export interface CandidateDetail extends Omit<LoadedCandidate, 'dir'> {
   view: CandidateView;
 }
 
@@ -138,24 +140,26 @@ export function parseReviewBody(body: unknown): CandidateReview {
   if (unknown.length > 0) {
     throw new HttpError(400, `Unknown section(s): ${unknown.join(', ')}`);
   }
-  return {
-    decisions,
-    by: optionalText(body.by, 'by', MAX_NAME_LENGTH),
-    at: new Date().toISOString(),
-    notes: optionalText(body.notes, 'notes', MAX_NOTE_LENGTH),
-  };
+  const by = optionalText(body.by, 'by', MAX_NAME_LENGTH);
+  const notes = optionalText(body.notes, 'notes', MAX_NOTE_LENGTH);
+  // An approval is a signed-off decision: the file records who made it.
+  if (by === null && Object.values(decisions).includes('approved')) {
+    throw new HttpError(400, 'by is required to approve a section (fill in the Reviewer field)');
+  }
+  return { decisions, by, at: new Date().toISOString(), notes };
 }
 
 export function parseMediaReviewBody(body: unknown): MediaReview {
   if (!isRecord(body)) {
     throw new HttpError(400, 'Body must be a JSON object');
   }
-  return {
-    status: oneOf(body.status, MEDIA_STATUSES, 'status'),
-    by: optionalText(body.by, 'by', MAX_NAME_LENGTH),
-    at: new Date().toISOString(),
-    note: optionalText(body.note, 'note', MAX_NOTE_LENGTH),
-  };
+  const status = oneOf(body.status, MEDIA_STATUSES, 'status');
+  const by = optionalText(body.by, 'by', MAX_NAME_LENGTH);
+  const note = optionalText(body.note, 'note', MAX_NOTE_LENGTH);
+  if (status === 'approved' && by === null) {
+    throw new HttpError(400, 'by is required to approve an image (fill in the Reviewer field)');
+  }
+  return { status, by, at: new Date().toISOString(), note };
 }
 
 export function parsePromoteBody(body: unknown): { dryRun: boolean } {
@@ -244,12 +248,12 @@ function isLoopbackHost(hostname: string, serverHost: string): boolean {
   return name === 'localhost' || name === '127.0.0.1' || name === '::1' || name === serverHost.toLowerCase();
 }
 
-/** Writes come from the page itself: same loopback host and port, and never cross-site. */
-function requireSameOrigin(req: IncomingMessage, host: string, port: number): void {
-  const site = req.headers['sec-fetch-site'];
-  if (typeof site === 'string' && site !== 'same-origin' && site !== 'none') {
-    throw new HttpError(403, 'Cross-site requests are not allowed');
-  }
+/**
+ * Every request: the Host header (and the Origin header, when the browser sends one) must name this
+ * server on the loopback interface, port included. A page on another site whose DNS name is rebound to
+ * 127.0.0.1 still sends that name as Host, so it can neither read candidates nor load their images.
+ */
+function requireLoopbackHost(req: IncomingMessage, host: string, port: number): void {
   for (const header of ['origin', 'host'] as const) {
     const value = req.headers[header];
     if (typeof value !== 'string' || value === '') {
@@ -268,14 +272,29 @@ function requireSameOrigin(req: IncomingMessage, host: string, port: number): vo
   }
 }
 
-function toHttpError(error: unknown, fallbackStatus: number): HttpError {
+/** Writes come from the page itself: never cross-site (on top of the loopback check every request passes). */
+function requireSameOrigin(req: IncomingMessage): void {
+  const site = req.headers['sec-fetch-site'];
+  if (typeof site === 'string' && site !== 'same-origin' && site !== 'none') {
+    throw new HttpError(403, 'Cross-site requests are not allowed');
+  }
+}
+
+const NOT_FOUND_PATTERN = /\bnot found\b|\bdoes not exist\b|\bno such\b|\bunknown candidate\b/i;
+
+/**
+ * Store errors become HTTP errors. The store's "not found" messages name files under the repository,
+ * so the response carries a generic message and the detail goes to the log.
+ */
+function toHttpError(error: unknown, fallbackStatus: number, log: Log): HttpError {
   if (error instanceof HttpError) {
     return error;
   }
   const message = error instanceof Error ? error.message : String(error);
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
-  if (code === 'ENOENT' || /\bnot found\b|\bdoes not exist\b|\bno such\b|\bunknown candidate\b/i.test(message)) {
-    return new HttpError(404, message);
+  if (code === 'ENOENT' || NOT_FOUND_PATTERN.test(message)) {
+    log(`not found: ${message}`);
+    return new HttpError(404, /^media entry\b/i.test(message) ? 'Media entry not found' : 'Candidate not found');
   }
   return new HttpError(fallbackStatus, message);
 }
@@ -299,12 +318,14 @@ interface Context {
   root: string | undefined;
   /** Candidate directories seen so far, so image requests do not reload the bundle. */
   dirs: Map<string, string>;
+  log: Log;
 }
 
 async function getDetail(ctx: Context, slug: string): Promise<CandidateDetail> {
   const loaded = await loadCandidate(slug, ctx.root);
   ctx.dirs.set(slug, loaded.dir);
-  return { ...loaded, view: buildCandidateView(loaded) };
+  const { dir: _dir, ...rest } = loaded;
+  return { ...rest, view: buildCandidateView(loaded) };
 }
 
 async function serveMedia(ctx: Context, res: ServerResponse, slug: string, rel: string): Promise<void> {
@@ -341,6 +362,7 @@ async function route(ctx: Context, req: IncomingMessage, res: ServerResponse): P
   const method = req.method ?? 'GET';
   const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
   let match: RegExpExecArray | null;
+  requireLoopbackHost(req, ctx.host, ctx.port);
 
   if (method === 'GET' || method === 'HEAD') {
     if (pathname === '/' || pathname === '/index.html') {
@@ -364,7 +386,7 @@ async function route(ctx: Context, req: IncomingMessage, res: ServerResponse): P
       try {
         sendJson(res, 200, await getDetail(ctx, slug));
       } catch (error) {
-        throw toHttpError(error, 500);
+        throw toHttpError(error, 500, ctx.log);
       }
       return;
     }
@@ -374,7 +396,7 @@ async function route(ctx: Context, req: IncomingMessage, res: ServerResponse): P
       try {
         await serveMedia(ctx, res, slug, rel);
       } catch (error) {
-        throw toHttpError(error, 500);
+        throw toHttpError(error, 500, ctx.log);
       }
       return;
     }
@@ -382,14 +404,14 @@ async function route(ctx: Context, req: IncomingMessage, res: ServerResponse): P
   }
 
   if (method === 'POST') {
-    requireSameOrigin(req, ctx.host, ctx.port);
+    requireSameOrigin(req);
     if ((match = /^\/api\/candidates\/([^/]+)\/review$/.exec(pathname))) {
       const slug = requireSlug(match[1]);
       const review = parseReviewBody(await readJsonBody(req));
       try {
         sendJson(res, 200, await saveCandidateReview(slug, review, ctx.root));
       } catch (error) {
-        throw toHttpError(error, 400);
+        throw toHttpError(error, 400, ctx.log);
       }
       return;
     }
@@ -400,7 +422,7 @@ async function route(ctx: Context, req: IncomingMessage, res: ServerResponse): P
       try {
         sendJson(res, 200, await saveCandidateMediaReview(slug, index, review, ctx.root));
       } catch (error) {
-        throw toHttpError(error, 400);
+        throw toHttpError(error, 400, ctx.log);
       }
       return;
     }
@@ -410,7 +432,7 @@ async function route(ctx: Context, req: IncomingMessage, res: ServerResponse): P
       try {
         sendJson(res, 200, await promoteCandidate(slug, { dryRun, root: ctx.root }));
       } catch (error) {
-        throw toHttpError(error, 400);
+        throw toHttpError(error, 400, ctx.log);
       }
       return;
     }
@@ -426,13 +448,13 @@ async function route(ctx: Context, req: IncomingMessage, res: ServerResponse): P
 export async function startReviewServer(options: ReviewServerOptions = {}): Promise<ReviewServer> {
   const host = options.host ?? DEFAULT_HOST;
   const log = options.log ?? (() => undefined);
-  const ctx: Context = { host, port: options.port ?? DEFAULT_PORT, root: options.root, dirs: new Map() };
+  const ctx: Context = { host, port: options.port ?? DEFAULT_PORT, root: options.root, dirs: new Map(), log };
 
   const server = createServer((req, res) => {
     const started = Date.now();
     route(ctx, req, res)
       .catch((error: unknown) => {
-        const httpError = toHttpError(error, 500);
+        const httpError = toHttpError(error, 500, log);
         if (httpError.status >= 500) {
           log(`error: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
         }

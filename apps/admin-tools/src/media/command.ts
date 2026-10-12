@@ -162,12 +162,14 @@ export async function mediaUpload(options: MediaUploadOptions): Promise<MediaUpl
     return { validation, plan, applied: null };
   }
   if (planIsEmpty(plan)) {
-    return { validation, plan, applied: { uploaded: 0, updated: 0, cleared: 0, removed: 0, bumped: [] } };
+    return { validation, plan, applied: { uploaded: 0, updated: 0, cleared: 0, removed: 0, bumped: [], removalFailures: [] } };
   }
   const applied = await applyMediaUpload(client, plan, log);
+  const notRemoved = applied.removalFailures.reduce((sum, failure) => sum + failure.paths.length, 0);
   log(
     `Done: ${applied.uploaded} uploaded, ${applied.updated} row(s) updated, ${applied.cleared} cleared, ` +
-      `${applied.removed} object(s) removed, ${applied.bumped.length} festival version(s) bumped.`,
+      `${applied.removed} object(s) removed${notRemoved > 0 ? ` (${notRemoved} NOT removed, see WARNING above)` : ''}, ` +
+      `${applied.bumped.length} festival version(s) bumped.`,
   );
   return { validation, plan, applied };
 }

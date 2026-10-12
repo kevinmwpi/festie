@@ -149,6 +149,25 @@ function fakeClient(tables: Tables, objects: Record<string, StoredFake> = {}) {
   return { client: client as unknown as SupabaseClient, calls, tables };
 }
 
+/** `client` whose `update()` on `table` fails with `message` when `when(values)` holds; everything else passes through. */
+function withFailingUpdate(client: SupabaseClient, table: string, when: (values: Row) => boolean, message: string): SupabaseClient {
+  const base = client as unknown as { from(name: string): { update(values: Row): unknown } };
+  return {
+    ...client,
+    from(name: string) {
+      const builder = base.from(name);
+      if (name === table) {
+        const update = builder.update.bind(builder);
+        builder.update = (values: Row) =>
+          when(values)
+            ? { eq: () => ({ then: (resolve: (value: unknown) => void) => resolve({ data: null, error: { message } }) }) }
+            : update(values);
+      }
+      return builder;
+    },
+  } as unknown as SupabaseClient;
+}
+
 const NO_IMAGE: ImageColumns = { image_url: null, image_credit: null, image_license: null, image_source_url: null };
 
 function artistRow(id: string, name: string, image: Partial<ImageColumns> = {}): Row {
@@ -365,7 +384,7 @@ describe('planMediaUpload', () => {
 });
 
 describe('applyMediaUpload', () => {
-  it('uploads, updates rows, clears, removes and bumps in that order', async () => {
+  it('uploads, updates rows, clears, bumps and removes last, in that order', async () => {
     const tables = tablesWithSets();
     tables.festivals[2] = festivalRow(F3, 'Other Fest', 'published', 7, { image_url: artworkPublicUrl(URL, `festivals/${F3}.jpg`), image_license: 'generated' });
     const { client, calls } = fakeClient(tables, { [`festivals/${F3}.jpg`]: { md5: 'b'.repeat(32), sha256: 'c'.repeat(64) } });
@@ -385,16 +404,18 @@ describe('applyMediaUpload', () => {
         { festivalId: F3, from: 7, to: 8 },
         { festivalId: F1, from: 3, to: 4 },
       ],
+      removalFailures: [],
     });
+    // Removals come after the bumps: a re-run plans them again, but not the bumps (rows already current).
     expect(calls).toEqual([
       `upload:artists/${A1}.jpg:image/jpeg:true:${sha256Of(JPEG).slice(0, 8)}:${JPEG.length}`,
       `update:artists:${A1}:${JSON.stringify(A1_COLUMNS)}`,
       `update:festivals:${F3}:${JSON.stringify(NO_IMAGE)}`,
-      `remove:festivals/${F3}.jpg`,
       'select:festivals:1',
       expect.stringMatching(new RegExp(`^update:festivals:${F3}:\\{"version":8,"updated_at":"`)),
       'select:festivals:1',
       expect.stringMatching(new RegExp(`^update:festivals:${F1}:\\{"version":4,"updated_at":"`)),
+      `remove:festivals/${F3}.jpg`,
     ]);
     expect(tables.artists[0]).toMatchObject(A1_COLUMNS);
     expect(tables.festivals[0]).toMatchObject({ version: 4 });
@@ -403,10 +424,67 @@ describe('applyMediaUpload', () => {
       `Uploaded artists/${A1}.jpg (Artist One).`,
       'Updated 1 row(s).',
       'Cleared 1 row(s).',
-      'Removed 1 object(s).',
       'Bumped Other Fest to version 8.',
       'Bumped Riverside Sounds to version 4.',
+      'Removed 1 object(s).',
     ]);
+  });
+
+  it('still bumps the versions when removing objects fails, and reports the failure', async () => {
+    const tables = tablesWithSets();
+    tables.festivals[2] = festivalRow(F3, 'Other Fest', 'published', 7, { image_url: artworkPublicUrl(URL, `festivals/${F3}.jpg`), image_license: 'generated' });
+    const { client } = fakeClient(tables, { [`festivals/${F3}.jpg`]: { md5: 'b'.repeat(32), sha256: 'c'.repeat(64) } });
+    const planned = await plan(client, [approvedArtist()]);
+    expect(planned.removals).toEqual([`festivals/${F3}.jpg`]);
+    const readOnlyStorage = {
+      ...client,
+      storage: { from: (bucket: string) => ({ ...client.storage.from(bucket), remove: async () => ({ data: null, error: { message: 'storage is read-only' } }) }) },
+    } as unknown as SupabaseClient;
+
+    const lines: string[] = [];
+    const result = await applyMediaUpload(readOnlyStorage, planned, (line) => lines.push(line));
+    expect(result).toMatchObject({
+      removed: 0,
+      removalFailures: [{ paths: [`festivals/${F3}.jpg`], message: 'storage is read-only' }],
+      bumped: [
+        { festivalId: F3, from: 7, to: 8 },
+        { festivalId: F1, from: 3, to: 4 },
+      ],
+    });
+    expect(tables.festivals[0]).toMatchObject({ version: 4 });
+    expect(tables.festivals[2]).toMatchObject({ version: 8, image_url: null });
+    expect(lines).toContain('WARNING could not remove 1 object(s) (batch 1): storage is read-only; the next media:upload retries.');
+    expect(lines).not.toContain('Removed 0 object(s).');
+  });
+
+  it('names the festivals left to bump when the run fails after the first row write', async () => {
+    const tables = tablesWithSets();
+    tables.festivals[2] = festivalRow(F3, 'Other Fest', 'published', 7, { image_url: artworkPublicUrl(URL, `festivals/${F3}.jpg`), image_license: 'generated' });
+    const { client } = fakeClient(tables, { [`festivals/${F3}.jpg`]: { md5: 'b'.repeat(32), sha256: 'c'.repeat(64) } });
+    const planned = await plan(client, [approvedArtist()]);
+
+    const lockedVersions = withFailingUpdate(client, 'festivals', (values) => 'version' in values, 'version column locked');
+    const error: Error = await applyMediaUpload(lockedVersions, planned).then(
+      () => { throw new Error('expected the bump to fail'); },
+      (thrown: Error) => thrown,
+    );
+    expect(error.message).toBe(
+      `Bumping festival ${F3} failed: version column locked\n` +
+        `Versions not bumped for: Other Fest (${F3}), Riverside Sounds (${F1}) — re-running media:upload will not bump them ` +
+        '(their rows are already current); run festival:seed seed-data/<slug>.json for each (it always bumps).',
+    );
+    expect(error.cause).toBeInstanceOf(Error);
+    // The rows were written before the failure: a re-run would see them as current.
+    expect(tables.artists[0]).toMatchObject(A1_COLUMNS);
+    expect(tables.festivals[2]).toMatchObject({ version: 7, image_url: null });
+
+    // Nothing written yet: the plain error, since a re-run plans everything again.
+    const fresh = fakeClient(tablesWithSets());
+    const freshPlan = await plan(fresh.client, [approvedArtist()]);
+    const lockedRows = withFailingUpdate(fresh.client, 'artists', () => true, 'artists are read-only');
+    await expect(applyMediaUpload(lockedRows, freshPlan)).rejects.toThrow(`Updating artists ${A1} failed: artists are read-only`);
+    const plain = await applyMediaUpload(lockedRows, freshPlan).catch((thrown: Error) => thrown.message);
+    expect(plain).not.toContain('Versions not bumped');
   });
 
   it('stops at a failed upload before touching rows', async () => {
@@ -466,7 +544,7 @@ describe('media:upload command', () => {
     expect(calls.some((call) => call.startsWith('upload:'))).toBe(false);
 
     const real = await mediaUpload({ dryRun: false, file, seedDataDir, client, supabaseUrl: URL, log: (line) => lines.push(line) });
-    expect(real.applied).toEqual({ uploaded: 1, updated: 1, cleared: 0, removed: 0, bumped: [{ festivalId: F1, from: 3, to: 4 }] });
+    expect(real.applied).toEqual({ uploaded: 1, updated: 1, cleared: 0, removed: 0, bumped: [{ festivalId: F1, from: 3, to: 4 }], removalFailures: [] });
     expect(lines.at(-1)).toBe('Done: 1 uploaded, 1 row(s) updated, 0 cleared, 0 object(s) removed, 1 festival version(s) bumped.');
     await expect(mediaUpload({ dryRun: true, file, seedDataDir, client })).rejects.toThrow('needs supabaseUrl');
   });
