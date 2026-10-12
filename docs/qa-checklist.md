@@ -14,7 +14,7 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Two iPhones, **A** and **B**, each signed in to TestFlight; ideally one on the oldest iOS you support.
       One physical Android phone for the festival-time spot-check in §7 (release gate 7 asks for iOS and
       Android even though v1 is submitted to the App Store only).
-- [ ] The build points at the project you are testing (staging or production); migrations 006–011 are
+- [ ] The build points at the project you are testing (staging or production); migrations 006–013 are
       applied there ([`release-runbook.md`](./release-runbook.md) §2).
 - [ ] Two real mailboxes you can read on the devices (custom SMTP is configured, runbook §2.7).
 - [ ] `npm run admin -- demo:seed` has run on that project; at least one real festival is published

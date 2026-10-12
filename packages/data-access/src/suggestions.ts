@@ -3,7 +3,7 @@ import { textLength } from './profile';
 import { requireStoredSession } from './session';
 import { callRpc } from './supabase';
 
-/** Limits of `public.suggest_festival` (migration 013); the server raises `invalid_input` past them. */
+/** Limits of `public.suggest_festival` (migration 012); the server raises `invalid_input` past them. */
 export const FESTIVAL_SUGGESTION_NAME_MAX_LENGTH = 120;
 export const FESTIVAL_SUGGESTION_URL_MAX_LENGTH = 500;
 export const FESTIVAL_SUGGESTION_NOTE_MAX_LENGTH = 300;

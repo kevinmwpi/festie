@@ -17,7 +17,7 @@ import {
   useOfflineStatus,
 } from '@festival/ui';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { SubScreenHeader } from '@/src/components/ScreenHeader';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
@@ -42,7 +42,8 @@ export default function SuggestFestivalScreen() {
   const [error, setError] = React.useState<string | null>(null);
   const [sending, setSending] = React.useState(false);
 
-  const noteLength = Array.from(note).length;
+  // Same unit as `maxLength` (UTF-16 units), so the counter and the field never disagree.
+  const noteLength = note.length;
   const canSend = !isOffline && !sending && name.trim().length > 0;
 
   const handleSend = React.useCallback(async () => {
@@ -60,11 +61,14 @@ export default function SuggestFestivalScreen() {
   }, [name, note, url]);
 
   return (
-    <View style={[styles.container, { backgroundColor: screenBg }]}>
+    // iOS does not resize the window for the keyboard, so the note field and the Send button would
+    // sit under it without this (Android uses adjustResize).
+    <KeyboardAvoidingView style={[styles.container, { backgroundColor: screenBg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubScreenHeader title="Suggest a festival" label="Don't see yours?" />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
         <SectionCard subtitle="Tell us which festival to add. Festie builds schedules from official published sources, so a link to the festival's website helps.">
@@ -75,7 +79,6 @@ export default function SuggestFestivalScreen() {
             placeholder="Festival name"
             maxLength={FESTIVAL_SUGGESTION_NAME_MAX_LENGTH}
             autoCapitalize="words"
-            returnKeyType="next"
             accessibilityLabel="Festival name"
           />
 
@@ -88,7 +91,6 @@ export default function SuggestFestivalScreen() {
             textContentType="URL"
             autoCapitalize="none"
             autoCorrect={false}
-            returnKeyType="next"
             accessibilityLabel="Official website, optional"
           />
 
@@ -117,7 +119,7 @@ export default function SuggestFestivalScreen() {
           published.
         </Text>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

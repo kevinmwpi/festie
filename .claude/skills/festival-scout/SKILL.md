@@ -18,7 +18,8 @@ optionally the official URL. `$ARGUMENTS` holds them.
 ## Scope
 
 Scout only a festival that is on the watchlist (`npm run admin -- watchlist:list`) or that the admin
-names in this request (add it with `watchlist:add --name ... --tier ...` first so the record exists).
+names in this request (add it first with `npm run admin -- watchlist:add --slug <slug> --name "<name>"
+--tier A|B|C [--url <official url>]`, the same `<slug>` you pass to `candidate:new`, so the record exists).
 Never go looking for other events. After scaffolding, run `npm run admin -- watchlist:set-status <slug>
 candidate`.
 

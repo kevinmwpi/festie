@@ -367,7 +367,10 @@ applied migration.
 ## 9. Troubleshooting
 
 - `Missing SUPABASE_URL …` — export both variables; the anon key is never accepted.
-- `PGRST205` / missing columns — the target project is missing migrations 006–011; apply them first.
+- `PGRST205` / missing columns — the target project is missing migrations 006–013; apply them first.
+  Migration 012 is missing when the app or `festival:seed` reports an unknown `image_credit` /
+  `image_license` / `image_source_url` column (42703 / PGRST204) or `suggest_festival` is not found; 013
+  when `media:upload` cannot find the `artwork` bucket.
   Migration 011 is missing when `festival:seed` or `demo:seed` stops with `Reading existing sets failed
   (42703): column sets.status does not exist` (the plan reads it before writing anything), or a write
   reports `Could not find the 'status' column of 'sets'` (PGRST204).

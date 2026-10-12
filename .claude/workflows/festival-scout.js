@@ -10,6 +10,8 @@
 //   hints       optional free text (organizer, venue, city, suggestion id, known sources)
 //   requestedBy 'admin' (default) or 'schedule'. A scheduled run must name a watchlist entry with
 //               scout = true (`npm run admin -- watchlist:list --json`); the Assemble step refuses otherwise.
+//   repoRoot    optional absolute path of the checkout (default: the session's working directory)
+//   scratchDir  optional scratch directory for notes (default: `scout/<slug>/` under the session scratchpad)
 export const meta = {
   name: 'festival-scout',
   description: 'Scout a festival from official public sources into a candidate bundle for human review (never seeds)',
@@ -33,10 +35,12 @@ const today = String(a.today)
 const officialUrl = a.officialUrl ? String(a.officialUrl) : ''
 const hints = a.hints ? String(a.hints) : ''
 const requestedBy = a.requestedBy === 'schedule' ? 'schedule' : 'admin'
+const repoRoot = a.repoRoot ? String(a.repoRoot) : 'the current working directory (the Festie checkout)'
+const scratchDir = a.scratchDir ? String(a.scratchDir) : `a \`scout/${slug}/\` directory under your session scratchpad directory`
 const candidateDir = `seed-data/candidates/${slug}`
 
-const RULES = `Repo: /home/user/festie. Festival: "${name}" ${year} (slug ${slug}). Today: ${today}. ${officialUrl ? `Known official URL: ${officialUrl}.` : ''} ${hints ? `Hints: ${hints}.` : ''}
-Rules (docs/agents/festival-pipeline.md §1, docs/festival-data.md §3): facts only from official public sources (organizer site or official app listing; press only to confirm); names as plain text; no artwork, logos, posters, brand colours; never invent times; record every page you tried with its URL, whether it opened (many hosts return 403 from this environment — record that), what it was used for and the access date. Never run festival:seed, demo:seed or media:upload; never write outside ${candidateDir}/. Scratch: /tmp/claude-0/-home-user/9d1a3812-444c-5bed-985c-fbc6a4a57d26/scratchpad/scout/${slug}/ (create it).`
+const RULES = `Repo: ${repoRoot}; run every command from the repo root. Festival: "${name}" ${year} (slug ${slug}). Today: ${today}. ${officialUrl ? `Known official URL: ${officialUrl}.` : ''} ${hints ? `Hints: ${hints}.` : ''}
+Rules (docs/agents/festival-pipeline.md §1, docs/festival-data.md §3): facts only from official public sources (organizer site or official app listing; press only to confirm); names as plain text; no artwork, logos, posters, brand colours; never invent times; record every page you tried with its URL, whether it opened (many hosts return 403 from this environment — record that), what it was used for and the access date. Never run festival:seed, demo:seed or media:upload; never write outside ${candidateDir}/. Scratch notes go in ${scratchDir} (create it).`
 
 const SOURCES = {
   type: 'object',
@@ -149,7 +153,7 @@ Steps:
 4. Run \`npm run admin -- festival:import-csv ${candidateDir} --out ${candidateDir}/_seed.json\` then \`npm run admin -- festival:validate ${candidateDir}/_seed.json\`; fix errors in the CSVs until there are none; keep the warnings for REVIEW.md.
 5. Photos: run \`npm run admin -- media:fetch-commons --seed ${candidateDir}/_seed.json --into ${candidateDir}/media\` once (it may fail without network — record the outcome). Never fetch images any other way.
 6. Delete ${candidateDir}/_seed.json. Write REVIEW.md: what this is; sources opened vs failed; counts per day; estimated/low-confidence rows; missing acts; cross-check problems not applied and why; photo results; validation warnings.
-7. Run \`npm run admin -- watchlist:set-status ${slug} candidate\`, then \`git -C /home/user/festie status --short ${candidateDir} seed-data/golden/watchlist.json\` and list the files. Do not commit.
+7. Run \`npm run admin -- watchlist:set-status ${slug} candidate\`, then \`git status --short ${candidateDir} seed-data/golden/watchlist.json\` (from the repo root) and list the files. Do not commit.
 Return a short report: files, counts, warnings, what the reviewer must check first.`,
   { label: 'assemble', phase: 'Assemble' },
 )
