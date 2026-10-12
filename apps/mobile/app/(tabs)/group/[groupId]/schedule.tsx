@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   // React Native gives horizontal ScrollViews flexGrow/flexShrink 1; in a flex column they would take
   // a share of the free height away from the list below.
   chipScroller: { flexGrow: 0 },
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   statePad: { padding: spacing.lg },
   scroll: { flex: 1 },
   inner: { gap: spacing.md, paddingHorizontal: spacing.lg },

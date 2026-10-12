@@ -96,7 +96,7 @@ export default function JoinGroupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: colors.background, flex: 1 },
+  container: { flex: 1 },
   content: { gap: spacing.md, padding: spacing.lg },
   codeInput: {
     fontSize: 24,

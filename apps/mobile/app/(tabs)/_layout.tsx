@@ -5,7 +5,7 @@ import { PlatformPressable } from '@react-navigation/elements';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSyncEventBridge } from '@/src/hooks/use-sync-events';
@@ -20,11 +20,11 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
  */
 const UNFOCUSED_TAB_INK = 'rgba(44, 51, 39, 0.85)';
 
-/** The floating pill's height; the icon + label stack is centred in it. */
+/** The floating pill's height; the icon + label stack is centred in it (see TabButton). */
 const TAB_BAR_HEIGHT = 80;
 /**
  * Box React Navigation gives each tab icon. Its default (31×28) is sized for a bare glyph; ours stacks a
- * 26 pt glyph, a gap and a label (≈ 41 pt, 1.1× when focused), which would overflow it and the pill.
+ * 26 pt glyph, a gap and a label (≈ 42 pt), which would overflow it and the pill.
  */
 const TAB_ICON_BOX_HEIGHT = 52;
 /** Space between the floating pill and the home indicator area below it. */
@@ -49,7 +49,14 @@ const TAB_CONFIG: Record<string, { icon: IoniconName; iconFocused: IoniconName; 
  * nothing, and the icon stack sits about 8 pt above the middle of the pill. Centre the pressable itself.
  */
 function TabButton(props: BottomTabBarButtonProps) {
-  return <PlatformPressable {...props} style={[props.style, styles.tabButton]} />;
+  return (
+    <PlatformPressable
+      {...props}
+      // A borderless ripple spills past the pill's rounded ends; keep it inside the tab.
+      android_ripple={{ color: 'rgba(44, 51, 39, 0.10)', borderless: false }}
+      style={[props.style, styles.tabButton]}
+    />
+  );
 }
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
@@ -58,9 +65,9 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   // Dark ink on the pastel accent keeps ≥ 4.5:1; unfocused tabs read as lighter ink, not lower opacity.
   const tint = focused ? colors.textPrimary : UNFOCUSED_TAB_INK;
   return (
-    <View style={[styles.iconContainer, focused && styles.iconContainerFocused]}>
+    <View style={styles.iconContainer}>
       <Ionicons name={focused ? cfg.iconFocused : cfg.icon} size={26} color={tint} />
-      <Text style={[styles.iconLabel, { color: tint }, focused && styles.iconLabelFocused]} allowFontScaling={false}>
+      <Text style={[styles.iconLabel, { color: tint }, focused && styles.iconLabelFocused]} maxFontSizeMultiplier={1.2}>
         {cfg.label}
       </Text>
     </View>
@@ -95,11 +102,12 @@ export default function TabLayout() {
           marginHorizontal: 20,
           marginBottom: TAB_BAR_GAP + insets.bottom,
           position: 'absolute',
-          shadowColor: '#000000',
-          shadowOpacity: 0.25,
-          shadowRadius: 24,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 12,
+          shadowColor: colors.textPrimary,
+          shadowOpacity: 0.14,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 8,
+          overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
           // subtle white border as in reference: border border-white/20
           borderWidth: 1,
           borderColor: 'rgba(255,255,255,0.2)',
@@ -124,14 +132,11 @@ const styles = StyleSheet.create({
     gap: 4,
     justifyContent: 'center',
   },
-  iconContainerFocused: {
-    transform: [{ scale: 1.1 }],
-  },
   iconLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
   iconLabelFocused: {
     fontWeight: '800',

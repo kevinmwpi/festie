@@ -383,9 +383,10 @@ const styles = StyleSheet.create({
   /* Secondary Button */
   secondaryButton: {
     alignItems: 'center',
-    borderColor: colors.primary,
+    // `inputBorder` is the one control boundary that clears 3:1 on white and on the festival tints.
+    borderColor: colors.inputBorder,
     borderRadius: radii.md + 4,
-    borderWidth: 2,
+    borderWidth: 1.5,
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md + 2,

@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 /**
  * Festie Design System — Theme Tokens
  *
@@ -103,13 +105,15 @@ export const radii = {
 
 /**
  * Typography tokens.
- * Georgia is the closest system serif italic to Libre Baskerville on iOS & Android.
- * Install @expo-google-fonts/libre-baskerville + inter + space-grotesk and swap
- * the fontFamily strings here for the exact reference fonts.
+ * Georgia is iOS-only; Android has no Georgia and would fall back to Roboto, so it gets the system
+ * serif (Noto Serif) until a serif italic is bundled next to Fredoka. Screens that hard-code
+ * 'Georgia' should move to `typography.heading`.
  */
+export const HEADING_FONT: string | undefined = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
+
 export const typography = {
   heading: {
-    fontFamily: 'Georgia' as string | undefined,
+    fontFamily: HEADING_FONT,
     fontStyle: 'italic' as const,
     fontWeight: '700' as const,
   },

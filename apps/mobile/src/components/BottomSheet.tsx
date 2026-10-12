@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { colors, layout, radii, spacing } from '@festival/ui';
 import React from 'react';
 import {
@@ -28,7 +29,12 @@ export function BottomSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.sm }]} accessibilityViewIsModal>
+        <View
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.sm }]}
+          accessibilityViewIsModal
+          // VoiceOver's two-finger Z gesture; the backdrop button is unreachable from inside a modal view.
+          onAccessibilityEscape={onClose}
+        >
           <View style={styles.grabber} importantForAccessibility="no" />
           <ScrollView
             bounces={false}
@@ -37,9 +43,20 @@ export function BottomSheet({
             showsVerticalScrollIndicator={false}
           >
             {title ? (
-              <Text style={styles.title} accessibilityRole="header">
-                {title}
-              </Text>
+              <View style={styles.titleRow}>
+                <Text style={[styles.title, styles.titleText]} accessibilityRole="header">
+                  {title}
+                </Text>
+                <Pressable
+                  onPress={onClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                  hitSlop={4}
+                  style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.6 }]}
+                >
+                  <Ionicons name="close" size={22} color={colors.textPrimary} />
+                </Pressable>
+              </View>
             ) : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
             {children}
@@ -129,6 +146,17 @@ const styles = StyleSheet.create({
     width: 40,
   },
   content: { gap: spacing.md, paddingBottom: spacing.sm },
+  titleRow: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.sm },
+  titleText: { flex: 1 },
+  closeButton: {
+    alignItems: 'center',
+    backgroundColor: '#F6F7F5',
+    borderRadius: layout.minTouchTarget / 2,
+    height: layout.minTouchTarget,
+    justifyContent: 'center',
+    marginTop: -spacing.xs,
+    width: layout.minTouchTarget,
+  },
   title: { color: colors.textPrimary, fontFamily: 'Georgia', fontSize: 24, fontStyle: 'italic', fontWeight: '700' },
   subtitle: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: -spacing.xs },
   actions: { gap: spacing.sm },

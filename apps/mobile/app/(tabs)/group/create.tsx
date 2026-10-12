@@ -113,7 +113,7 @@ export default function CreateGroupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: colors.background, flex: 1 },
+  container: { flex: 1 },
   content: { gap: spacing.md, padding: spacing.lg },
   festivalRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
   festivalLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },

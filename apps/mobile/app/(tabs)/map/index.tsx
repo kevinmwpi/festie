@@ -743,7 +743,8 @@ const styles = StyleSheet.create({
   // a share of the free height away from the list below.
   chipScroller: { flexGrow: 0 },
   container: { flex: 1 },
-  map: { left: 0, position: 'absolute', right: 0, top: 0 },
+  // All four edges: an absolute view with only `top` gets a content-sized (zero) height.
+  map: StyleSheet.absoluteFillObject,
   statePad: { padding: spacing.lg },
   scroll: { flex: 1 },
   scrollContent: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },

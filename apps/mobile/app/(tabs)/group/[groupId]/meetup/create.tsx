@@ -354,7 +354,7 @@ export default function CreateMeetupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   content: { gap: spacing.md, paddingHorizontal: spacing.lg },
   pressed: { opacity: 0.8 },
   iosPickerRow: { alignItems: 'flex-start' },

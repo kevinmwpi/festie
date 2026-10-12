@@ -653,7 +653,7 @@ export default function GroupDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   statePad: { padding: spacing.lg },
   scroll: { flex: 1 },
   inner: { gap: spacing.md, paddingHorizontal: spacing.lg },
