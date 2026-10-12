@@ -31,6 +31,7 @@ import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } fro
 import { useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useMySchedule } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
 /* ─── Timeline geometry ─────────────────────────────────── */
@@ -181,6 +182,7 @@ export default function PersonalScheduleScreen() {
   const festivalId = useAppStore((s) => s.activeFestivalId);
   const activeFestivalAccent = useAppStore((s) => s.activeFestivalAccent);
   const screenBg = deriveAccentColors(activeFestivalAccent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
   const isOffline = useOfflineStatus();
 
   const { bundle, schedule, festival } = useMySchedule(festivalId);

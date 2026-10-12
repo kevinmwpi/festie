@@ -17,6 +17,7 @@ import { ScreenHeader } from '@/src/components/ScreenHeader';
 import { ErrorState, LoadingState, StaleDataNote } from '@/src/components/StateViews';
 import { useFestivalsById, useGroups } from '@/src/hooks/use-groups';
 import { useLocationSharing } from '@/src/location/LocationSharingProvider';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
 function CrewActions() {
@@ -52,6 +53,7 @@ export default function GroupsScreen() {
   const activeFestivalAccent = useAppStore((s) => s.activeFestivalAccent);
   const setSelectedGroupId = useAppStore((s) => s.setSelectedGroupId);
   const screenBg = deriveAccentColors(activeFestivalAccent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
 
   const list = groups.data ?? [];
   const hasGroups = list.length > 0;

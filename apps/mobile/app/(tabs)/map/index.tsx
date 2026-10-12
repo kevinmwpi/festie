@@ -56,6 +56,7 @@ import { visibleFriendLocations, withDeviceClockTimes, type DeviceTimed } from '
 import { cancelCrewReminders } from '@/src/notifications/crew-reminders';
 import { restoreMeetupReminders } from '@/src/notifications/restore-reminders';
 import { STOP_NOT_CONFIRMED_MESSAGE, useLocationSharing } from '@/src/location/LocationSharingProvider';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
 const FRIEND_POLL_MS = 30_000;
@@ -386,6 +387,7 @@ function FallbackLists({
 export default function MapScreen() {
   const { festivalId, accent, bundle, festival } = useActiveFestival();
   const screenBg = deriveAccentColors(accent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
   const solidAccent = deriveAccentColors(accent).solid;
   const clock = useFestivalClock(festival);
   const isOffline = useOfflineStatus();

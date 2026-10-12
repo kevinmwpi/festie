@@ -35,6 +35,7 @@ import { useCacheFirstQuery } from '@/src/hooks/use-cache-first-query';
 import { useCurrentProfile } from '@/src/hooks/use-current-profile';
 import { formatFestivalDateRange } from '@/src/hooks/use-festival';
 import { useUserKey } from '@/src/hooks/use-session';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { ensureActiveFestival, useAppStore } from '@/src/state/app-store';
 
 function FestivalCard({
@@ -129,6 +130,7 @@ export default function FestivalsScreen() {
   const setActiveFestival = useAppStore((s) => s.setActiveFestival);
   const activeFestivalAccent = useAppStore((s) => s.activeFestivalAccent);
   const screenBg = deriveAccentColors(activeFestivalAccent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
   const catalog = useCacheFirstQuery({

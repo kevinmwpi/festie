@@ -22,6 +22,7 @@ import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } fro
 import { useFestivalClock } from '@/src/hooks/use-festival';
 import { useLineup, type LineupRow } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
 const ALL = 'all';
@@ -32,6 +33,7 @@ export default function BrowseScheduleScreen() {
   const festivalId = useAppStore((state) => state.activeFestivalId);
   const accent = useAppStore((state) => state.activeFestivalAccent);
   const screenBg = deriveAccentColors(accent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
   const isOffline = useOfflineStatus();
 
   const { bundle, lineup, festival } = useLineup(festivalId);
