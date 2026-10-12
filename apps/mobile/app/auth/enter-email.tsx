@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BrandMark } from '@/src/components/BrandMark';
 import { WORDMARK_FONT } from '@/src/config/fonts';
 import { openPrivacyPolicy, openTermsOfUse } from '@/src/providers/external-links';
 
@@ -52,7 +53,7 @@ export default function EnterEmailScreen() {
           {/* Icon */}
           <View style={styles.iconWrap} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
             <View style={[styles.iconBox, { backgroundColor: AUTH_ACCENT }]}>
-              <Text style={styles.iconGlyph}>⛺</Text>
+              <BrandMark />
             </View>
           </View>
 
@@ -140,7 +141,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
-  iconGlyph: { fontSize: 36 },
   brand: { alignItems: 'center', gap: spacing.xs, marginTop: -spacing.md },
   wordmark: {
     fontFamily: WORDMARK_FONT,

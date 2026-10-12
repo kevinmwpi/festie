@@ -9,6 +9,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
+import { BrandMark } from '@/src/components/BrandMark';
 import { SUPPORT_EMAIL } from '@/src/config/app-info';
 import { WORDMARK_FONT } from '@/src/config/fonts';
 import { AppProviders } from '@/src/providers/app-providers';
@@ -105,7 +106,7 @@ function ConfigErrorScreen({ detail }: { detail: string }) {
       <View style={styles.configContainer}>
         <View style={styles.configCard}>
           <View style={styles.configIcon} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-            <Text style={styles.configGlyph}>⛺</Text>
+            <BrandMark size={46} />
           </View>
           <Text style={styles.configTitle} accessibilityRole="header">
             Festie can&apos;t start
@@ -162,7 +163,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 72,
   },
-  configGlyph: { fontSize: 32 },
   configTitle: {
     color: colors.textPrimary,
     fontFamily: 'Georgia',
