@@ -8,6 +8,8 @@
 //   officialUrl optional known official site or schedule page
 //   today       ISO date 'YYYY-MM-DD' (scripts cannot read the clock)
 //   hints       optional free text (organizer, venue, city, suggestion id, known sources)
+//   requestedBy 'admin' (default) or 'schedule'. A scheduled run must name a watchlist entry with
+//               scout = true (`npm run admin -- watchlist:list --json`); the Assemble step refuses otherwise.
 export const meta = {
   name: 'festival-scout',
   description: 'Scout a festival from official public sources into a candidate bundle for human review (never seeds)',
@@ -30,6 +32,7 @@ const year = a.year ? String(a.year) : ''
 const today = String(a.today)
 const officialUrl = a.officialUrl ? String(a.officialUrl) : ''
 const hints = a.hints ? String(a.hints) : ''
+const requestedBy = a.requestedBy === 'schedule' ? 'schedule' : 'admin'
 const candidateDir = `seed-data/candidates/${slug}`
 
 const RULES = `Repo: /home/user/festie. Festival: "${name}" ${year} (slug ${slug}). Today: ${today}. ${officialUrl ? `Known official URL: ${officialUrl}.` : ''} ${hints ? `Hints: ${hints}.` : ''}
@@ -139,13 +142,14 @@ const assembled = await agent(
 Inputs — sources:\n${JSON.stringify(allSources, null, 1)}\n\nExtracted:\n${JSON.stringify(extracted, null, 1)}\n\nCross-check problems (apply every fix you agree with; mention the rest in REVIEW.md):\n${JSON.stringify(checks, null, 1)}
 
 Steps:
+0. Scope check: run \`npm run admin -- watchlist:list --json\`. This run was requested by: ${requestedBy}. If "schedule" and the slug ${slug} is not an entry with "scout": true, STOP: write nothing and return "not scoutable on schedule: <reason>". If "admin" and the slug is not on the watchlist, add it: \`npm run admin -- watchlist:add --slug ${slug} --name "${name}" --tier A${officialUrl ? ` --url ${officialUrl}` : ''}\`.
 1. Try \`npm run admin -- candidate:new ${slug} --name "${name}"${officialUrl ? ` --source ${officialUrl}` : ''}\` to scaffold; if the command is unavailable or the dir exists, write the files yourself following docs/festival-data.md §2 and apps/admin-tools/src/candidates/types.ts.
 2. Write festival.csv (status draft, a neutral accent_color like #E4D9FF, source_url = the official schedule page), stages.csv, artists.csv, sets.csv (header artist,stage,start,end,status,original_start,note; status/original_start/note only when a change applies; estimated ends get note "end time estimated (<how>)").
 3. Write candidate.json: version 1, slug, name, created_at ${today}T00:00:00Z (keep existing), status needs_review, trigger {kind:'manual'}, agent {tool:'claude-code workflow festival-scout', started_at}, sources (url,title,kind,accessed_at ${today},used_for,note incl. "could not open"), confidence per section (from the checks), notes, items.sets keyed "<artist>|<YYYY-MM-DD HH:MM>" → {sources:[indexes], confidence, note}, review {decisions all pending, by null, at null}.
 4. Run \`npm run admin -- festival:import-csv ${candidateDir} --out ${candidateDir}/_seed.json\` then \`npm run admin -- festival:validate ${candidateDir}/_seed.json\`; fix errors in the CSVs until there are none; keep the warnings for REVIEW.md.
 5. Photos: run \`npm run admin -- media:fetch-commons --seed ${candidateDir}/_seed.json --into ${candidateDir}/media\` once (it may fail without network — record the outcome). Never fetch images any other way.
 6. Delete ${candidateDir}/_seed.json. Write REVIEW.md: what this is; sources opened vs failed; counts per day; estimated/low-confidence rows; missing acts; cross-check problems not applied and why; photo results; validation warnings.
-7. Run \`git -C /home/user/festie status --short ${candidateDir}\` and list the files. Do not commit.
+7. Run \`npm run admin -- watchlist:set-status ${slug} candidate\`, then \`git -C /home/user/festie status --short ${candidateDir} seed-data/golden/watchlist.json\` and list the files. Do not commit.
 Return a short report: files, counts, warnings, what the reviewer must check first.`,
   { label: 'assemble', phase: 'Assemble' },
 )

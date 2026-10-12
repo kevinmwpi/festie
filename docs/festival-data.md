@@ -290,8 +290,10 @@ http://127.0.0.1:8787): approve or reject each section and each image, then
 `seed-data/golden/index.json`. Publish as in §4. The roles, rules and the flywheel are in
 [`agents/festival-pipeline.md`](./agents/festival-pipeline.md).
 
-User suggestions from the app ("Suggest a festival") land in `festival_suggestions` (migration 012):
-`suggestions:list`, `suggestions:to-candidate <id>`.
+Which festivals get scouted is decided by the watchlist (`seed-data/golden/watchlist.json`:
+`watchlist:list`, `watchlist:add`), not by sweeping every event: flagship tier, user demand, or an admin
+request. User suggestions from the app ("Suggest a festival") land in `festival_suggestions`
+(migration 012): `suggestions:ranking`, `suggestions:list`, `suggestions:to-candidate <id>`.
 
 ## 8. Moderation
 

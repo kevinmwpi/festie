@@ -53,9 +53,9 @@ These restate [`festival-data.md`](../festival-data.md) §3 for agents and add t
 
 ```
    intake            scout (agent)        enrich (agent+tools)      validate (tools)
- suggestions  ──►  official sources  ──►  artist registry match  ──►  import-csv
- scheduled scan     extract CSVs          licensed photos            festival:validate
- manual             provenance            generated marks            media:validate
+ watchlist    ──►  official sources  ──►  artist registry match  ──►  import-csv
+ (tier + demand)    extract CSVs          licensed photos            festival:validate
+ admin request      provenance            generated marks            media:validate
                         │                                                  │
                         ▼                                                  ▼
                  seed-data/candidates/<slug>/  ◄──────────────────  review (human)
@@ -72,7 +72,7 @@ These restate [`festival-data.md`](../festival-data.md) §3 for agents and add t
 
 | Role | Who | Does | Must not |
 |---|---|---|---|
-| Intake | tools + person | Turns a user suggestion (`suggestions:list`, `suggestions:to-candidate`), a scheduled scan, or a manual request into a candidate stub (`candidate:new`) | Start a candidate for a leaked or rumoured lineup |
+| Intake | tools + person | Keeps the **watchlist** (`watchlist:add`, tiers A/B/C) and reads demand (`suggestions:ranking`); turns a scoutable watchlist entry, a user suggestion (`suggestions:to-candidate`) or an admin request into a candidate stub (`candidate:new`) | Scout festivals that are not on the watchlist (no sweeping "every concert"); start a candidate for a leaked or rumoured lineup |
 | Scout | agent (`/festival-scout`, workflow `festival-scout`) | Finds the official schedule, extracts festival facts, stages, artists, sets and changes into the CSVs, records sources and confidence, writes `REVIEW.md` | Invent or round times; copy text; publish |
 | Enricher | agent + `media:fetch-commons` | Matches artists to the golden registry (same name → same id), fetches licensed photos with their licence and attribution, leaves pending image entries | Fetch from sources without licence metadata; store an NC/ND image |
 | Validator | tools | `festival:import-csv`, `festival:validate`, `media:validate`; errors block, warnings are listed for the reviewer | — |
@@ -80,6 +80,26 @@ These restate [`festival-data.md`](../festival-data.md) §3 for agents and add t
 | Publisher | person, with tools | `candidate:promote`, then `media:upload`, then `festival:seed --dry-run` and `festival:seed` | Seed a candidate that was not promoted |
 | Maintainer | agent + person | Near and during the festival: watches the official channels, produces *change* candidates (moved / cancelled sets, `festival-data.md` §4.1) through the same review | Edit the database directly |
 | Evaluator | tools (`scout:eval`) + person | Scores an agent run against golden data; feeds failure modes back into the agent instructions (§7) | — |
+
+### Which festivals get scouted
+
+Agents do not go looking for every event. The scope is the **watchlist** (`seed-data/golden/watchlist.json`,
+`npm run admin -- watchlist:list`), and the order is a transparent score:
+
+| Signal | Points | Why |
+|---|---|---|
+| Tier the admin assigned: **A** flagship (EDC Las Vegas, Coachella, Lollapalooza, Ultra, Head Trip-size Goldenvoice events), **B** regional major, **C** tracked only | A 100, B 50, C 0 | Big multi-day, multi-stage events are where crews need the app most |
+| Users asked for it in the app (`festival_suggestions`, same name) | 10 each, max 50 | Demand we can measure |
+| Users follow it already (`user_festivals`, once it is in the catalog) | 5 each, max 50 | Keeps popular festivals maintained year to year |
+| Starts within 120 days | up to 30, more the closer | Set times land 2–7 days before; priority rises as the date nears |
+
+A **scheduled** run (a Routine) may only scout entries whose status is `watching` and whose score is
+≥ 60 (`scout = yes` in `watchlist:list`): every tier-A event, and tier-B events with user demand or a
+near date. An **admin request** (`/festival-scout <slug>` or the workflow with `requestedBy: 'admin'`)
+may name any watchlist entry, or add one first with `watchlist:add`. When a candidate is created the
+entry's status becomes `candidate`, then `published` after the seed; `passed` and `dropped` take it out
+of scheduling. Adjust the weights in `apps/admin-tools/src/watchlist/watchlist.ts` and this table
+together.
 
 ## 3. The golden database
 
@@ -145,8 +165,9 @@ This is not legal advice; have the policy reviewed before a public launch.
 
 Each turn of the loop should make the next one cheaper and better:
 
-1. **Intake gets sharper.** Suggestions tell us which festivals people actually want; a scan of large
-   upcoming festivals (multi-day, multi-stage, within ~90 days, lineup announced) fills the rest.
+1. **Intake gets sharper.** Suggestions and follows feed the watchlist score, so the festivals people
+   actually want rise to the top; the admin adds flagship events by hand. Nothing outside the
+   watchlist is scouted.
 2. **Scouting gets cheaper.** Known artists (ids, photos) are reused from golden. Known organizers have
    known source patterns (where Insomniac posts set times, how many days before) recorded in §7.
 3. **Review gets faster.** The reviewer edits less when the agent's precision is higher; `scout:eval`
@@ -167,16 +188,18 @@ Metrics worth tracking per candidate (write them in `REVIEW.md` or the review no
 | Hours from trigger to publish | The cost of a festival |
 | Post-publish corrections | What review missed |
 
-Cadence: a scan of upcoming festivals weekly (a Claude Code Routine can run the `festival-scout`
-workflow); set times land 2–7 days before most festivals, so expect a candidate update then; during the
-festival watch for changes daily.
+Cadence: weekly, a Routine runs `watchlist:list` and scouts the `scout = yes` entries that have no
+candidate yet (nothing else); set times land 2–7 days before most festivals, so expect a candidate
+update then; during the festival watch for changes daily.
 
 ## 6. Operating it
 
 ### Commands
 
 ```sh
-npm run admin -- suggestions:list                    # what users asked for
+npm run admin -- watchlist:list                      # who is up next (score, scout = yes)
+npm run admin -- watchlist:add --name "EDC Las Vegas" --tier A --year 2027 --url https://lasvegas.edc.com --start 2027-05-14
+npm run admin -- suggestions:ranking                 # what users ask for most
 npm run admin -- suggestions:to-candidate <id>       # or: candidate:new <slug> --name "<festival>"
 # scout (agent) fills seed-data/candidates/<slug>/ — see §6 "Running the scout"
 npm run admin -- review:serve                        # http://127.0.0.1:8787 — approve / reject
@@ -197,8 +220,9 @@ festival seed that should show the images (the seed bumps the version clients re
 - As a workflow: `Workflow({ name: 'festival-scout', args: { slug, name, year, officialUrl, today } })`
   (`.claude/workflows/festival-scout.js`): parallel source sweeps, extraction, cross-checks, media
   enrichment, assembly, validation.
-- From a Routine: a weekly prompt that lists large upcoming festivals without a candidate, then runs the
-  workflow for each. The Routine still only produces candidates.
+- From a Routine: a weekly prompt that runs `watchlist:list --json`, takes the entries with
+  `scout: true` and no candidate directory, and runs the workflow for each with `requestedBy:
+  'schedule'`. The Routine never adds festivals to the watchlist and still only produces candidates.
 
 Cloud sessions reach few festival sites (the proxy returns 403 for most hosts); a run from the founder's
 machine sees more. The agent records which sources it could open either way.

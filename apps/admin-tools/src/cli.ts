@@ -36,6 +36,23 @@ import {
   suggestionToCandidate,
   type SuggestionStatus,
 } from './suggestions/list';
+import {
+  addWatchlistEntry,
+  formatSuggestionRanking,
+  formatWatchlistTable,
+  goldenNameMap,
+  groupSuggestions,
+  loadSignals,
+  noSignals,
+  rankWatchlist,
+  readWatchlist,
+  removeWatchlistEntry,
+  setWatchlistStatus,
+  TIERS,
+  WATCH_STATUSES,
+  type Tier,
+  type WatchStatus,
+} from './watchlist/watchlist';
 
 const HELP = `Festie admin tools (service role). Usage:
 
@@ -59,6 +76,13 @@ Moderation
 
 Storage
   storage:sweep-orphans [--dry-run]                Delete totem photos no meetup references (older than 24 h)
+
+Watchlist (which festivals the scout may work on: flagship tier, user demand, or an admin request)
+  watchlist:list [--json]                          Priority order; "scout = yes" is what a scheduled run may take
+  watchlist:add --name <name> --tier A|B|C [--slug <slug>] [--year <n>] [--url <official>] [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--note <text>]
+  watchlist:set-status <slug> watching|candidate|published|passed|dropped
+  watchlist:remove <slug>
+  suggestions:ranking [--json]                     What users ask for most, with watchlist/golden matches
 
 Candidates (seed-data/candidates, reviewed before anything is seeded; docs/agents/festival-pipeline.md)
   candidate:list [--json]                          Candidate bundles with counts, images and validation issues
@@ -436,6 +460,81 @@ async function suggestionsSetStatus(args: string[]): Promise<void> {
   log(`Suggestion ${positionals[0]} is now ${positionals[1]}.`);
 }
 
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function watchlistList(args: string[]): Promise<void> {
+  const { values } = parse(args, { json: { type: 'boolean' } }, { min: 0, max: 0, usage: 'watchlist:list [--json]' });
+  const config = readSupabaseConfig();
+  const signals = config ? await loadSignals(createAdminClient(config)) : noSignals();
+  const ranked = rankWatchlist(readWatchlist(), signals, todayKey());
+  log(values.json ? JSON.stringify(ranked, null, 2) : formatWatchlistTable(ranked, { signalsLoaded: Boolean(config) }));
+}
+
+async function watchlistAdd(args: string[]): Promise<void> {
+  const usage =
+    'watchlist:add --name <name> --tier A|B|C [--slug <slug>] [--year <n>] [--url <official>] [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--note <text>]';
+  const { values } = parse(
+    args,
+    {
+      name: { type: 'string' }, tier: { type: 'string' }, slug: { type: 'string' }, year: { type: 'string' },
+      url: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, note: { type: 'string' },
+    },
+    { min: 0, max: 0, usage },
+  );
+  if (typeof values.name !== 'string' || values.name.trim() === '' || !TIERS.includes(values.tier as Tier)) {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  const year = typeof values.year === 'string' ? Number(values.year) : null;
+  if (year !== null && !Number.isInteger(year)) {
+    throw new UsageError('--year must be a whole number');
+  }
+  let result;
+  try {
+    result = addWatchlistEntry({
+      slug: typeof values.slug === 'string' ? values.slug : undefined,
+      name: values.name,
+      tier: values.tier as Tier,
+      year,
+      officialUrl: typeof values.url === 'string' ? values.url : null,
+      startDate: typeof values.start === 'string' ? values.start : null,
+      endDate: typeof values.end === 'string' ? values.end : null,
+      note: typeof values.note === 'string' ? values.note : null,
+      addedBy: process.env.USER ?? process.env.USERNAME ?? null,
+    });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(`${result.replaced ? 'Updated' : 'Added'} ${result.entry.slug} (tier ${result.entry.tier}).`);
+}
+
+async function watchlistSetStatus(args: string[]): Promise<void> {
+  const usage = `watchlist:set-status <slug> ${WATCH_STATUSES.join('|')}`;
+  const { positionals } = parse(args, {}, { min: 2, max: 2, usage });
+  if (!(WATCH_STATUSES as readonly string[]).includes(positionals[1])) {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  try {
+    const entry = setWatchlistStatus(positionals[0], positionals[1] as WatchStatus);
+    log(`${entry.slug} is now ${entry.status}.`);
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+}
+
+async function watchlistRemove(args: string[]): Promise<void> {
+  const { positionals } = parse(args, {}, { min: 1, max: 1, usage: 'watchlist:remove <slug>' });
+  log(removeWatchlistEntry(positionals[0]) ? `Removed ${positionals[0]}.` : `${positionals[0]} was not on the watchlist.`);
+}
+
+async function suggestionsRanking(args: string[]): Promise<void> {
+  const { values } = parse(args, { json: { type: 'boolean' } }, { min: 0, max: 0, usage: 'suggestions:ranking [--json]' });
+  const rows = await listSuggestions(createAdminClient(requireSupabaseConfig()), { status: 'all', limit: 1000 });
+  const groups = groupSuggestions(rows, readWatchlist(), goldenNameMap());
+  log(values.json ? JSON.stringify(groups, null, 2) : formatSuggestionRanking(groups));
+}
+
 const COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'festival:validate': festivalValidate,
   'festival:seed': festivalSeed,
@@ -457,6 +556,11 @@ const COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'suggestions:list': suggestionsList,
   'suggestions:to-candidate': suggestionsToCandidate,
   'suggestions:set-status': suggestionsSetStatus,
+  'suggestions:ranking': suggestionsRanking,
+  'watchlist:list': watchlistList,
+  'watchlist:add': watchlistAdd,
+  'watchlist:set-status': watchlistSetStatus,
+  'watchlist:remove': watchlistRemove,
   ...Object.fromEntries(
     Object.entries(MEDIA_COMMANDS).map(([name, run]) => [name, (args: string[]) => run(args, log)]),
   ),

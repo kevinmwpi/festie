@@ -15,6 +15,13 @@ no edits to golden files (`seed-data/*.json`, `seed-data/*-csv/`, `seed-data/med
 Arguments: `<slug>` (`^[a-z0-9]+(-[a-z0-9]+)*$`, e.g. `countdown-nye-2026`), the festival name, and
 optionally the official URL. `$ARGUMENTS` holds them.
 
+## Scope
+
+Scout only a festival that is on the watchlist (`npm run admin -- watchlist:list`) or that the admin
+names in this request (add it with `watchlist:add --name ... --tier ...` first so the record exists).
+Never go looking for other events. After scaffolding, run `npm run admin -- watchlist:set-status <slug>
+candidate`.
+
 ## Procedure
 
 1. **Scaffold.** `npm run admin -- candidate:new <slug> --name "<name>" [--source <official url>]`.

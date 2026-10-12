@@ -16,6 +16,16 @@ records the **last check against the official source** (`at`, `by`, `source_url`
 somebody did one. Before publishing a real festival, verify it and record the check here (or in the
 festival's notes file, as `head-trip-2026-changes.md` does), then seed.
 
+## `watchlist.json`
+
+Which festivals the scout agent may work on, in priority order: the admin assigns a tier (A flagship
+such as EDC Las Vegas, Coachella, Lollapalooza, Ultra or Head Trip; B regional major; C tracked only),
+and user demand (suggestions, follows) plus how soon the festival starts add to the score. A scheduled
+run takes only entries with `scout = yes` in `npm run admin -- watchlist:list`; an admin can name any
+entry. Agents never scout festivals that are not on this list. Commands: `watchlist:list`,
+`watchlist:add`, `watchlist:set-status`, `watchlist:remove`, `suggestions:ranking`
+(`docs/agents/festival-pipeline.md` §2).
+
 ## `index.json`
 
 ```json
