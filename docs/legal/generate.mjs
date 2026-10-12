@@ -210,7 +210,7 @@ header, main, footer { max-width: 720px; margin: 0 auto; padding: 0 16px; }
 header { padding-top: 24px; }
 nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0; padding: 0; font-size: 15px; font-weight: 600; }
 nav a[aria-current="page"] { color: var(--text); text-decoration: none; }
-.brand { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 700; font-size: 22px; color: var(--text); text-decoration: none; display: inline-block; margin-bottom: 8px; }
+.brand { font-family: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif; font-weight: 700; font-size: 22px; color: var(--text); text-decoration: none; display: inline-block; margin-bottom: 8px; }
 article { background: var(--card); border-radius: 32px; padding: 28px 22px 32px; margin: 20px 0; }
 h1 { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 32px; line-height: 1.2; margin: 0 0 8px; }
 h2 { font-size: 21px; line-height: 1.3; margin: 32px 0 8px; }

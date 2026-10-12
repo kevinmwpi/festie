@@ -12,7 +12,7 @@ Goals, in priority order:
 1. **Secure** — no user can read or change data they should not; proven by automated tests that would fail if a rule were missing.
 2. **Passes App Review** — in-app account deletion, UGC filter/report/block/eject, a reviewer login that survives the reviewer deleting the account, accurate privacy disclosures, no dead UI.
 3. **Works at a festival** — launches into cached schedule/groups with no signal and an expired token; times are right in the festival's timezone; location sharing is truthful.
-4. **Design** — build on the merged `match_aistudio` design language (pastel palette, 40px card radii, Georgia-italic headings, uppercase micro-labels, per-festival accent via `deriveAccentColors`). New screens must look native to it. Change existing visuals only for function, accessibility or consistency.
+4. **Design** — build on the merged `match_aistudio` design language (pastel palette, 40px card radii, Georgia-italic headings, the "Festie" wordmark in the bundled rounded font Fredoka Bold, uppercase micro-labels, per-festival accent via `deriveAccentColors`). New screens must look native to it. Change existing visuals only for function, accessibility or consistency.
 
 Non-goals for v1: chat (removed), background location, social login, universal links (custom scheme + typed code + App Store link), server push notifications.
 

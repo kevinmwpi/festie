@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { WORDMARK_FONT } from '@/src/config/fonts';
 import { openPrivacyPolicy, openTermsOfUse } from '@/src/providers/external-links';
 
 const MAX_EMAIL_LENGTH = 254;
@@ -142,10 +143,8 @@ const styles = StyleSheet.create({
   iconGlyph: { fontSize: 36 },
   brand: { alignItems: 'center', gap: spacing.xs, marginTop: -spacing.md },
   wordmark: {
-    fontFamily: 'Georgia',
-    fontStyle: 'italic',
+    fontFamily: WORDMARK_FONT,
     fontSize: 52,
-    fontWeight: '700',
     color: colors.textPrimary,
   },
   tagline: {

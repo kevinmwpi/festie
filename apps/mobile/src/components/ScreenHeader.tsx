@@ -3,8 +3,10 @@ import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { WORDMARK_FONT } from '@/src/config/fonts';
+
 /**
- * Tab-root header: the Georgia-italic "Festie" wordmark over an uppercase breadcrumb, with an optional
+ * Tab-root header: the "Festie" wordmark (`WORDMARK_FONT`) over an uppercase breadcrumb, with an optional
  * trailing control (e.g. the settings avatar). Breadcrumbs use `textPrimary` (§5.8 — accents are
  * fill-only).
  */
@@ -81,10 +83,8 @@ const styles = StyleSheet.create({
   titleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   wordmark: {
     color: colors.textPrimary,
-    fontFamily: 'Georgia',
+    fontFamily: WORDMARK_FONT,
     fontSize: 40,
-    fontStyle: 'italic',
-    fontWeight: '700',
     letterSpacing: -0.5,
   },
   right: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },

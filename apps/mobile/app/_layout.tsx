@@ -10,6 +10,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { SUPPORT_EMAIL } from '@/src/config/app-info';
+import { WORDMARK_FONT } from '@/src/config/fonts';
 import { AppProviders } from '@/src/providers/app-providers';
 import { useHasStoredSession } from '@/src/providers/session-state';
 import { useHasAcceptedTerms } from '@/src/providers/terms-acceptance';
@@ -23,6 +24,7 @@ void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    [WORDMARK_FONT]: require('../assets/fonts/Fredoka-Bold.ttf'),
   });
 
   // A font that fails to load must not block launch; the system font is used instead.
