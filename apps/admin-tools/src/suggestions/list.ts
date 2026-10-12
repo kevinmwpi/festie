@@ -8,6 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { scaffoldCandidate, slugify, type ScaffoldResult } from '../candidates/scaffold';
 import { assertSlug, isSlug } from '../candidates/slug';
+import { normalizeName, readGoldenIndex } from '../candidates/store';
 import { check } from '../env';
 import { isUuid } from '../lib/uuid';
 
@@ -110,10 +111,21 @@ export interface SuggestionCandidateResult extends ScaffoldResult {
   suggestion: SuggestionRow;
 }
 
+/** The golden slug of the festival with this name (matched like the watchlist does), or null. */
+function goldenSlugFor(name: string, root?: string): string | null {
+  const key = normalizeName(name);
+  if (key === '') {
+    return null;
+  }
+  return readGoldenIndex(root).festivals.find((festival) => normalizeName(festival.name) === key)?.slug ?? null;
+}
+
 /**
  * Scaffolds `seed-data/candidates/<slug>/` from a suggestion (trigger `suggestion`, its URL as an
- * `other` source) and marks the suggestion accepted. The slug defaults to the slugified name; pass
- * one when the name is ambiguous or already taken (e.g. add the year).
+ * `other` source) and marks the suggestion accepted. The slug defaults to the golden slug when a
+ * festival of that name is already in `golden/index.json` (so `candidate:promote` replaces that
+ * festival's files instead of adding a second one), otherwise to the slugified name; pass one when the
+ * name is ambiguous or already taken (e.g. add the year, or `<slug>-changes-<date>`).
  */
 export async function suggestionToCandidate(
   client: SupabaseClient,
@@ -127,7 +139,7 @@ export async function suggestionToCandidate(
   if (options.slug !== undefined) {
     slug = assertSlug(options.slug);
   } else {
-    slug = slugify(suggestion.name);
+    slug = goldenSlugFor(suggestion.name, options.root) ?? slugify(suggestion.name);
     if (!isSlug(slug)) {
       throw new Error(`Could not derive a slug from "${suggestion.name}"; pass --slug <slug>`);
     }

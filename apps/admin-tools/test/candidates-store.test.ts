@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -297,6 +297,21 @@ describe('saveCandidateReview', () => {
     expect(pending.status).toBe('needs_review');
   });
 
+  it('requires a reviewer name to approve any section', async () => {
+    const dir = writeCandidate('demo-festival', demoCsv());
+    for (const by of [null, '', '   ']) {
+      await expect(saveCandidateReview('demo-festival', { decisions: ALL('approved'), by, at: null }, root)).rejects.toThrow(
+        'Approving a section records who approved it; enter a reviewer name',
+      );
+      await expect(
+        saveCandidateReview('demo-festival', { decisions: { ...ALL('pending'), stages: 'approved' }, by, at: null }, root),
+      ).rejects.toThrow(/enter a reviewer name/);
+    }
+    expect(readJson(path.join(dir, 'candidate.json')).status).toBe('needs_review');
+    const rejected = await saveCandidateReview('demo-festival', { decisions: { ...ALL('pending'), sets: 'rejected' }, by: null, at: null }, root);
+    expect(rejected.status).toBe('rejected');
+  });
+
   it('rejects malformed decisions and never downgrades a promoted candidate', async () => {
     writeCandidate('demo-festival', demoCsv());
     await expect(
@@ -332,6 +347,20 @@ describe('saveCandidateMediaReview', () => {
     expect(onDisk.entries[1].review.status).toBe('approved');
     await expect(saveCandidateMediaReview('demo-festival', 2, { status: 'rejected', by: null, at: null }, root)).rejects.toThrow(/does not exist/);
     await expect(saveCandidateMediaReview('demo-festival', 0, { status: 'maybe' as never, by: null, at: null }, root)).rejects.toThrow(/must be one of/);
+  });
+
+  it('requires a reviewer name to approve an image', async () => {
+    const seed = seedOf(demoCsv());
+    const dir = writeCandidate('demo-festival', demoCsv());
+    writeMedia(dir, [mediaEntry(seed, { review: { status: 'pending', by: null, at: null } })]);
+    for (const by of [null, '', '  ']) {
+      await expect(saveCandidateMediaReview('demo-festival', 0, { status: 'approved', by, at: null }, root)).rejects.toThrow(
+        'Approving an image records who approved it; enter a reviewer name',
+      );
+    }
+    expect(readJson(path.join(dir, 'media', 'registry.json')).entries[0].review.status).toBe('pending');
+    const rejected = await saveCandidateMediaReview('demo-festival', 0, { status: 'rejected', by: null, at: null }, root);
+    expect(rejected.review.status).toBe('rejected');
   });
 
   it('throws when the candidate has no registry', async () => {
@@ -394,7 +423,7 @@ describe('promoteCandidate', () => {
     writeMedia(dir, [
       mediaEntry(seed),
       mediaEntry(seed, { subject_id: other.id, subject_name: other.name, file: `artists/${other.id}.png`, review: { status: 'pending', by: null, at: null } }),
-      mediaEntry(seed, { subject_type: 'festival', subject_id: seed.festival.id, subject_name: seed.festival.name, file: 'festivals/demo.png' }),
+      mediaEntry(seed, { subject_type: 'festival', subject_id: seed.festival.id, subject_name: seed.festival.name, file: `festivals/${seed.festival.id}.png` }),
     ]);
     // An older image for the same artist, and one for an unrelated subject, already in the shared registry.
     const oldEntry = mediaEntry(seed, { file: `artists/${seed.artists[0].id}-old.jpg`, sha256: 'old', mime: 'image/jpeg' });
@@ -414,11 +443,11 @@ describe('promoteCandidate', () => {
     expect(readFileSync(path.join(root, 'demo-festival.json'), 'utf8')).toBe(`${JSON.stringify(seed, null, 2)}\n`);
 
     expect(readFileSync(path.join(root, 'media', 'artists', `${seed.artists[0].id}.png`))).toEqual(PNG);
-    expect(readFileSync(path.join(root, 'media', 'festivals', 'demo.png'))).toEqual(PNG);
+    expect(readFileSync(path.join(root, 'media', 'festivals', `${seed.festival.id}.png`))).toEqual(PNG);
     expect(existsSync(path.join(root, 'media', 'artists', `${other.id}.png`))).toBe(false);
     const registry = readJson(path.join(root, 'media', 'registry.json'));
     expect(registry.version).toBe(1);
-    expect(registry.entries.map((e: MediaEntry) => e.file)).toEqual(['artists/someone.jpg', `artists/${seed.artists[0].id}.png`, 'festivals/demo.png']);
+    expect(registry.entries.map((e: MediaEntry) => e.file)).toEqual(['artists/someone.jpg', `artists/${seed.artists[0].id}.png`, `festivals/${seed.festival.id}.png`]);
 
     const golden = readGoldenIndex(root);
     expect(golden.festivals).toHaveLength(1);
@@ -460,32 +489,176 @@ describe('promoteCandidate', () => {
 
     const result = await promoteCandidate('demo-festival', { dryRun: false, root });
     expect(result.actions[0]).toBe('replace seed-data/demo-festival-csv/festival.csv');
-    expect(result.actions).toContain('replace demo-festival in seed-data/golden/index.json');
+    expect(result.actions).toContain(`replace demo-festival (festival ${seed.festival.id}) in seed-data/golden/index.json`);
     expect(readJson(path.join(root, 'demo-festival.json'))).toEqual(seed);
     const golden = readGoldenIndex(root);
     expect(golden.festivals.map((f) => f.slug)).toEqual(['other', 'demo-festival']);
     expect(golden.festivals[1]).toMatchObject({ name: 'Festie Demo Fest', candidate: 'demo-festival', csv_dir: 'seed-data/demo-festival-csv', notes: 'fictional' });
   });
 
-  it("refuses to overwrite another festival's seed file", async () => {
+  it('promotes a change candidate under another slug onto the golden files of the same festival', async () => {
+    const seed = seedOf(demoCsv());
+    writeFileSync(path.join(root, 'demo-festival.json'), JSON.stringify({ festival: { id: seed.festival.id } }));
+    mkdirSync(path.join(root, 'demo-festival-csv'));
+    writeFileSync(path.join(root, 'demo-festival-csv', 'sets.csv'), 'stale');
+    mkdirSync(path.join(root, 'golden'));
+    writeFileSync(
+      path.join(root, 'golden', 'index.json'),
+      JSON.stringify({
+        version: 1,
+        festivals: [
+          {
+            slug: 'demo-festival',
+            festival_id: seed.festival.id,
+            name: 'Festie Demo Fest',
+            seed_file: 'seed-data/demo-festival.json',
+            csv_dir: 'seed-data/demo-festival-csv',
+            candidate: 'demo-festival',
+            promoted_at: '2026-01-01T00:00:00Z',
+            verified: { at: '2026-02-01T00:00:00Z', by: 'kevin', source_url: 'https://example.org/schedule' },
+            notes: 'fictional',
+          },
+        ],
+      }),
+    );
+    const dir = writeCandidate('demo-festival-2027', demoCsv(), APPROVED);
+
+    const dry = await promoteCandidate('demo-festival-2027', { dryRun: true, root });
+    expect(dry.seedFile).toBe(path.join(root, 'demo-festival.json'));
+    expect(dry.csvDir).toBe(path.join(root, 'demo-festival-csv'));
+    expect(dry.actions).toContain('replace seed-data/demo-festival-csv/sets.csv');
+    expect(dry.actions).toContain(`replace demo-festival (festival ${seed.festival.id}) in seed-data/golden/index.json`);
+    expect(dry.actions).toContain('mark candidates/demo-festival-2027/candidate.json promoted');
+    expect(dry.actions.some((action) => action.includes('demo-festival-2027.json') || action.includes('demo-festival-2027-csv'))).toBe(false);
+    expect(readFileSync(path.join(root, 'demo-festival-csv', 'sets.csv'), 'utf8')).toBe('stale');
+
+    const result = await promoteCandidate('demo-festival-2027', { dryRun: false, root });
+    expect(result.slug).toBe('demo-festival-2027');
+    expect(result.seedFile).toBe(path.join(root, 'demo-festival.json'));
+    // One seed file for the festival id: the golden one, overwritten; nothing under the candidate's slug.
+    expect(readdirSync(root).filter((name) => name.endsWith('.json'))).toEqual(['demo-festival.json']);
+    expect(readJson(path.join(root, 'demo-festival.json'))).toEqual(seed);
+    expect(readFileSync(path.join(root, 'demo-festival-csv', 'sets.csv'), 'utf8')).toBe(demoCsv()['sets.csv']);
+    expect(existsSync(path.join(root, 'demo-festival-2027-csv'))).toBe(false);
+
+    const golden = readGoldenIndex(root);
+    expect(golden.festivals).toHaveLength(1);
+    expect(golden.festivals[0]).toMatchObject({
+      slug: 'demo-festival',
+      festival_id: seed.festival.id,
+      name: 'Festie Demo Fest',
+      seed_file: 'seed-data/demo-festival.json',
+      csv_dir: 'seed-data/demo-festival-csv',
+      candidate: 'demo-festival-2027',
+      verified: null,
+      notes: 'fictional',
+    });
+    const file = readJson(path.join(dir, 'candidate.json'));
+    expect(file.status).toBe('promoted');
+    expect(file.promoted).toMatchObject({ seed_file: 'seed-data/demo-festival.json', csv_dir: 'seed-data/demo-festival-csv' });
+  });
+
+  it("refuses to overwrite another festival's seed file or golden row", async () => {
     writeFileSync(path.join(root, 'demo-festival.json'), JSON.stringify({ festival: { id: '11111111-1111-4111-8111-111111111111' } }));
     const dir = writeCandidate('demo-festival', demoCsv(), APPROVED);
     await expect(promoteCandidate('demo-festival', { dryRun: false, root })).rejects.toThrow(/already exists with festival id 11111111/);
     expect(readJson(path.join(root, 'demo-festival.json')).festival.id).toBe('11111111-1111-4111-8111-111111111111');
     expect(readJson(path.join(dir, 'candidate.json')).status).toBe('approved');
     expect(existsSync(path.join(root, 'golden', 'index.json'))).toBe(false);
+
+    // The same clash through the golden index alone (the seed file is gone, the row is not).
+    rmSync(path.join(root, 'demo-festival.json'));
+    mkdirSync(path.join(root, 'golden'));
+    writeFileSync(
+      path.join(root, 'golden', 'index.json'),
+      JSON.stringify({
+        version: 1,
+        festivals: [
+          { slug: 'demo-festival', festival_id: '11111111-1111-4111-8111-111111111111', name: 'Other', seed_file: 'seed-data/demo-festival.json', csv_dir: null, candidate: null, promoted_at: '2026-01-01T00:00:00Z', verified: null },
+        ],
+      }),
+    );
+    await expect(promoteCandidate('demo-festival', { dryRun: false, root })).rejects.toThrow(/index\.json lists demo-festival with festival id 11111111/);
+    expect(existsSync(path.join(root, 'demo-festival.json'))).toBe(false);
+    expect(readGoldenIndex(root).festivals[0].name).toBe('Other');
   });
 
-  it('refuses approved media whose file is missing, changed, or for an unknown subject', async () => {
+  it('refuses approved media that media:validate rejects, before writing anything', async () => {
     const seed = seedOf(demoCsv());
     const dir = writeCandidate('demo-festival', demoCsv(), APPROVED);
+    const promote = () => promoteCandidate('demo-festival', { dryRun: false, root });
+    const artist = seed.artists[0];
+
     writeMedia(dir, [mediaEntry(seed)], false);
-    await expect(promoteCandidate('demo-festival', { dryRun: true, root })).rejects.toThrow(/has no file/);
+    await expect(promote()).rejects.toThrow(/media:validate rejects[\s\S]*entries\[0\]\.file: file not found/);
     writeMedia(dir, [mediaEntry(seed, { sha256: 'deadbeef' })]);
-    await expect(promoteCandidate('demo-festival', { dryRun: true, root })).rejects.toThrow(/changed since it was recorded/);
-    writeMedia(dir, [mediaEntry(seed, { subject_id: '99999999-9999-4999-8999-999999999999' })]);
-    await expect(promoteCandidate('demo-festival', { dryRun: true, root })).rejects.toThrow(/not in this candidate's festival or artists/);
+    await expect(promote()).rejects.toThrow(/entries\[0\]\.sha256: must be 64 lowercase hex characters/);
+    writeMedia(dir, [mediaEntry(seed, { sha256: '' })]);
+    await expect(promote()).rejects.toThrow(/entries\[0\]\.sha256: must be 64 lowercase hex characters/);
+    writeMedia(dir, [mediaEntry(seed, { sha256: '0'.repeat(64) })]);
+    await expect(promote()).rejects.toThrow(/entries\[0\]\.sha256: does not match the file/);
+    writeMedia(dir, [mediaEntry(seed, { subject_id: '99999999-9999-4999-8999-999999999999', file: 'artists/99999999-9999-4999-8999-999999999999.png' })]);
+    await expect(promote()).rejects.toThrow(/entries\[0\]\.subject_id: no artist with this id in the seed files/);
+    writeMedia(dir, [mediaEntry(seed, { subject_type: 'festival', file: `festivals/${artist.id}.png` })]);
+    await expect(promote()).rejects.toThrow(/entries\[0\]\.subject_type: .* is a artist, not a festival/);
+    writeMedia(dir, [mediaEntry(seed, { review: { status: 'approved', by: null, at: '2026-10-12T11:00:00Z' } })]);
+    await expect(promote()).rejects.toThrow(/entries\[0\]\.review\.by: an approved entry records who approved it/);
+    writeMedia(dir, [mediaEntry(seed, { license: { id: 'CC-BY-4.0', url: 'https://creativecommons.org/licenses/by/4.0/', attribution: null } })]);
+    await expect(promote()).rejects.toThrow(/entries\[0\]\.license\.attribution: CC-BY-4.0 requires attribution text/);
+    writeMedia(dir, [mediaEntry(seed, { mime: 'image/jpeg', file: `artists/${artist.id}.jpg` })]);
+    await expect(promote()).rejects.toThrow(/entries\[0\]\.mime: file is image\/png, not image\/jpeg/);
+    writeMedia(dir, [mediaEntry(seed), mediaEntry(seed)]);
+    await expect(promote()).rejects.toThrow(/entries\[1\]\.review\.status: a second approved entry for artist/);
     expect(existsSync(path.join(root, 'media'))).toBe(false);
+    expect(existsSync(path.join(root, 'demo-festival.json'))).toBe(false);
+    expect(readJson(path.join(dir, 'candidate.json')).status).toBe('approved');
+
+    // Problems in pending or rejected entries do not block: they are not merged.
+    writeMedia(dir, [mediaEntry(seed, { sha256: 'bogus', review: { status: 'pending', by: null, at: null } }), mediaEntry(seed)]);
+    const result = await promoteCandidate('demo-festival', { dryRun: true, root });
+    expect(result.mediaMerged).toBe(1);
+    expect(result.actions).toContain(`copy media/artists/${artist.id}.png to seed-data/media/artists/${artist.id}.png`);
+  });
+
+  it('refuses approved media whose path escapes media/ or is a symbolic link, and writes nothing', async () => {
+    const seed = seedOf(demoCsv());
+    const dir = writeCandidate('demo-festival', demoCsv(), APPROVED);
+    const promote = (dryRun: boolean) => promoteCandidate('demo-festival', { dryRun, root });
+    const victim = path.join(root, 'x.json');
+    writeFileSync(victim, '{"festival":{"id":"victim"}}');
+    const pattern = /entries\[0\]\.file: must match <artists\|festivals>\/<uuid>\.<jpg\|png\|webp>/;
+
+    // `file` names the destination too: `../x.json` would land on seed-data/x.json.
+    writeMedia(dir, [mediaEntry(seed, { file: '../x.json' })]);
+    await expect(promote(false)).rejects.toThrow(pattern);
+    await expect(promote(true)).rejects.toThrow(pattern);
+    writeMedia(dir, [mediaEntry(seed, { file: '../../evil/x' })], false);
+    await expect(promote(false)).rejects.toThrow(pattern);
+    writeMedia(dir, [mediaEntry(seed, { file: `artists/../../${seed.artists[0].id}.png` })]);
+    await expect(promote(false)).rejects.toThrow(pattern);
+    writeMedia(dir, [mediaEntry(seed, { file: `/etc/${seed.artists[0].id}.png` })], false);
+    await expect(promote(false)).rejects.toThrow(pattern);
+
+    // A symbolic link in place of the image, and a symlinked folder: both read fine, both refused.
+    const outside = path.join(tmp, 'outside.png');
+    writeFileSync(outside, PNG);
+    writeMedia(dir, [mediaEntry(seed)], false);
+    rmSync(path.join(dir, 'media', 'artists'), { recursive: true, force: true });
+    mkdirSync(path.join(dir, 'media', 'artists'), { recursive: true });
+    symlinkSync(outside, path.join(dir, 'media', 'artists', `${seed.artists[0].id}.png`));
+    await expect(promote(false)).rejects.toThrow(/is a symbolic link/);
+    const outsideDir = path.join(tmp, 'outside-dir');
+    mkdirSync(outsideDir);
+    writeFileSync(path.join(outsideDir, `${seed.festival.id}.png`), PNG);
+    writeMedia(dir, [mediaEntry(seed, { subject_type: 'festival', subject_id: seed.festival.id, subject_name: seed.festival.name, file: `festivals/${seed.festival.id}.png` })], false);
+    symlinkSync(outsideDir, path.join(dir, 'media', 'festivals'));
+    await expect(promote(false)).rejects.toThrow(/outside the candidate's media directory/);
+
+    expect(readFileSync(victim, 'utf8')).toBe('{"festival":{"id":"victim"}}');
+    expect(existsSync(path.join(root, 'media'))).toBe(false);
+    expect(existsSync(path.join(root, 'demo-festival.json'))).toBe(false);
+    expect(existsSync(path.join(root, 'golden'))).toBe(false);
+    expect(readJson(path.join(dir, 'candidate.json')).status).toBe('approved');
   });
 });
 

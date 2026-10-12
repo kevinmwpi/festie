@@ -244,8 +244,17 @@ machine sees more. The agent records which sources it could open either way.
 ### Publishing a change during a festival
 
 The maintainer agent (or you) edits the golden CSV for the festival (`festival-data.md` §4.1), validates,
-and seeds. For a large change, create a change candidate instead (`candidate:new <slug>-changes-<date>`
-seeded from the golden CSVs) and review it like any other; promote overwrites the golden files.
+and seeds. For a large change, create a change candidate instead and review it like any other:
+`candidate:new <slug>-changes-<date>` seeded from the golden CSVs (`suggestions:to-candidate` for a
+festival that is already golden picks the golden slug by itself). A change candidate may use any slug;
+what ties it to the existing festival is the festival id, which the CSV import derives from the name and
+start date (or reads from the `id` column of `festival.csv`). Because that id matches a row in
+`seed-data/golden/index.json`, `candidate:promote` overwrites the festival's own files
+(`seed-data/<slug>.json`, `seed-data/<slug>-csv/`) and its index row, keeping the row's `slug` and
+recording the change candidate under `candidate`; it never leaves a second seed file for one festival,
+and it refuses a candidate slug that is already golden under a different festival id. The
+`festival:seed seed-data/<slug>.json` that follows therefore uses the festival's own slug, the path
+`candidate:promote` prints, not the candidate's.
 
 ## 7. Making the agent better
 

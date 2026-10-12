@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -173,6 +173,32 @@ describe('suggestionToCandidate', () => {
     const result = await suggestionToCandidate(client, { id: S2, slug: 'primavera-sound-2027', root });
     expect(result.dir).toBe(path.join(root, 'candidates', 'primavera-sound-2027'));
     expect(result.file.sources).toEqual([]);
+  });
+
+  it('uses the golden slug when a festival of that name is already golden, unless a slug is given', async () => {
+    mkdirSync(path.join(root, 'golden'));
+    writeFileSync(
+      path.join(root, 'golden', 'index.json'),
+      JSON.stringify({
+        version: 1,
+        festivals: [
+          { slug: 'other-fest', festival_id: '6f1d2c3b-0000-4000-8000-0000000000f0', name: 'Other Fest', seed_file: 'seed-data/other-fest.json', csv_dir: null, candidate: null, promoted_at: '2026-01-01T00:00:00Z', verified: null },
+          { slug: 'rock-en-seine-2026', festival_id: '6f1d2c3b-0000-4000-8000-0000000000f1', name: 'ROCK  en Seine', seed_file: 'seed-data/rock-en-seine-2026.json', csv_dir: null, candidate: null, promoted_at: '2026-01-01T00:00:00Z', verified: null },
+        ],
+      }),
+    );
+    const { client, data } = fakeClient();
+    const result = await suggestionToCandidate(client, { id: S1, root });
+    expect(result.dir).toBe(path.join(root, 'candidates', 'rock-en-seine-2026'));
+    expect(result.file.slug).toBe('rock-en-seine-2026');
+    expect(result.file.name).toBe('Rock en Seine');
+    expect(data[0].status).toBe('accepted');
+
+    // A name that is not golden still gets the slugified name; an explicit slug always wins.
+    expect((await suggestionToCandidate(client, { id: S2, root })).dir).toBe(path.join(root, 'candidates', 'primavera-sound'));
+    data[0].status = 'new';
+    const explicit = await suggestionToCandidate(client, { id: S1, slug: 'rock-en-seine-changes-2026-10-12', root });
+    expect(explicit.dir).toBe(path.join(root, 'candidates', 'rock-en-seine-changes-2026-10-12'));
   });
 
   it('refuses rejected suggestions, bad slugs and existing directories without touching the status', async () => {

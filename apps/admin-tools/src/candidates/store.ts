@@ -6,7 +6,7 @@
  * Paths recorded in JSON (`GoldenFestival.seed_file`, `candidate.promoted.seed_file`, …) are relative
  * to the parent of the seed-data directory, i.e. the repo root: `seed-data/head-trip-2026.json`.
  */
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { repoRoot } from '../env';
@@ -17,6 +17,15 @@ import { parseCsvRecords } from '../lib/csv';
 import { festivalDayOf, parseOffsetTimestamp } from '../lib/time';
 import { readRegistry, readRegistryOrEmpty, sha256Of, subjectKey, writeRegistry } from '../media/registry';
 import type { MediaEntry, MediaRegistry, MediaReview } from '../media/types';
+import {
+  addSubjectsFromSeed,
+  entryHasErrors,
+  errorsOf,
+  formatMediaIssues,
+  MEDIA_FILE_PATTERN,
+  validateRegistry,
+  type SubjectMap,
+} from '../media/validate';
 import { assertSlug } from './slug';
 import {
   CANDIDATE_SECTIONS,
@@ -77,6 +86,12 @@ const CANDIDATE_STATUSES: readonly CandidateStatus[] = ['needs_review', 'approve
 const DECISIONS: readonly SectionDecision[] = ['pending', 'approved', 'rejected'];
 const CONFIDENCES: readonly Confidence[] = ['high', 'medium', 'low'];
 const MEDIA_REVIEW_STATUSES = ['pending', 'approved', 'rejected'] as const;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
+/** An approval must say who approved: media:validate rejects approved entries without `review.by`. */
+function hasReviewerName(by: unknown): boolean {
+  return typeof by === 'string' && by.trim() !== '';
+}
 
 // Paths -------------------------------------------------------------------------------------------
 
@@ -416,6 +431,9 @@ export async function saveCandidateReview(slug: string, review: CandidateReview,
   if (review.by !== null && typeof review.by !== 'string') {
     throw new Error('review.by must be a string or null');
   }
+  if (CANDIDATE_SECTIONS.some((section) => decisions[section] === 'approved') && !hasReviewerName(review.by)) {
+    throw new Error('Approving a section records who approved it; enter a reviewer name');
+  }
   const updated: CandidateFile = {
     ...file,
     status: deriveCandidateStatus(decisions),
@@ -441,6 +459,9 @@ export async function saveCandidateMediaReview(slug: string, index: number, revi
   }
   if (!(MEDIA_REVIEW_STATUSES as readonly string[]).includes(review.status)) {
     throw new Error(`Media review status must be one of ${MEDIA_REVIEW_STATUSES.join(', ')} (got ${JSON.stringify(review.status)})`);
+  }
+  if (review.status === 'approved' && !hasReviewerName(review.by)) {
+    throw new Error('Approving an image records who approved it; enter a reviewer name');
   }
   const entry: MediaEntry = {
     ...registry.entries[index],
@@ -488,9 +509,23 @@ export async function promoteCandidate(slug: string, options: { dryRun: boolean;
   const seed = loaded.seed;
 
   const seedRoot = seedDataRoot(root);
-  const seedFile = path.join(seedRoot, `${slug}.json`);
-  const csvDir = path.join(seedRoot, `${slug}-csv`);
   const actions: string[] = [];
+
+  // A festival that is already golden keeps its slug and files: a change candidate (any slug, e.g.
+  // `<slug>-changes-<date>`) for the same festival id replaces them instead of leaving a second seed
+  // file for one festival behind. An entry under this slug for another festival id is a clash.
+  const golden = readGoldenIndex(root);
+  const previous =
+    golden.festivals.find((f) => f.festival_id === seed.festival.id) ?? golden.festivals.find((f) => f.slug === slug);
+  if (previous && previous.festival_id !== seed.festival.id) {
+    throw new Error(
+      `${repoRelative(goldenIndexPath(root), root)} lists ${previous.slug} with festival id ${previous.festival_id} but the candidate has ` +
+        `${seed.festival.id}; pick another slug or put the existing id in festival.csv`,
+    );
+  }
+  const goldenSlug = previous?.slug ?? slug;
+  const seedFile = (previous && resolveGoldenPath(previous.seed_file, root)) ?? path.join(seedRoot, `${goldenSlug}.json`);
+  const csvDir = (previous && resolveGoldenPath(previous.csv_dir, root)) ?? path.join(seedRoot, `${goldenSlug}-csv`);
 
   // Never replace another festival's file: the id is what users' groups and picks hang off.
   if (existsSync(seedFile)) {
@@ -514,52 +549,68 @@ export async function promoteCandidate(slug: string, options: { dryRun: boolean;
       `(${seed.festival.name}, ${seed.festival.status}: ${seed.stages.length} stages, ${seed.artists.length} artists, ${seed.sets.length} sets)`,
   );
 
-  // 2. Approved media.
+  // 2. Approved media. Approved entries must pass the media:validate rules against this candidate's
+  //    festival and artists (so the shared registry stays valid for media:upload), and the copy's source
+  //    and destination are derived from the checked `<folder>/<uuid>.<ext>` path, never from the raw
+  //    `file` string: a candidate must not write anywhere but seed-data/media/<folder>/.
   const mediaRoot = path.join(seedRoot, 'media');
   const registryPath = path.join(mediaRoot, 'registry.json');
-  const approvedMedia = (loaded.media?.entries ?? []).filter((entry) => entry.review?.status === 'approved');
-  const knownSubjects = new Set([
-    subjectKey('festival', seed.festival.id),
-    ...seed.artists.map((artist) => subjectKey('artist', artist.id)),
-  ]);
+  const approvedMedia = (loaded.media?.entries ?? [])
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => entry.review?.status === 'approved');
   const mediaCopies: Array<{ from: string; to: string }> = [];
   let registry: MediaRegistry | null = null;
   if (approvedMedia.length > 0) {
-    registry = readRegistryOrEmpty(registryPath);
-    for (const entry of approvedMedia) {
-      const subject = subjectKey(entry.subject_type, entry.subject_id);
-      if (!knownSubjects.has(subject)) {
-        throw new Error(`Approved media entry ${entry.file} is for ${subject}, which is not in this candidate's festival or artists`);
+    const candidateMediaDir = path.join(dir, 'media');
+    const subjects: SubjectMap = new Map();
+    addSubjectsFromSeed(subjects, seed);
+    const issues = errorsOf(validateRegistry(loaded.media, { dir: candidateMediaDir, subjects }));
+    const blocked = approvedMedia.filter(({ index }) => entryHasErrors(issues, index)).map(({ index }) => `entries[${index}]`);
+    if (blocked.length > 0) {
+      const relevant = issues.filter((issue) => blocked.some((prefix) => issue.path === prefix || issue.path.startsWith(`${prefix}.`)));
+      throw new Error(
+        `Candidate "${slug}" has approved media that media:validate rejects; fix or reject ${blocked.length === 1 ? 'the entry' : 'these entries'} first:\n` +
+          formatMediaIssues(relevant),
+      );
+    }
+    const mediaReal = realpathSync(candidateMediaDir);
+    const shared = readRegistryOrEmpty(registryPath);
+    registry = shared;
+    for (const { entry } of approvedMedia) {
+      const match = MEDIA_FILE_PATTERN.exec(entry.file);
+      if (!match) {
+        throw new Error(`Approved media entry ${entry.file} must match <artists|festivals>/<uuid>.<jpg|png|webp>`);
       }
-      const from = path.join(dir, 'media', entry.file);
-      if (!existsSync(from)) {
-        throw new Error(`Approved media entry ${entry.file} has no file at ${from}`);
+      const [, folder, fileId, extension] = match;
+      const fileName = `${fileId}.${extension}`;
+      const from = checkedMediaSource(path.join(candidateMediaDir, folder, fileName), mediaReal, entry.file);
+      if (!SHA256_PATTERN.test(entry.sha256)) {
+        throw new Error(`Approved media entry ${entry.file} needs a sha256 (64 lowercase hex characters) so the copy can be checked`);
       }
       const actual = sha256Of(readFileSync(from));
-      if (entry.sha256 && entry.sha256 !== actual) {
+      if (actual !== entry.sha256) {
         throw new Error(`Media file ${entry.file} changed since it was recorded (sha256 ${actual}, registry says ${entry.sha256})`);
       }
-      const to = path.join(mediaRoot, entry.file);
+      const to = path.join(mediaRoot, folder, fileName);
       mediaCopies.push({ from, to });
-      const replaced = registry!.entries.filter((e) => subjectKey(e.subject_type, e.subject_id) === subject);
-      registry!.entries = registry!.entries.filter((e) => subjectKey(e.subject_type, e.subject_id) !== subject);
-      registry!.entries.push(entry);
+      const subject = subjectKey(entry.subject_type, entry.subject_id);
+      const replaced = shared.entries.filter((e) => subjectKey(e.subject_type, e.subject_id) === subject);
+      shared.entries = shared.entries.filter((e) => subjectKey(e.subject_type, e.subject_id) !== subject);
+      shared.entries.push(entry);
       actions.push(
-        `copy media/${entry.file} to ${repoRelative(to, root)}` +
+        `copy media/${folder}/${fileName} to ${repoRelative(to, root)}` +
           (replaced.length > 0 ? ` (replaces ${replaced.map((e) => e.file).join(', ')} for ${entry.subject_name})` : ''),
       );
     }
     actions.push(`${existsSync(registryPath) ? 'update' : 'write'} ${repoRelative(registryPath, root)} (+${approvedMedia.length} approved entries)`);
   }
 
-  // 3. Golden index.
-  const golden = readGoldenIndex(root);
+  // 3. Golden index: the festival keeps its slug; `candidate` records which bundle the files came from.
   const promotedAt = new Date().toISOString();
   const seedFileRel = repoRelative(seedFile, root);
   const csvDirRel = repoRelative(csvDir, root);
-  const previous = golden.festivals.find((f) => f.slug === slug || f.festival_id === seed.festival.id);
   const goldenEntry: GoldenFestival = {
-    slug,
+    slug: goldenSlug,
     festival_id: seed.festival.id,
     name: seed.festival.name,
     seed_file: seedFileRel,
@@ -570,7 +621,11 @@ export async function promoteCandidate(slug: string, options: { dryRun: boolean;
     notes: previous?.notes ?? null,
   };
   golden.festivals = [...golden.festivals.filter((f) => f !== previous), goldenEntry];
-  actions.push(`${previous ? 'replace' : 'add'} ${slug} in ${repoRelative(goldenIndexPath(root), root)}`);
+  actions.push(
+    previous
+      ? `replace ${previous.slug} (festival ${seed.festival.id}) in ${repoRelative(goldenIndexPath(root), root)}`
+      : `add ${slug} in ${repoRelative(goldenIndexPath(root), root)}`,
+  );
 
   // 4. The candidate itself.
   actions.push(`mark candidates/${slug}/${CANDIDATE_FILE} promoted`);
@@ -599,6 +654,36 @@ export async function promoteCandidate(slug: string, options: { dryRun: boolean;
     promoted: { at: promotedAt, seed_file: seedFileRel, csv_dir: csvDirRel },
   });
   return result;
+}
+
+/** A `seed_file` / `csv_dir` recorded in the golden index (relative to the repo root); null when blank. */
+function resolveGoldenPath(recorded: string | null | undefined, root?: string): string | null {
+  return typeof recorded === 'string' && recorded.trim() !== '' ? path.resolve(path.dirname(seedDataRoot(root)), recorded) : null;
+}
+
+/**
+ * The real file behind a candidate's media path. Refuses symbolic links and anything whose real path is
+ * outside the candidate's media directory (`mediaReal`, its realpath), so a crafted bundle cannot make
+ * the copy read from elsewhere in the repository.
+ */
+function checkedMediaSource(filePath: string, mediaReal: string, label: string): string {
+  let stat: ReturnType<typeof lstatSync>;
+  try {
+    stat = lstatSync(filePath);
+  } catch {
+    throw new Error(`Approved media entry ${label} has no file at ${filePath}`);
+  }
+  if (stat.isSymbolicLink()) {
+    throw new Error(`Approved media entry ${label} is a symbolic link; copy the image itself into the candidate's media directory`);
+  }
+  if (!stat.isFile()) {
+    throw new Error(`Approved media entry ${label} is not a regular file (${filePath})`);
+  }
+  const real = realpathSync(filePath);
+  if (!real.startsWith(mediaReal + path.sep)) {
+    throw new Error(`Approved media entry ${label} resolves to ${real}, outside the candidate's media directory`);
+  }
+  return real;
 }
 
 // Evaluation ---------------------------------------------------------------------------------------
