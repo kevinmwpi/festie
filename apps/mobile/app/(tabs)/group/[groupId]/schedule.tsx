@@ -1,6 +1,6 @@
 import type { CombinedSelectionRow } from '@festival/data-access';
 import { festivalDayKey, listFestivalDays } from '@festival/domain';
-import { Badge, Chip, colors, EmptyState, layout, radii, SegmentedControl, spacing, useOfflineStatus } from '@festival/ui';
+import { Badge, Chip, colors, EmptyState, radii, SegmentedControl, spacing, useOfflineStatus } from '@festival/ui';
 import { useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -10,6 +10,7 @@ import { SubScreenHeader } from '@/src/components/ScreenHeader';
 import { ErrorState, FestivalBundleState, LoadingState, StaleDataNote } from '@/src/components/StateViews';
 import { useFestivalBundle, useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useCombinedSelections, useGroupDetail } from '@/src/hooks/use-groups';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 
 type ScheduleView = 'overlap' | 'per-person' | 'divergence';
 
@@ -58,6 +59,7 @@ function SetRow({
 }
 
 export default function CombinedScheduleScreen() {
+  const tabBarClearance = useTabBarClearance();
   const params = useLocalSearchParams<{ groupId?: string | string[] }>();
   const groupId = (Array.isArray(params.groupId) ? params.groupId[0] : params.groupId) ?? '';
   const [view, setView] = React.useState<ScheduleView>('overlap');
@@ -235,7 +237,7 @@ export default function CombinedScheduleScreen() {
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: tabBarClearance }}
         refreshControl={
           <RefreshControl
             refreshing={detail.isRefreshing && !selections.isLoading}
@@ -299,7 +301,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   statePad: { padding: spacing.lg },
   scroll: { flex: 1 },
-  scrollContent: { paddingBottom: layout.tabBarClearance },
   inner: { gap: spacing.md, paddingHorizontal: spacing.lg },
   card: {
     backgroundColor: colors.surface,

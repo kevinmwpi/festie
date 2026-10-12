@@ -16,6 +16,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { ScreenHeader } from '@/src/components/ScreenHeader';
 import { ErrorState, LoadingState, StaleDataNote } from '@/src/components/StateViews';
 import { useFestivalsById, useGroups } from '@/src/hooks/use-groups';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useLocationSharing } from '@/src/location/LocationSharingProvider';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
@@ -46,6 +47,7 @@ function CrewActions() {
 }
 
 export default function GroupsScreen() {
+  const tabBarClearance = useTabBarClearance();
   const groups = useGroups();
   const festivalsById = useFestivalsById();
   const sharing = useLocationSharing();
@@ -153,7 +155,7 @@ export default function GroupsScreen() {
       <ScreenHeader crumbs={['My Crews']} />
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -172,7 +174,7 @@ export default function GroupsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: layout.tabBarClearance, gap: spacing.md },
+  scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
   pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
 
   emptyCard: {

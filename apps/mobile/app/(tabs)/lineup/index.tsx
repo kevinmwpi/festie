@@ -23,6 +23,7 @@ import { formatWeekdayDayLabel } from '@/src/hooks/festival-time-labels';
 import { useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useLineup, type LineupRow } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
@@ -106,6 +107,7 @@ function ArtistCard({
 /* ─── Screen ──────────────────────────────────────────────── */
 
 export default function LineupScreen() {
+  const tabBarClearance = useTabBarClearance();
   const festivalId = useAppStore((s) => s.activeFestivalId);
   const activeFestivalAccent = useAppStore((s) => s.activeFestivalAccent);
   const screenBg = deriveAccentColors(activeFestivalAccent).bgTint;
@@ -242,7 +244,7 @@ export default function LineupScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -331,7 +333,7 @@ const styles = StyleSheet.create({
   },
 
   scroll: { flex: 1 },
-  scrollContent: { padding: spacing.lg, paddingBottom: layout.tabBarClearance, gap: spacing.md },
+  scrollContent: { padding: spacing.lg, gap: spacing.md },
 
   /* Artist card — white, 40px radius */
   artistCard: {

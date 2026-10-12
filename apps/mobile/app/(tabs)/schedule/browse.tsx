@@ -22,6 +22,7 @@ import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } fro
 import { useFestivalClock } from '@/src/hooks/use-festival';
 import { useLineup, type LineupRow } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
@@ -30,6 +31,7 @@ const NO_ROWS: LineupRow[] = [];
 
 /** Compact, searchable lineup for adding sets to "My Schedule". */
 export default function BrowseScheduleScreen() {
+  const tabBarClearance = useTabBarClearance();
   const festivalId = useAppStore((state) => state.activeFestivalId);
   const accent = useAppStore((state) => state.activeFestivalAccent);
   const screenBg = deriveAccentColors(accent).bgTint;
@@ -83,7 +85,7 @@ export default function BrowseScheduleScreen() {
       {header}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -185,7 +187,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   statePad: { padding: spacing.lg },
   scroll: { flex: 1 },
-  scrollContent: { gap: spacing.md, paddingBottom: layout.tabBarClearance, paddingHorizontal: spacing.lg },
+  scrollContent: { gap: spacing.md, paddingHorizontal: spacing.lg },
   filterRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
   listCard: {
     backgroundColor: colors.surface,

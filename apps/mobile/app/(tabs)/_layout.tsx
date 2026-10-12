@@ -4,6 +4,7 @@ import { colors } from '@festival/ui';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSyncEventBridge } from '@/src/hooks/use-sync-events';
 import { useAppStore } from '@/src/state/app-store';
@@ -24,7 +25,12 @@ const TAB_BAR_HEIGHT = 80;
  * 26 pt glyph, a gap and a label (≈ 41 pt, 1.1× when focused), which would overflow it and the pill.
  */
 const TAB_ICON_BOX_HEIGHT = 52;
-/** The root `SafeAreaView` (app/_layout.tsx) already insets every screen, so the bar must not add more. */
+/** Space between the floating pill and the home indicator area below it. */
+const TAB_BAR_GAP = 24;
+/**
+ * Screens run to the bottom edge of the display (app/_layout.tsx insets only the status bar). The pill
+ * places itself above the home indicator with its bottom margin, so React Navigation adds no inset.
+ */
 const NO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
 
 const TAB_CONFIG: Record<string, { icon: IoniconName; iconFocused: IoniconName; label: string }> = {
@@ -53,6 +59,7 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
 export default function TabLayout() {
   // Tab bar background = selected festival accent colour (fill only), as in the reference.
   const accent = useAppStore((s) => s.activeFestivalAccent);
+  const insets = useSafeAreaInsets();
 
   useSyncEventBridge();
   React.useEffect(() => {
@@ -76,7 +83,7 @@ export default function TabLayout() {
           paddingTop: 0,
           paddingBottom: 0,
           marginHorizontal: 20,
-          marginBottom: 24,
+          marginBottom: TAB_BAR_GAP + insets.bottom,
           position: 'absolute',
           shadowColor: '#000000',
           shadowOpacity: 0.25,

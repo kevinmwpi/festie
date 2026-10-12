@@ -43,6 +43,7 @@ import { invalidateAfterBlockChange, invalidateGroupQueries } from '@/src/hooks/
 import { useFestivalBundle, useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useGroupDetail, useGroups } from '@/src/hooks/use-groups';
 import { useNow } from '@/src/hooks/use-now';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useAddTotemPhoto } from '@/src/hooks/use-totem-photo';
 import { stopLocationSharingForGroup } from '@/src/location/LocationSharingProvider';
 import { cancelCrewReminders } from '@/src/notifications/crew-reminders';
@@ -164,6 +165,7 @@ function MeetupCard({
 /* ─── Screen ────────────────────────────────────────────── */
 
 export default function GroupDetailScreen() {
+  const tabBarClearance = useTabBarClearance();
   const params = useLocalSearchParams<{ groupId?: string | string[] }>();
   const groupId = (Array.isArray(params.groupId) ? params.groupId[0] : params.groupId) ?? '';
   const queryClient = useQueryClient();
@@ -505,7 +507,7 @@ export default function GroupDetailScreen() {
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: tabBarClearance }}
         refreshControl={
           <RefreshControl refreshing={detail.isRefreshing} onRefresh={() => void detail.refetch()} tintColor={colors.textPrimary} />
         }
@@ -654,7 +656,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   statePad: { padding: spacing.lg },
   scroll: { flex: 1 },
-  scrollContent: { paddingBottom: layout.tabBarClearance },
   inner: { gap: spacing.md, paddingHorizontal: spacing.lg },
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
 

@@ -4,7 +4,6 @@ import {
   FieldInput,
   FieldLabel,
   InlineMessage,
-  layout,
   PrimaryButton,
   radii,
   SecondaryButton,
@@ -23,6 +22,7 @@ import { NoFestivalState } from '@/src/components/StateViews';
 import { buildInviteShareMessage } from '@/src/config/app-info';
 import { invalidateGroupQueries } from '@/src/hooks/query-keys';
 import { useActiveFestival } from '@/src/hooks/use-festival';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useAppStore } from '@/src/state/app-store';
 
 async function shareInvite(group: Pick<CreatedGroup, 'name' | 'invite_code'>): Promise<void> {
@@ -34,6 +34,7 @@ async function shareInvite(group: Pick<CreatedGroup, 'name' | 'invite_code'>): P
 }
 
 export default function CreateGroupScreen() {
+  const tabBarClearance = useTabBarClearance();
   const queryClient = useQueryClient();
   const isOffline = useOfflineStatus();
   const { festivalId, festival } = useActiveFestival();
@@ -66,7 +67,7 @@ export default function CreateGroupScreen() {
   return (
     <View style={styles.container}>
       <SubScreenHeader title="Create a Crew" label="Give your crew a name" />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} keyboardShouldPersistTaps="handled">
         {!festivalId ? (
           <NoFestivalState onPick={() => router.navigate('/(tabs)/festivals')} />
         ) : created ? (
@@ -113,7 +114,7 @@ export default function CreateGroupScreen() {
 
 const styles = StyleSheet.create({
   container: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: spacing.md, padding: spacing.lg, paddingBottom: layout.tabBarClearance },
+  content: { gap: spacing.md, padding: spacing.lg },
   festivalRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
   festivalLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
   festivalName: { color: colors.textPrimary, flex: 1, fontSize: 15, fontWeight: '700' },

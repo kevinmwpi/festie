@@ -55,10 +55,11 @@ function RootShell() {
 
   return (
     <View style={styles.root}>
-      {/* The safe-area edges (status bar, home indicator) take the focused screen's festival wash so it
-          reaches the rounded corners; every Stack's opaque background keeps it out of the content. */}
+      {/* Screens run to the bottom edge of the display and keep their own content clear of the home
+          indicator. Only the status bar strip is inset; it takes the focused screen's festival wash so the
+          colour reaches the top corners. Every Stack's opaque background keeps the wash out of content. */}
       {edgeColor ? <View style={[StyleSheet.absoluteFill, { backgroundColor: edgeColor }]} pointerEvents="none" /> : null}
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <OfflineBanner visible={isOffline} label="Offline — showing what's saved on this device" />
         <View style={styles.content}>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>

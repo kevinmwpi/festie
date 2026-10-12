@@ -13,7 +13,6 @@ import {
   deriveAccentColors,
   EmptyState,
   IconButton,
-  layout,
   radii,
   SecondaryButton,
   spacing,
@@ -31,6 +30,7 @@ import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } fro
 import { useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useMySchedule } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
@@ -179,6 +179,7 @@ function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; cloc
 /* ─── Screen ────────────────────────────────────────────── */
 
 export default function PersonalScheduleScreen() {
+  const tabBarClearance = useTabBarClearance();
   const festivalId = useAppStore((s) => s.activeFestivalId);
   const activeFestivalAccent = useAppStore((s) => s.activeFestivalAccent);
   const screenBg = deriveAccentColors(activeFestivalAccent).bgTint;
@@ -303,7 +304,7 @@ export default function PersonalScheduleScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -398,7 +399,7 @@ const styles = StyleSheet.create({
   dayRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
 
   scroll: { flex: 1 },
-  scrollContent: { gap: spacing.md, paddingBottom: layout.tabBarClearance, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  scrollContent: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   infoRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
 
   timeline: { flexDirection: 'row', paddingTop: spacing.sm },
