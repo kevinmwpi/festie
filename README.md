@@ -36,9 +36,11 @@ supabase/
   tests/               rls.sql (pgTAP-style) and local stubs, fixtures and race scripts
   templates/           Code-only sign-in email templates
   config.toml          Local config; pushed to hosted after review (runbook §2.8)
-seed-data/             Fictional demo festival (JSON + CSV), its totem photo, and Head Trip 2026 (real, with schedule changes)
+seed-data/             Golden festival files (demo + Head Trip 2026), media registry (licensed photos), candidates awaiting review
 scripts/db-test.sh     Throwaway Postgres 16 harness for the database tests
 docs/                  Contract, runbook, QA, festival data, App Store and legal documents, static site
+docs/agents/           How festival data and artwork get in: scout agent -> human review -> publish (the flywheel)
+.claude/               /festival-scout skill and the festival-scout workflow for Claude Code sessions
 ```
 
 ## Setup
