@@ -37,11 +37,13 @@ import { useUserKey } from '@/src/hooks/use-session';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { ensureActiveFestival, useAppStore } from '@/src/state/app-store';
+import { hasFestivalEnded, localTodayKey, orderFestivalsForList } from '@/src/state/default-festival';
 
 function FestivalCard({
   festival,
   isFollowing,
   isActive,
+  ended,
   busy,
   onToggle,
   onSelect,
@@ -49,6 +51,7 @@ function FestivalCard({
   festival: Festival;
   isFollowing: boolean;
   isActive: boolean;
+  ended: boolean;
   busy: boolean;
   onToggle: () => void;
   onSelect: () => void;
@@ -77,7 +80,7 @@ function FestivalCard({
           onPressIn={() => setPressed(true)}
           onPressOut={() => setPressed(false)}
           accessibilityRole="button"
-          accessibilityLabel={`${festival.name}${festival.is_demo ? ', sample festival' : ''}, ${meta}${isFollowing ? ', following' : ''}`}
+          accessibilityLabel={`${festival.name}${festival.is_demo ? ', sample festival' : ''}${ended ? ', ended' : ''}, ${meta}${isFollowing ? ', following' : ''}`}
           accessibilityHint="Opens this festival's lineup"
           accessibilityState={{ selected: isActive }}
           style={styles.cardBody}
@@ -88,6 +91,7 @@ function FestivalCard({
 
           <View style={styles.cardText}>
             {festival.is_demo ? <Badge label="Sample" tone="sample" /> : null}
+            {ended && !festival.is_demo ? <Badge label="Ended" tone="neutral" /> : null}
             <Text style={styles.festivalName} numberOfLines={2}>
               {festival.name}
             </Text>
@@ -152,11 +156,9 @@ export default function FestivalsScreen() {
     },
   });
 
-  const festivals = React.useMemo(() => {
-    const list = catalog.data ?? [];
-    // Demo ("Sample") festivals always sort last; otherwise keep the cache order (by start date).
-    return [...list].sort((left, right) => Number(left.is_demo) - Number(right.is_demo));
-  }, [catalog.data]);
+  const today = localTodayKey();
+  // Upcoming and current festivals first, then ended ones, then demo ("Sample") festivals.
+  const festivals = React.useMemo(() => orderFestivalsForList(catalog.data ?? [], today), [catalog.data, today]);
 
   const followingIds = React.useMemo(
     () => new Set((following.data ?? []).map((row) => row.festival_id)),
@@ -262,6 +264,7 @@ export default function FestivalsScreen() {
             festival={festival}
             isFollowing={followingIds.has(festival.id)}
             isActive={festival.id === activeFestivalId}
+            ended={hasFestivalEnded(festival, today)}
             busy={busyId === festival.id}
             onToggle={() => void handleToggle(festival)}
             onSelect={() => handleSelect(festival)}

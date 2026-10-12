@@ -326,8 +326,10 @@ applied migration.
 ## 7. Troubleshooting
 
 - `Missing SUPABASE_URL …` — export both variables; the anon key is never accepted.
-- `PGRST205` / missing columns — the target project is missing migrations 006–011; apply them first
-  (`Could not find the 'status' column of 'sets'` means 011 is missing).
+- `PGRST205` / missing columns — the target project is missing migrations 006–011; apply them first.
+  Migration 011 is missing when `festival:seed` or `demo:seed` stops with `Reading existing sets failed
+  (42703): column sets.status does not exist` (the plan reads it before writing anything), or a write
+  reports `Could not find the 'status' column of 'sets'` (PGRST204).
 - `sets_status_check`, `sets_original_start_time_check`, `sets_change_note_check` — a set change the
   database refuses; `festival:validate` reports the same rules with the file path.
 - The reviewer lands in no crew after a demo login — `demo:seed` has not run against this project

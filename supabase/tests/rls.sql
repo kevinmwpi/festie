@@ -2186,6 +2186,10 @@ select is(
   array['scheduled:-:-', 'scheduled:-:-', 'scheduled:-:-', 'scheduled:-:-'],
   'Q1 existing sets default to scheduled with no original start or note'
 );
+-- carol picks the set that Q2 cancels (she already picks e5..01, which Q2 moves; fixture 5e..06).
+insert into public.user_set_selections (id, user_id, festival_id, set_id)
+values ('5e000000-0000-4000-8000-000000000021', 'b0000000-0000-4000-8000-000000000003',
+        'f0000000-0000-4000-8000-000000000001', 'e5000000-0000-4000-8000-000000000002');
 
 select pg_temp.become('service_role');
 select lives_ok(
@@ -2249,18 +2253,20 @@ select throws_ok(
 -- Picks are never refused or removed because of a status, so a pick queued offline before a
 -- cancellation still syncs and users keep their picks of moved and cancelled sets.
 select pg_temp.become('carol');
-select lives_ok(
-  $$ insert into public.user_set_selections (id, user_id, festival_id, set_id)
-     values ('5e000000-0000-4000-8000-000000000020', 'b0000000-0000-4000-8000-000000000003',
-             'f0000000-0000-4000-8000-000000000001', 'e5000000-0000-4000-8000-000000000002') $$,
-  'Q13 a user can still pick a cancelled set'
-);
 select is(
-  array(select set_id::text from public.user_set_selections
+  array(select id::text || ':' || set_id::text from public.user_set_selections
         where user_id = 'b0000000-0000-4000-8000-000000000003' and festival_id = 'f0000000-0000-4000-8000-000000000001'
         order by set_id),
-  array['e5000000-0000-4000-8000-000000000001', 'e5000000-0000-4000-8000-000000000002'],
-  'Q14 the user keeps their picks of the moved and the cancelled set'
+  array['5e000000-0000-4000-8000-000000000006:e5000000-0000-4000-8000-000000000001',
+        '5e000000-0000-4000-8000-000000000021:e5000000-0000-4000-8000-000000000002'],
+  'Q13 picks made before a set moved or was cancelled survive the change'
+);
+select pg_temp.become('frank');
+select lives_ok(
+  $$ insert into public.user_set_selections (id, user_id, festival_id, set_id)
+     values ('5e000000-0000-4000-8000-000000000020', 'b0000000-0000-4000-8000-000000000006',
+             'f0000000-0000-4000-8000-000000000001', 'e5000000-0000-4000-8000-000000000002') $$,
+  'Q14 a user can still pick a cancelled set (an offline pick queued before the change syncs)'
 );
 
 select * from finish();

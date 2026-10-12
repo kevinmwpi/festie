@@ -16,11 +16,14 @@ export function SetChangeBadge({ change }: { change: SetChange | null }) {
   return <Badge label={change.label} tone={change.status === 'cancelled' ? 'danger' : 'info'} />;
 }
 
-/** `Was Sat 11:00 PM · Moved to Sunday (weather)`; nothing when there is no detail to show. */
+/**
+ * `Was Sat 11:00 PM · Moved to Sunday (weather)`; nothing when there is no detail to show. Wraps in
+ * full by default: most screens have no other place to read the note.
+ */
 export function SetChangeDetail({
   change,
   style,
-  numberOfLines = 2,
+  numberOfLines,
 }: {
   change: SetChange | null;
   style?: StyleProp<TextStyle>;
@@ -107,9 +110,7 @@ export function ScheduleChangesNotice<T extends ChangedPick>({
               <SetChangeBadge change={change} />
             </View>
             {detail ? (
-              <Text style={styles.noticeDetail} numberOfLines={2}>
-                {detail}
-              </Text>
+              <Text style={styles.noticeDetail}>{detail}</Text>
             ) : null}
           </>
         );

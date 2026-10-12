@@ -29,6 +29,7 @@ import {
   subscribeToSyncEvents,
   trackQueueActivity,
 } from '../src/sync-service';
+import { CACHE_TABLES, LOCAL_SCHEMA_VERSION, createTableSql, type TableDefinition } from '../src/schema';
 import { SyncTransportError, type SyncEvent, type SyncTransport } from '../src/types';
 
 const USER = 'user-1';
@@ -612,18 +613,26 @@ describe('local schema v2', () => {
     expect(await db.getFirstAsync('SELECT value FROM app_meta WHERE key = ?;', ['schema_version'])).toEqual({ value: '2' });
   });
 
-  it('adds new cache columns in place, keeps cached rows and marks bundles stale', async () => {
-    const existing: LocalDatabase = await createSqlJsDatabase();
-    await existing.execAsync(`
+  /** The previous release's cache: today's schema minus the given columns, at the current version. */
+  async function previousReleaseCache(missing: Record<string, readonly string[]>): Promise<LocalDatabase> {
+    const database = await createSqlJsDatabase();
+    for (const [name, definition] of Object.entries(CACHE_TABLES) as Array<[string, TableDefinition]>) {
+      const columns = definition.columns.filter(([column]) => !(missing[name] ?? []).includes(column));
+      await database.execAsync(createTableSql(name, { ...definition, columns }));
+    }
+    await database.execAsync(`
       CREATE TABLE app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT INTO app_meta VALUES ('schema_version', '2');
-      CREATE TABLE festivals (id TEXT PRIMARY KEY, name TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT NOT NULL, timezone TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'published', is_demo INTEGER NOT NULL DEFAULT 0, bundle_version INTEGER);
-      CREATE TABLE sets (id TEXT PRIMARY KEY, festival_id TEXT NOT NULL, artist_id TEXT NOT NULL, stage_id TEXT NOT NULL, start_time TEXT NOT NULL, end_time TEXT NOT NULL, set_type TEXT NOT NULL DEFAULT 'performance');
-      CREATE TABLE user_set_selections (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, festival_id TEXT NOT NULL, set_id TEXT NOT NULL, selected_at TEXT NOT NULL, note TEXT, pending_sync INTEGER NOT NULL DEFAULT 0, synced_at TEXT);
+      INSERT INTO app_meta VALUES ('schema_version', '${LOCAL_SCHEMA_VERSION}');
       INSERT INTO festivals (id, name, start_date, end_date, timezone, version, bundle_version) VALUES ('f1', 'Fest', '2026-10-10', '2026-10-11', 'UTC', 5, 5), ('f2', 'Unopened', '2026-11-01', '2026-11-02', 'UTC', 1, NULL);
-      INSERT INTO sets VALUES ('s1', 'f1', 'a1', 'st1', '2026-10-10T20:00:00Z', '2026-10-10T21:00:00Z', 'performance');
-      INSERT INTO user_set_selections VALUES ('sel1', 'u1', 'f1', 's1', '2026-10-01T00:00:00Z', NULL, 1, NULL);
+      INSERT INTO sets (id, festival_id, artist_id, stage_id, start_time, end_time) VALUES ('s1', 'f1', 'a1', 'st1', '2026-10-10T20:00:00Z', '2026-10-10T21:00:00Z');
+      INSERT INTO user_set_selections (id, user_id, festival_id, set_id, selected_at, pending_sync) VALUES ('sel1', 'u1', 'f1', 's1', '2026-10-01T00:00:00Z', 1);
     `);
+    return database;
+  }
+
+  it('adds the set status columns in place on upgrade, keeps cached rows and marks bundles stale', async () => {
+    // Exactly what the release before migration 011 had on devices.
+    const existing = await previousReleaseCache({ sets: ['status', 'original_start_time', 'change_note'] });
     setDatabaseFactoryForTests(async () => existing);
 
     const db = await getDb();
@@ -635,7 +644,9 @@ describe('local schema v2', () => {
       { id: 'f2', bundle_version: null },
     ]);
     expect(await db.getAllAsync('SELECT id, pending_sync FROM user_set_selections;')).toEqual([{ id: 'sel1', pending_sync: 1 }]);
-    expect(await db.getFirstAsync('SELECT value FROM app_meta WHERE key = ?;', ['schema_version'])).toEqual({ value: '2' });
+    expect(await db.getFirstAsync('SELECT value FROM app_meta WHERE key = ?;', ['schema_version'])).toEqual({
+      value: String(LOCAL_SCHEMA_VERSION),
+    });
 
     // Nothing left to add on the next launch: bundles fetched since are not marked stale again.
     await db.runAsync('UPDATE festivals SET bundle_version = 6 WHERE id = ?;', ['f1']);
@@ -643,6 +654,16 @@ describe('local schema v2', () => {
     setDatabaseFactoryForTests(async () => existing);
     const reopened = await getDb();
     expect(await reopened.getFirstAsync('SELECT bundle_version FROM festivals WHERE id = ?;', ['f1'])).toEqual({ bundle_version: 6 });
+  });
+
+  it('keeps bundles current when only a non-catalog cache table gains a column', async () => {
+    const existing = await previousReleaseCache({ groups: ['invite_code_rotated_at'] });
+    setDatabaseFactoryForTests(async () => existing);
+
+    const db = await getDb();
+    const groupColumns = (await db.getAllAsync<{ name: string }>('PRAGMA table_info(groups);')).map((column) => column.name);
+    expect(groupColumns).toContain('invite_code_rotated_at');
+    expect(await db.getFirstAsync('SELECT bundle_version FROM festivals WHERE id = ?;', ['f1'])).toEqual({ bundle_version: 5 });
   });
 
   it('keeps cached data when the schema version is current', async () => {

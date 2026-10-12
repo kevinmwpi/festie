@@ -33,6 +33,7 @@ import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } fro
 import { useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useMySchedule } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
+import { runReminderTask } from '@/src/notifications/reminder-queue';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
@@ -164,9 +165,10 @@ function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; cloc
           width: `${widthPercent}%`,
           borderLeftColor: pastelFor(block.row.stage_id),
         },
-        block.isConflict && styles.blockConflict,
         cancelled && styles.blockCancelled,
         change?.status === 'moved' && styles.blockMoved,
+        // Last, so a moved set that now clashes still shows the red conflict border.
+        block.isConflict && styles.blockConflict,
         pressed && { opacity: 0.8 },
       ]}
     >
@@ -268,18 +270,20 @@ export default function PersonalScheduleScreen() {
   const timeline = React.useMemo(() => layoutTimeline(dayRows, timeZone, conflictIds), [conflictIds, dayRows, timeZone]);
 
   // Keep existing reminders in step with picks (cancel removed and cancelled sets, reschedule moved
-  // ones). Never prompts.
+  // ones). Never prompts. Keyed on primitives, not the festival object: a new festival version
+  // re-creates that object before the picks are re-read, and a run with those stale picks would
+  // move a rescheduled reminder back. Queued with the other reminder work for the same reason.
+  const syncFestivalId = festival?.id ?? null;
+  const syncTimeZone = festival?.timezone ?? null;
   React.useEffect(() => {
-    if (!festival || schedule.isLoading || schedule.data === undefined) {
+    if (!syncFestivalId || !syncTimeZone || schedule.isLoading || schedule.data === undefined) {
       return;
     }
-    void syncSetReminders(
-      rows
-        .filter((row) => !isCancelledSet(row))
-        .map((row) => ({ id: row.id, start_time: row.start_time, artist_name: row.artist_name, stage_name: row.stage_name })),
-      { timeZone: festival.timezone, festivalId: festival.id },
-    );
-  }, [festival, rows, schedule.data, schedule.isLoading]);
+    const picks = rows
+      .filter((row) => !isCancelledSet(row))
+      .map((row) => ({ id: row.id, start_time: row.start_time, artist_name: row.artist_name, stage_name: row.stage_name }));
+    void runReminderTask(() => syncSetReminders(picks, { timeZone: syncTimeZone, festivalId: syncFestivalId }));
+  }, [syncFestivalId, syncTimeZone, rows, schedule.data, schedule.isLoading]);
 
   const handleRefresh = React.useCallback(async () => {
     await Promise.all([bundle.refetch(), schedule.refetch()]);

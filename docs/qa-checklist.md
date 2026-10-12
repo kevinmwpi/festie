@@ -105,9 +105,12 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Overlapping picks show a conflict; back-to-back sets (end = next start) do not.
 - [ ] Crew schedule shows the picks of crew members for the same festival, and not those of a blocked
       member.
-- [ ] **Schedule changes** (seed a festival with one picked set marked `moved` to another day and one
-      picked set marked `cancelled`, e.g. `seed-data/head-trip-2026.json` on staging; then pull to
-      refresh):
+- [ ] **Schedule changes**, on future data so picks can be made before the change: shift the demo
+      festival into the future (`festival:shift-dates`, §7) and seed it unchanged; pick two sets on
+      device A. Then, in a copy of its CSV, mark one picked set `moved` to another day (new `start`/`end`,
+      `original_start` = its old start, a `note`) and the other `cancelled` (with a `note`), convert, seed
+      it again and pull to refresh. (`seed-data/head-trip-2026.json` is in the past: use it only to look
+      at the chips and notes.)
   - [ ] The moved set shows a blue "Moved" chip and "Was Sat 11:00 PM" (or "Sat night 1:00 AM") with
         its note, sits under its new day in Lineup, Add sets, My Schedule and the crew schedule, and stays
         picked.

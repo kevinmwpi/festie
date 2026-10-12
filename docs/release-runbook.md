@@ -155,6 +155,9 @@ npx supabase migration list
   `npx supabase migration repair --status applied 001 002 003 004 005`.
 - **New project:** the remote column is empty and all eleven migrations will be applied.
 
+**History — done, skip on `kevins_project`:** the block below was run in October 2026; the project now
+has 001–010 applied and §2.5 only adds 011.
+
 **`kevins_project` (`lzxewkfxdibohzqbqmiu`) as inspected on 2026-10-06:** the remote history holds only
 three dashboard-made versions (`20260328045611` auth trigger + invite lookup policy, `20260329180317`
 user_festivals + festival theme, `20260408060752` users RLS fix). The 001–004 tables exist, the 005
@@ -165,7 +168,7 @@ festivals (14 stages, 44 artists, 64 sets), no crews, meetups or photos. So, for
 ```sh
 npx supabase migration repair --status reverted 20260328045611 20260329180317 20260408060752
 npx supabase migration repair --status applied 001 002 003 004   # NOT 005: its table is missing
-npx supabase db push --dry-run      # must list exactly 005, 006, 007, 008, 009, 010
+npx supabase db push --dry-run      # listed exactly 005, 006, 007, 008, 009, 010 at the time (011 did not exist yet)
 npx supabase db push
 ```
 
@@ -862,6 +865,8 @@ Legal text is not legal advice; have it reviewed if you can.
 - [ ] Railway services deleted; service-role key rotated and stored only in your local `.env`; if the
       legacy JWT keys were rotated, the new anon key is the one in EAS (§2.3).
 - [ ] Migrations 006–011 applied, cron jobs and bucket verified, Security Advisor clean (§2.4–2.6).
+- [ ] Head Trip 2026 (test data) either verified against its official source and recorded in
+      `seed-data/head-trip-2026-changes.md`, or set back to `draft` and seeded (`festival-data.md` §4.1).
 - [ ] Custom SMTP live; the hosted email templates send 8-digit codes with no links; the per-user email
       interval is 60 seconds, not 1 second (§2.7–2.8).
 - [ ] Auth audit logs no longer written to the database and `purge-auth-audit-log` scheduled (or support

@@ -2,9 +2,16 @@
 
 `head-trip-2026-csv/` (converted to `head-trip-2026.json`) holds the Head Trip schedule **with the weekend's
 changes marked**: one main stage, nine sets, Saturday 10 and Sunday 11 October 2026 at the Empire Polo
-Club in Indio, California (Goldenvoice). It is published so the schedule-changes feature can be tested
-against real data. The festival is over, so the app lists it with past festivals; it is test data, not
-launch content.
+Club in Indio, California (Goldenvoice). It is marked published, at the founder's request, so the
+schedule-changes feature can be tested against real data on the pre-launch project. It is test data, not
+launch content: the festival is over, and its source has not been verified yet (below). **Before App
+Review, either verify it against the official set-times page or the official Head Trip app and record what
+was checked here, or set `status` back to `draft` and seed again.** There is only one Supabase project, so
+anything published is what every build sees.
+
+In the app it carries an "Ended" badge and is listed after upcoming festivals (demo festivals last). An
+ended festival only becomes a new user's default festival when no upcoming festival, followed or not, and
+no upcoming demo festival is published.
 
 How the changes are entered (`docs/festival-data.md` §4.1; times are festival local time,
 America/Los_Angeles, PDT):

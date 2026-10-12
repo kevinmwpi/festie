@@ -31,6 +31,8 @@ import {
 
 import { isSigningOut } from '@/src/providers/session-actions';
 
+import { runReminderTask } from './reminder-queue';
+
 /** The signed-in user's profile id, or `null` while signed out or signing out. */
 function currentUserId(): string | null {
   return isSigningOut() ? null : (getCachedProfile()?.id ?? null);
@@ -68,7 +70,11 @@ async function scheduledIds(entityType: ReminderEntityType): Promise<Set<string>
  * Schedules the missing reminders of the user's future picks in one festival, moves reminders of
  * picks whose set moved and cancels reminders of picks whose set was cancelled (cache only).
  */
-export async function restoreSetReminders(festivalId: string, now = Date.now()): Promise<void> {
+export function restoreSetReminders(festivalId: string, now = Date.now()): Promise<void> {
+  return runReminderTask(() => restoreSetRemindersNow(festivalId, now));
+}
+
+async function restoreSetRemindersNow(festivalId: string, now: number): Promise<void> {
   try {
     const userId = currentUserId();
     if (!userId || !festivalId || (await getReminderPermission()) !== 'granted') {
