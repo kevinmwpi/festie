@@ -4,7 +4,6 @@ import {
   FieldInput,
   FieldLabel,
   InlineMessage,
-  layout,
   PrimaryButton,
   SectionCard,
   spacing,
@@ -17,6 +16,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { SubScreenHeader } from '@/src/components/ScreenHeader';
 import { invalidateGroupQueries } from '@/src/hooks/query-keys';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useAppStore } from '@/src/state/app-store';
 
 function firstParam(value: string | string[] | undefined): string {
@@ -24,6 +24,7 @@ function firstParam(value: string | string[] | undefined): string {
 }
 
 export default function JoinGroupScreen() {
+  const tabBarClearance = useTabBarClearance();
   const params = useLocalSearchParams<{ code?: string | string[] }>();
   const queryClient = useQueryClient();
   const isOffline = useOfflineStatus();
@@ -62,7 +63,7 @@ export default function JoinGroupScreen() {
   return (
     <View style={styles.container}>
       <SubScreenHeader title="Join a Crew" label="Enter your invite code" />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} keyboardShouldPersistTaps="handled">
         <SectionCard subtitle="Codes are 6 letters and numbers. Paste or type the code a friend sent you.">
           <FieldLabel>Invite code</FieldLabel>
           <FieldInput
@@ -96,7 +97,7 @@ export default function JoinGroupScreen() {
 
 const styles = StyleSheet.create({
   container: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: spacing.md, padding: spacing.lg, paddingBottom: layout.tabBarClearance },
+  content: { gap: spacing.md, padding: spacing.lg },
   codeInput: {
     fontSize: 24,
     fontWeight: '800',

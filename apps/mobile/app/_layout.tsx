@@ -9,8 +9,11 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
+import { BrandMark } from '@/src/components/BrandMark';
 import { SUPPORT_EMAIL } from '@/src/config/app-info';
+import { WORDMARK_FONT } from '@/src/config/fonts';
 import { AppProviders } from '@/src/providers/app-providers';
+import { useSafeAreaEdgeColor } from '@/src/providers/screen-tint';
 import { useHasStoredSession } from '@/src/providers/session-state';
 import { useHasAcceptedTerms } from '@/src/providers/terms-acceptance';
 
@@ -23,6 +26,7 @@ void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    [WORDMARK_FONT]: require('../assets/fonts/Fredoka-Bold.ttf'),
   });
 
   // A font that fails to load must not block launch; the system font is used instead.
@@ -48,35 +52,42 @@ function RootShell() {
   const isOffline = useOfflineStatus();
   const hasSession = useHasStoredSession();
   const acceptedTerms = useHasAcceptedTerms();
+  const edgeColor = useSafeAreaEdgeColor();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <OfflineBanner visible={isOffline} label="Offline — showing what's saved on this device" />
-      <View style={styles.content}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-          <Stack.Screen name="index" />
-          {/* Signed-in users cannot reach sign-in (e.g. from a `festivalapp://auth/…` link): verifying a
-              second account there would switch users without the sign-out teardown. A successful
-              verify flips both guards and the router lands on `index`, which routes onward. */}
-          <Stack.Protected guard={!hasSession}>
-            <Stack.Screen name="auth/enter-email" />
-            <Stack.Screen name="auth/verify-otp" />
-          </Stack.Protected>
-          <Stack.Protected guard={hasSession}>
-            <Stack.Screen name="auth/profile-setup" options={{ gestureEnabled: false }} />
-            <Stack.Screen name="auth/accept-terms" options={{ gestureEnabled: false }} />
-            {/* Deleting the account must not depend on agreeing to the terms (App Review 5.1.1(v)). */}
-            <Stack.Screen name="auth/delete-account" />
-          </Stack.Protected>
-          {/* Crew content opens only after this account explicitly agreed to the terms (§5.2, App
-              Review 1.2) — on profile setup, or once on `auth/accept-terms` for existing accounts. */}
-          <Stack.Protected guard={hasSession && acceptedTerms}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="settings" />
-          </Stack.Protected>
-        </Stack>
-      </View>
-    </SafeAreaView>
+    <View style={styles.root}>
+      {/* Screens run to the bottom edge of the display and keep their own content clear of the home
+          indicator. Only the status bar strip is inset; it takes the focused screen's festival wash so the
+          colour reaches the top corners. Every Stack's opaque background keeps the wash out of content. */}
+      {edgeColor ? <View style={[StyleSheet.absoluteFill, { backgroundColor: edgeColor }]} pointerEvents="none" /> : null}
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <OfflineBanner visible={isOffline} label="Offline — showing what's saved on this device" />
+        <View style={styles.content}>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+            <Stack.Screen name="index" />
+            {/* Signed-in users cannot reach sign-in (e.g. from a `festivalapp://auth/…` link): verifying a
+                second account there would switch users without the sign-out teardown. A successful
+                verify flips both guards and the router lands on `index`, which routes onward. */}
+            <Stack.Protected guard={!hasSession}>
+              <Stack.Screen name="auth/enter-email" />
+              <Stack.Screen name="auth/verify-otp" />
+            </Stack.Protected>
+            <Stack.Protected guard={hasSession}>
+              <Stack.Screen name="auth/profile-setup" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="auth/accept-terms" options={{ gestureEnabled: false }} />
+              {/* Deleting the account must not depend on agreeing to the terms (App Review 5.1.1(v)). */}
+              <Stack.Screen name="auth/delete-account" />
+            </Stack.Protected>
+            {/* Crew content opens only after this account explicitly agreed to the terms (§5.2, App
+                Review 1.2) — on profile setup, or once on `auth/accept-terms` for existing accounts. */}
+            <Stack.Protected guard={hasSession && acceptedTerms}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="settings" />
+            </Stack.Protected>
+          </Stack>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -91,11 +102,11 @@ function ConfigErrorScreen({ detail }: { detail: string }) {
   }, []);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.root}>
       <View style={styles.configContainer}>
         <View style={styles.configCard}>
           <View style={styles.configIcon} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-            <Text style={styles.configGlyph}>⛺</Text>
+            <BrandMark size={46} />
           </View>
           <Text style={styles.configTitle} accessibilityRole="header">
             Festie can&apos;t start
@@ -120,9 +131,12 @@ function ConfigErrorScreen({ detail }: { detail: string }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  root: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  safeArea: {
+    flex: 1,
   },
   content: {
     flex: 1,
@@ -149,7 +163,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 72,
   },
-  configGlyph: { fontSize: 32 },
   configTitle: {
     color: colors.textPrimary,
     fontFamily: 'Georgia',

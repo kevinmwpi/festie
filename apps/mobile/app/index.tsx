@@ -13,6 +13,7 @@ import { Redirect, type Href } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+import { BrandMark } from '@/src/components/BrandMark';
 import { LaunchOfflineError, resolveLaunchRoute, resolveLaunchRouteOffline } from '@/src/providers/launch-route';
 import { performSignOut, signOutErrorMessage } from '@/src/providers/session-actions';
 
@@ -77,7 +78,7 @@ export default function IndexScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.iconBox} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-        <Text style={styles.iconGlyph}>⛺</Text>
+        <BrandMark />
       </View>
 
       {state.kind === 'resolving' ? (
@@ -134,7 +135,6 @@ const styles = StyleSheet.create({
     width: 80,
     elevation: 4,
   },
-  iconGlyph: { fontSize: 36 },
   loading: { alignItems: 'center', minHeight: 44 },
   card: {
     backgroundColor: colors.surface,

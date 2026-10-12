@@ -35,7 +35,6 @@ import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, AppState, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/src/components/Avatar';
 import { ActionSheet, type SheetAction } from '@/src/components/BottomSheet';
@@ -52,10 +51,12 @@ import { useGroups } from '@/src/hooks/use-groups';
 import { formatAgo, useNow } from '@/src/hooks/use-now';
 import { OFFLINE_MAP_STYLE, useOfflinePack, type OfflinePackState } from '@/src/hooks/use-offline-pack';
 import { useUserKey } from '@/src/hooks/use-session';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { visibleFriendLocations, withDeviceClockTimes, type DeviceTimed } from '@/src/location/friend-visibility';
 import { cancelCrewReminders } from '@/src/notifications/crew-reminders';
 import { restoreMeetupReminders } from '@/src/notifications/restore-reminders';
 import { STOP_NOT_CONFIRMED_MESSAGE, useLocationSharing } from '@/src/location/LocationSharingProvider';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
 const FRIEND_POLL_MS = 30_000;
@@ -384,15 +385,16 @@ function FallbackLists({
 /* ─── Screen ────────────────────────────────────────────── */
 
 export default function MapScreen() {
+  const tabBarClearance = useTabBarClearance();
   const { festivalId, accent, bundle, festival } = useActiveFestival();
   const screenBg = deriveAccentColors(accent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
   const solidAccent = deriveAccentColors(accent).solid;
   const clock = useFestivalClock(festival);
   const isOffline = useOfflineStatus();
   const now = useNow(30_000);
   const sharing = useLocationSharing();
   const locationGranted = useLocationGranted(sharing.status);
-  const insets = useSafeAreaInsets();
 
   const { groups, allGroups, group, select } = useMapGroup(festivalId);
   const meetupsQuery = useMeetups(group?.id ?? null);
@@ -467,7 +469,7 @@ export default function MapScreen() {
         {header}
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
           refreshControl={
             <RefreshControl
               refreshing={meetupsQuery.isRefreshing}
@@ -606,14 +608,14 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      {/* The root safe area insets the bottom of every screen; the map alone bleeds into the home
-          indicator area so no strip of background shows under the floating tab bar. */}
+      {/* Screens run to the bottom edge of the display, so the map fills it, under the floating tab bar
+          and the home indicator. */}
       <Mapbox.MapView
-        style={[styles.map, { bottom: -insets.bottom }]}
+        style={styles.map}
         styleURL={OFFLINE_MAP_STYLE}
         scaleBarEnabled={false}
-        logoPosition={{ bottom: layout.tabBarClearance + insets.bottom + 4, left: 12 }}
-        attributionPosition={{ bottom: layout.tabBarClearance + insets.bottom + 4, right: 12 }}
+        logoPosition={{ bottom: tabBarClearance + 4, left: 12 }}
+        attributionPosition={{ bottom: tabBarClearance + 4, right: 12 }}
       >
         <Mapbox.Camera
           ref={cameraRef}
@@ -684,12 +686,12 @@ export default function MapScreen() {
         </ScrollView>
       </View>
 
-      <View style={styles.recenter}>
+      <View style={[styles.recenter, { bottom: tabBarClearance + 64 }]}>
         <IconButton icon={<Ionicons name="locate-outline" size={20} color={colors.textPrimary} />} accessibilityLabel="Show the whole festival" onPress={recenter} />
       </View>
 
       {/* Bottom summary */}
-      <View style={styles.legend} accessibilityLiveRegion="polite">
+      <View style={[styles.legend, { bottom: tabBarClearance + 8 }]} accessibilityLiveRegion="polite">
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: solidAccent }]} />
           <Text style={styles.legendText}>{stagePins.length} stages</Text>
@@ -742,7 +744,7 @@ const styles = StyleSheet.create({
   map: { left: 0, position: 'absolute', right: 0, top: 0 },
   statePad: { padding: spacing.lg },
   scroll: { flex: 1 },
-  scrollContent: { gap: spacing.md, paddingBottom: layout.tabBarClearance, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  scrollContent: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
 
   /* Fallback lists */
   card: {
@@ -801,7 +803,7 @@ const styles = StyleSheet.create({
   },
   pillActive: { backgroundColor: colors.success },
   pillLabel: { color: colors.textPrimary, fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
-  recenter: { bottom: layout.tabBarClearance + 64, position: 'absolute', right: spacing.lg },
+  recenter: { position: 'absolute', right: spacing.lg },
 
   /* Pins */
   stagePin: {
@@ -863,7 +865,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.95)',
     borderRadius: radii.pill,
-    bottom: layout.tabBarClearance + 8,
     flexDirection: 'row',
     gap: spacing.md,
     justifyContent: 'center',

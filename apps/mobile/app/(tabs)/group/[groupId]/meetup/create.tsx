@@ -37,6 +37,7 @@ import { invalidateGroupQueries } from '@/src/hooks/query-keys';
 import { useFestivalBundle, useFestivalClock } from '@/src/hooks/use-festival';
 import { useGroupDetail } from '@/src/hooks/use-groups';
 import { writeAndAwaitSync } from '@/src/hooks/sync-outcome';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import {
   chooseTotemSource,
   pickTotemPhoto,
@@ -53,6 +54,7 @@ function defaultStart(): Date {
 }
 
 export default function CreateMeetupScreen() {
+  const tabBarClearance = useTabBarClearance();
   const params = useLocalSearchParams<{ groupId?: string | string[] }>();
   const groupId = (Array.isArray(params.groupId) ? params.groupId[0] : params.groupId) ?? '';
   const queryClient = useQueryClient();
@@ -205,7 +207,7 @@ export default function CreateMeetupScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+      <ScrollView contentContainerStyle={{ paddingBottom: tabBarClearance }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {header}
         <View style={styles.content}>
           <SectionCard subtitle="Meetups save on your phone first and sync to your crew when you have signal.">
@@ -353,7 +355,6 @@ export default function CreateMeetupScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { paddingBottom: layout.tabBarClearance },
   content: { gap: spacing.md, paddingHorizontal: spacing.lg },
   pressed: { opacity: 0.8 },
   iosPickerRow: { alignItems: 'flex-start' },

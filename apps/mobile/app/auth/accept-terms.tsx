@@ -9,6 +9,7 @@ import { Redirect, router } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BrandMark } from '@/src/components/BrandMark';
 import { resetTo } from '@/src/providers/launch-route';
 import { performSignOut, signOutErrorMessage } from '@/src/providers/session-actions';
 import { hasCurrentUserAcceptedTerms, markTermsAccepted } from '@/src/providers/terms-acceptance';
@@ -55,7 +56,7 @@ export default function AcceptTermsScreen() {
     >
       <View style={styles.content}>
         <View style={styles.iconBox} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-          <Text style={styles.iconGlyph}>⛺</Text>
+          <BrandMark />
         </View>
 
         <View style={styles.header}>
@@ -119,7 +120,6 @@ const styles = StyleSheet.create({
     width: 80,
     elevation: 4,
   },
-  iconGlyph: { fontSize: 36 },
   header: { alignItems: 'center', gap: spacing.sm },
   eyebrow: { ...typography.label, color: colors.textSecondary },
   title: { ...typography.heading, color: colors.textPrimary, fontSize: 32, textAlign: 'center' },

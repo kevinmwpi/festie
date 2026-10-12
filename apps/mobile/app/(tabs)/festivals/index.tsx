@@ -13,7 +13,6 @@ import {
   deriveAccentColors,
   EmptyState,
   IconButton,
-  layout,
   radii,
   SecondaryButton,
   showToast,
@@ -35,6 +34,8 @@ import { useCacheFirstQuery } from '@/src/hooks/use-cache-first-query';
 import { useCurrentProfile } from '@/src/hooks/use-current-profile';
 import { formatFestivalDateRange } from '@/src/hooks/use-festival';
 import { useUserKey } from '@/src/hooks/use-session';
+import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { ensureActiveFestival, useAppStore } from '@/src/state/app-store';
 
 function FestivalCard({
@@ -121,6 +122,7 @@ function FestivalCard({
 }
 
 export default function FestivalsScreen() {
+  const tabBarClearance = useTabBarClearance();
   const queryClient = useQueryClient();
   const userKey = useUserKey();
   const isOffline = useOfflineStatus();
@@ -129,6 +131,7 @@ export default function FestivalsScreen() {
   const setActiveFestival = useAppStore((s) => s.setActiveFestival);
   const activeFestivalAccent = useAppStore((s) => s.activeFestivalAccent);
   const screenBg = deriveAccentColors(activeFestivalAccent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
   const catalog = useCacheFirstQuery({
@@ -242,7 +245,7 @@ export default function FestivalsScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -302,7 +305,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: layout.tabBarClearance,
     gap: spacing.md,
   },
 
