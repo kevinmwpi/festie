@@ -1,5 +1,5 @@
 import { getLocalImageCredits, type ImageCredit } from '@festival/data-access';
-import { colors, EmptyState, ListRow, ListSection, radii, ScreenHeader, showToast, spacing } from '@festival/ui';
+import { colors, EmptyState, ListRow, ListSection, radii, ScreenHeader, showToast, spacing, textStyles } from '@festival/ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import React from 'react';
@@ -85,9 +85,9 @@ export default function PhotoCreditsScreen() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: colors.background, flex: 1 },
   content: { gap: spacing.lg, padding: spacing.lg, paddingBottom: spacing.xxxl + spacing.xl },
-  intro: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  intro: { ...textStyles.subheadline, color: colors.textSecondary },
   loading: { alignItems: 'center', paddingVertical: spacing.xxl },
   thumb: { borderRadius: radii.sm, height: THUMB_SIZE, overflow: 'hidden', width: THUMB_SIZE },
   thumbImage: { borderRadius: radii.sm, height: THUMB_SIZE, width: THUMB_SIZE },
-  footer: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  footer: { ...textStyles.caption1, color: colors.textSecondary, textAlign: 'center' },
 });

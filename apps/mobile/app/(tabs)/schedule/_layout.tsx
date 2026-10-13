@@ -12,8 +12,8 @@ export default function ScheduleLayout() {
         headerShown: false,
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'My Schedule' }} />
-      <Stack.Screen name="browse" options={{ title: 'Browse Lineup' }} />
+      <Stack.Screen name="index" options={{ title: 'My schedule' }} />
+      <Stack.Screen name="browse" options={{ title: 'Browse lineup' }} />
     </Stack>
   );
 }

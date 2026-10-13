@@ -7,13 +7,23 @@
  */
 import { toUserMessage } from '@festival/data-access';
 import { isOnline } from '@festival/sync-engine';
-import { colors, PrimaryButton, radii, spacing, TextLink } from '@festival/ui';
+import {
+  colors,
+  continuous,
+  elevation,
+  layout,
+  PrimaryButton,
+  radii,
+  spacing,
+  TextLink,
+  textStyles,
+} from '@festival/ui';
 import NetInfo from '@react-native-community/netinfo';
 import { Redirect, type Href } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { BrandMark } from '@/src/components/BrandMark';
+import { BrandTile } from '@/src/components/BrandMark';
 import { LaunchOfflineError, resolveLaunchRoute, resolveLaunchRouteOffline } from '@/src/providers/launch-route';
 import { performSignOut, signOutErrorMessage } from '@/src/providers/session-actions';
 
@@ -76,10 +86,14 @@ export default function IndexScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.iconBox} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-        <BrandMark />
-      </View>
+    // Scrolls instead of clipping at large text sizes.
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <BrandTile style={styles.brandTile} />
 
       {state.kind === 'resolving' ? (
         <View style={styles.loading} accessible accessibilityLabel="Loading Festie" accessibilityRole="progressbar">
@@ -102,57 +116,46 @@ export default function IndexScreen() {
           <View style={styles.linkRow}>
             <TextLink
               align="center"
+              role="button"
               label={signingOut ? 'Signing out…' : 'Use a different email'}
+              busy={signingOut}
               onPress={signingOut ? () => undefined : handleUseAnotherAccount}
             />
           </View>
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'stretch',
+  screen: {
     backgroundColor: colors.background,
     flex: 1,
+  },
+  container: {
+    alignItems: 'stretch',
+    flexGrow: 1,
     gap: spacing.xl,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: layout.screenGutter,
+    paddingVertical: spacing.xl,
   },
-  iconBox: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: '#FFB3D9',
-    borderRadius: radii.xxl,
-    height: 80,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    width: 80,
-    elevation: 4,
-  },
+  brandTile: { alignSelf: 'center' },
+  // A steady box for the large spinner (about 37pt tall).
   loading: { alignItems: 'center', minHeight: 44 },
   card: {
+    ...continuous,
+    ...elevation.card,
     backgroundColor: colors.surface,
     borderColor: colors.borderCard,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: spacing.md,
-    padding: spacing.xl,
+    padding: layout.cardPadding,
   },
-  title: {
-    color: colors.textPrimary,
-    fontFamily: 'Georgia',
-    fontSize: 26,
-    fontStyle: 'italic',
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  body: { color: colors.textSecondary, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-  hint: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  title: { ...textStyles.title1, color: colors.textPrimary, textAlign: 'center' },
+  body: { ...textStyles.subheadline, color: colors.textSecondary, textAlign: 'center' },
+  hint: { ...textStyles.footnote, color: colors.textSecondary, textAlign: 'center' },
   linkRow: { alignItems: 'center' },
 });

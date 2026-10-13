@@ -1,7 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { accessibleAccent, colors, layout, radii, spacing } from './theme';
+import { accessibleAccent, colors, continuous, layout, radii, spacing, textStyles, upright } from './theme';
 
 /* ─── Avatar ────────────────────────────────────────────── */
 
@@ -174,11 +175,7 @@ export function Checkbox({
       style={({ pressed }) => [styles.checkboxRow, disabled && styles.disabled, pressed && styles.pressed]}
     >
       <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-        {checked ? (
-          <Text style={styles.checkmark} allowFontScaling={false}>
-            ✓
-          </Text>
-        ) : null}
+        {checked ? <Ionicons name="checkmark" size={17} color={colors.textPrimary} /> : null}
       </View>
       {typeof label === 'string' ? <Text style={styles.checkboxLabel}>{label}</Text> : <View style={styles.checkboxLabelWrap}>{label}</View>}
     </Pressable>
@@ -187,13 +184,12 @@ export function Checkbox({
 
 /** Text style for `Checkbox` labels built from nested `Text` (so they match string labels). */
 export const checkboxLabelStyle = {
+  ...textStyles.subheadline,
   color: colors.textPrimary,
-  fontSize: 14,
-  lineHeight: 20,
 } as const;
 
 const styles = StyleSheet.create({
-  avatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatar: { ...continuous, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarGlyph: { color: colors.textPrimary, textAlign: 'center' },
   avatarGlyphMuted: { color: colors.textSecondary },
 
@@ -201,8 +197,9 @@ const styles = StyleSheet.create({
   // Five 18%-wide cells per row; the remaining 10% is split between them. A fixed column gap would
   // need a grid at least 400pt wide (0.9W + 4 × gap ≤ W) and wrap to four per row on every phone.
   // AVATAR_EMOJIS has a multiple of five entries, so every row is full.
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.ms },
   emojiCell: {
+    ...continuous,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.borderCard,
@@ -215,6 +212,7 @@ const styles = StyleSheet.create({
   cellSelected: { backgroundColor: colors.inputBg, borderColor: colors.link, borderWidth: 2 },
   emoji: { fontSize: 24 },
   initialsCard: {
+    ...continuous,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.borderCard,
@@ -222,25 +220,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: spacing.xs,
     minHeight: layout.minTouchTarget,
-    padding: 14,
+    padding: spacing.ms,
   },
-  initialsLabel: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-  initialsValue: { color: colors.textPrimary, fontSize: 24, fontWeight: '700' },
+  initialsLabel: { ...textStyles.footnote, color: colors.textSecondary, fontWeight: '600' },
+  initialsValue: { ...textStyles.title2, ...upright, color: colors.textPrimary },
   pressed: { opacity: 0.7 },
 
-  checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm + 4, minHeight: layout.minTouchTarget, paddingVertical: spacing.xs },
+  checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.ms, minHeight: layout.minTouchTarget, paddingVertical: spacing.xs },
   checkbox: {
+    ...continuous,
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderColor: colors.textSecondary,
-    borderRadius: 8,
+    borderColor: colors.inputBorder,
+    borderRadius: radii.sm,
     borderWidth: 2,
     height: 24,
     justifyContent: 'center',
     width: 24,
   },
   checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.link },
-  checkmark: { color: colors.textPrimary, fontSize: 15, fontWeight: '900', lineHeight: 18 },
   checkboxLabel: { ...checkboxLabelStyle, flex: 1 },
   checkboxLabelWrap: { flex: 1 },
   disabled: { opacity: 0.5 },

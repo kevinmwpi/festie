@@ -1,10 +1,10 @@
-import { colors, InlineMessage, PrimaryButton, ScreenHeader, SectionCard, showToast, spacing } from '@festival/ui';
-import { Ionicons } from '@expo/vector-icons';
+import { colors, InlineMessage, layout, PrimaryButton, ScreenHeader, SectionCard, showToast, spacing } from '@festival/ui';
 import { usePreventRemove } from '@react-navigation/native';
 import { useNavigation } from 'expo-router';
 import React from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { Alert, ScrollView, StyleSheet } from 'react-native';
 
+import { KeyboardAvoidingScreen } from '@/src/components/KeyboardAvoidingScreen';
 import { goBackOr } from '@/src/providers/launch-route';
 import { ProfileFields, useProfileForm } from '@/src/providers/profile-form';
 import { useCachedProfile } from '@/src/providers/session-state';
@@ -40,14 +40,9 @@ export default function EditProfileScreen() {
   }, [form]);
 
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: screenTint }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingScreen style={[styles.screen, { backgroundColor: screenTint }]}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <ScreenHeader
-          title="Edit profile"
-          subtitle="How your crew sees you"
-          onBack={() => goBackOr('/settings')}
-          backIcon={<Ionicons name="chevron-back" size={22} color={colors.textPrimary} />}
-        />
+        <ScreenHeader title="Edit profile" subtitle="How your crew sees you" onBack={() => goBackOr('/settings')} />
         <SectionCard>
           <ProfileFields form={form} />
         </SectionCard>
@@ -59,11 +54,11 @@ export default function EditProfileScreen() {
           onPress={() => void handleSave()}
         />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingScreen>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: spacing.lg, padding: spacing.lg, paddingBottom: spacing.xxxl + spacing.xl },
+  content: { gap: spacing.lg, padding: layout.screenGutter, paddingBottom: spacing.xxxl + spacing.xl },
 });

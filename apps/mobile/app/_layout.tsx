@@ -1,15 +1,25 @@
 import { supabaseConfigError } from '@festival/data-access';
-import { OfflineBanner, colors, radii, spacing, TextLink, useOfflineStatus } from '@festival/ui';
+import {
+  colors,
+  continuous,
+  layout,
+  OfflineBanner,
+  radii,
+  spacing,
+  TextLink,
+  textStyles,
+  useOfflineStatus,
+} from '@festival/ui';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-import { BrandMark } from '@/src/components/BrandMark';
+import { BrandTile } from '@/src/components/BrandMark';
 import { SUPPORT_EMAIL } from '@/src/config/app-info';
 import { WORDMARK_FONT } from '@/src/config/fonts';
 import { AppProviders } from '@/src/providers/app-providers';
@@ -25,7 +35,6 @@ void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     [WORDMARK_FONT]: require('../assets/fonts/Fredoka-Bold.ttf'),
   });
 
@@ -103,11 +112,10 @@ function ConfigErrorScreen({ detail }: { detail: string }) {
 
   return (
     <SafeAreaView style={styles.root}>
-      <View style={styles.configContainer}>
+      {/* Scrolls instead of clipping when the text size is very large. */}
+      <ScrollView contentContainerStyle={styles.configContainer}>
         <View style={styles.configCard}>
-          <View style={styles.configIcon} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-            <BrandMark size={46} />
-          </View>
+          <BrandTile />
           <Text style={styles.configTitle} accessibilityRole="header">
             Festie can&apos;t start
           </Text>
@@ -125,7 +133,7 @@ function ConfigErrorScreen({ detail }: { detail: string }) {
             />
           ) : null}
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -142,11 +150,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   configContainer: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: layout.screenGutter,
+    paddingVertical: spacing.xl,
   },
   configCard: {
+    ...continuous,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.borderCard,
@@ -155,22 +165,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xxl,
   },
-  configIcon: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: radii.xxl,
-    height: 72,
-    justifyContent: 'center',
-    width: 72,
-  },
-  configTitle: {
-    color: colors.textPrimary,
-    fontFamily: 'Georgia',
-    fontSize: 26,
-    fontStyle: 'italic',
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  configBody: { color: colors.textSecondary, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-  configDetail: { color: colors.destructive, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  configTitle: { ...textStyles.title1, color: colors.textPrimary, textAlign: 'center' },
+  configBody: { ...textStyles.subheadline, color: colors.textSecondary, textAlign: 'center' },
+  configDetail: { ...textStyles.caption1, color: colors.destructive, textAlign: 'center' },
 });

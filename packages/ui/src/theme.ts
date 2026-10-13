@@ -1,19 +1,25 @@
-import { Platform } from 'react-native';
+import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 
 /**
- * Festie Design System — Theme Tokens
+ * Festie Design System — tokens.
  *
- * Matches the AI Studio prototype palette exactly.
- * Primary = pastel blue #B2CEFE (global CTA).
- * Screen backgrounds and tab bar tint are driven per-festival
- * via deriveAccentColors(festival.accent_color).
+ * The rules that go with these tokens are in docs/design-system.md. Light appearance only
+ * (`userInterfaceStyle: "light"`): every contrast ratio below is for that appearance. Screen
+ * backgrounds and the tab bar are tinted per festival at runtime via
+ * `deriveAccentColors(festival.accent_color)`; pastel accents are fills, never text.
  */
 
 export const colors = {
-  /** Pastel blue — global CTA buttons, active chips, add/check buttons */
+  /** Pastel blue — global CTA buttons, active chips, add/check buttons. Fill only (label it `textPrimary`). */
   primary: '#B2CEFE',
   /** Darker pressed state */
   primaryPressed: '#8FB8F8',
+
+  /**
+   * Festie's signature pink (the Coachella pastel): the brand tile on the launch, sign-in and terms screens
+   * and the sign-in CTA, before any festival accent applies. Fill only; `textPrimary` on it is 7.7:1.
+   */
+  brand: '#FFB3D9',
 
   /** Default background (Coachella soft pink — overridden per festival at runtime) */
   background: '#FFF5F9',
@@ -28,6 +34,13 @@ export const colors = {
    * admin-entered accent once `accessibleAccent` has lifted it (worst case 4.54:1).
    */
   textSecondary: 'rgba(44, 51, 39, 0.7)',
+  /**
+   * Decorative glyphs only (chevrons, bullets, separators between crumbs): under 3:1 on white, so never
+   * for text that carries information.
+   */
+  textTertiary: 'rgba(44, 51, 39, 0.45)',
+  /** Text on dark fills (the ink chip): 13.0:1 on `textPrimary`. */
+  textOnInk: '#FFFFFF',
   /** TextInput placeholder — same contrast floor as secondary text. */
   placeholder: 'rgba(44, 51, 39, 0.7)',
   textOnPrimary: '#2C3327',   // reference buttons use dark text on pastel bg
@@ -40,43 +53,67 @@ export const colors = {
    */
   link: '#2F5DA8',
   linkPressed: '#244A87',
+  /** Tinted fill of secondary buttons and the "sample" badge; `link` on it is 5.7:1. */
+  tintedFill: '#EAF1FF',
 
   /** Destructive actions and error copy: 6.57:1 on white, 5.76:1 on `destructiveBg`. */
   destructive: '#B42318',
   destructiveBg: '#FDECEC',
 
-  /** Borders */
-  border: 'rgba(0, 0, 0, 0.05)',
-  borderCard: 'rgba(0, 0, 0, 0.05)',
+  /** Card and chip outlines (ink at 6%). */
+  border: 'rgba(44, 51, 39, 0.06)',
+  borderCard: 'rgba(44, 51, 39, 0.06)',
+  /** Hairline dividers between rows (`StyleSheet.hairlineWidth`). */
+  separator: 'rgba(44, 51, 39, 0.12)',
+
+  /** Neutral fills inside cards: pressed rows, action rows, muted tiles. */
+  fill: 'rgba(44, 51, 39, 0.05)',
+  /** Stronger neutral fill: the segmented-control track, progress tracks. */
+  fillStrong: 'rgba(44, 51, 39, 0.1)',
+  /**
+   * Surfaces floating over the map. Near-opaque so text keeps its contrast over any map pixel
+   * (`textSecondary` 4.80:1 even over black).
+   */
+  overlay: 'rgba(255, 255, 255, 0.95)',
+  /** Dimmed backdrop behind sheets. */
+  scrim: 'rgba(20, 24, 18, 0.35)',
 
   /** Semantic */
   success: '#B2D8B2',           // pastel green — attending / selected
   successBg: '#E8F5E8',
+  /** Text on `successBg`: 7.1:1. */
+  successText: '#1F5C2E',
   warning: '#FDFD96',           // pastel yellow
-  warningBg: '#FEFEE8',
-  conflict: '#FFB3B3',          // pastel red
-  conflictBg: '#FFF5F5',
+  warningBg: '#FFF4D6',
+  /**
+   * Text and non-text marks for warnings and schedule conflicts: 6.8:1 on `warningBg`, 8.1:1 on white
+   * (also ≥ 3:1 as a border on any tint).
+   */
+  warningText: '#7A4A00',
   info: '#B2CEFE',
 
   /** Input bg tint */
   inputBg: '#F0F4FF',
   /**
    * Text-field outline (WCAG 1.4.11 non-text contrast): 3.90:1 on white cards and sheets, ≥ 3.3:1 on
-   * `background`, `inputBg` and the pastel festival tints.
+   * `background`, `inputBg` and the pastel festival tints. Also radio rings and checkbox borders.
    */
   inputBorder: '#7D8378',
 
-  /** Shadows */
-  shadow: 'rgba(0, 0, 0, 0.06)',
+  /** Shadow colour: the ink, not black, so depth reads soft on the pastel washes. */
+  shadow: '#2C3327',
 
   /** Offline banner */
   offlineBg: '#ffd166',
   offlineText: '#2d1800',
 } as const;
 
+/** 4pt grid with an 8pt rhythm. `ms` (12) sits between `sm` and `md`. */
 export const spacing = {
+  xxs: 2,
   xs: 4,
   sm: 8,
+  ms: 12,
   md: 16,
   lg: 20,
   xl: 24,
@@ -90,48 +127,148 @@ export const layout = {
   tabBarClearance: 120,
   /** Minimum touch target (Apple HIG / Material): every tappable control is at least 44×44. */
   minTouchTarget: 44,
-} as const;
-
-export const radii = {
-  sm: 12,
-  md: 16,
-  lg: 20,
-  xl: 24,
-  xxl: 32,
-  /** 40px — the reference's dominant card radius */
-  card: 40,
-  pill: 999,
+  /** Horizontal margin of screen content. */
+  screenGutter: 20,
+  /** Inner padding of cards and list sections. */
+  cardPadding: 20,
+  /** Height of full-width buttons (primary, secondary, destructive). */
+  buttonHeight: 52,
+  /** Visual height of chips; `hitSlop` makes up the rest of the 44pt target. */
+  chipHeight: 36,
 } as const;
 
 /**
- * Typography tokens.
- * Georgia is iOS-only; Android has no Georgia and would fall back to Roboto, so it gets the system
- * serif (Noto Serif) until a serif italic is bundled next to Fredoka. Screens that hard-code
- * 'Georgia' should move to `typography.heading`.
+ * Corner radii. Containers are the roundest and anything nested is tighter, so corners stay concentric
+ * (inner ≈ outer − inset). Use with `continuous` for Apple's squircle curve.
  */
-export const HEADING_FONT: string | undefined = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
+export const radii = {
+  /** Progress tracks, grabbers, tiny indicators. */
+  xs: 4,
+  /** Checkboxes, small thumbnails. */
+  sm: 8,
+  /** Buttons, text fields, segmented controls, action rows. */
+  md: 14,
+  /** Tiles and media nested inside a card: photos, map previews, code blocks, stage blocks. */
+  lg: 18,
+  /** Toasts and floating controls. */
+  xl: 22,
+  /** Cards, list sections, sheets, empty and loading states. */
+  card: 26,
+  pill: 999,
+} as const;
 
-export const typography = {
-  heading: {
-    fontFamily: HEADING_FONT,
-    fontStyle: 'italic' as const,
-    fontWeight: '700' as const,
+/** Corner radius of an app-icon-like tile of edge `size` (the iOS icon proportion, 22.37%). */
+export function iconRadius(size: number): number {
+  return Math.round(size * 0.2237);
+}
+
+/** Apple's continuous ("squircle") corner curve. iOS only; other platforms ignore it. */
+export const continuous: ViewStyle = { borderCurve: 'continuous' };
+
+/**
+ * Elevation: one light source from above, tinted with the ink. Cards barely lift off the wash; only
+ * things that float over content get a real shadow. Buttons, chips and rows are flat. Never put a shadow
+ * on a view that also clips (`overflow: 'hidden'`), and never on a translucent fill.
+ */
+export const elevation = {
+  /** Cards and list sections on the festival wash. */
+  card: {
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 1,
   },
-  body: {
-    fontFamily: undefined as string | undefined,
-    fontWeight: '400' as const,
+  /** Small floating controls: round icon buttons, follow and add toggles, map pins. */
+  raised: {
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
-  label: {
-    fontFamily: undefined as string | undefined,
-    fontWeight: '800' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 2,
-    fontSize: 10,
+  /** Surfaces over content: the tab bar, toasts, sheets, map overlays. */
+  floating: {
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
   },
-  display: {
-    fontFamily: undefined as string | undefined,
-    fontWeight: '700' as const,
-  },
+} satisfies Record<string, ViewStyle>;
+
+/**
+ * Font families. Text is the platform system font (SF Pro on iOS). Titles use Festie's display face:
+ * Georgia, set bold italic (built into iOS; other platforms fall back to their serif).
+ */
+export const fontFamily = {
+  text: undefined as string | undefined,
+  display: Platform.select<string | undefined>({
+    ios: 'Georgia',
+    web: 'Georgia, "Times New Roman", serif',
+    default: 'serif',
+  }),
+};
+
+/** The display face as a style: bold italic Georgia, the brand's titles. */
+const displayFace = { fontFamily: fontFamily.display, fontStyle: 'italic', fontWeight: '700' } as const;
+
+/**
+ * Upright system face, for text that spreads a title role but must not be italic serif (invite codes,
+ * sign-in code digits, initials): `{ ...textStyles.title2, ...upright }`.
+ */
+export const upright = { fontFamily: fontFamily.text, fontStyle: 'normal' } as const satisfies TextStyle;
+
+/**
+ * Text styles. Titles are the brand's bold italic Georgia; everything else follows Apple's text styles at
+ * the default content size. React Native scales sizes and line heights with the user's text size
+ * (`allowFontScaling`, on by default). Emphasise with `fontWeight`, never a new size:
+ * `{ ...textStyles.footnote, fontWeight: '600' }`.
+ */
+export const textStyles = {
+  largeTitle: { ...displayFace, fontSize: 34, lineHeight: 41 },
+  title1: { ...displayFace, fontSize: 28, lineHeight: 34 },
+  title2: { ...displayFace, fontSize: 22, lineHeight: 28 },
+  title3: { ...displayFace, fontSize: 20, lineHeight: 25 },
+  headline: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  body: { fontSize: 17, lineHeight: 22, fontWeight: '400' },
+  callout: { fontSize: 16, lineHeight: 21, fontWeight: '400' },
+  subheadline: { fontSize: 15, lineHeight: 20, fontWeight: '400' },
+  footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  caption1: { fontSize: 12, lineHeight: 16, fontWeight: '400' },
+  caption2: { fontSize: 11, lineHeight: 13, fontWeight: '400' },
+  /** Spaced capitals: the line under a screen title (e.g. "PACKAGES/UI + APP COMPONENTS"). */
+  label: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
+  /** Primary and destructive button labels: spaced capitals. */
+  buttonCaps: { fontSize: 13, lineHeight: 18, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
+  /** Secondary button labels: bold, as written. */
+  buttonText: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
+} satisfies Record<string, TextStyle>;
+
+/** Tabular (fixed-width) digits for times, counts and codes, so numbers line up. */
+export const tabularNums: TextStyle = { fontVariant: ['tabular-nums'] };
+
+/**
+ * Motion. Durations in ms; springs (RN `Animated.spring` speed/bounciness) for anything a finger
+ * starts. Only `transform` and `opacity` animate, on the native driver. With Reduce Motion on
+ * (`useReduceMotion`), movement becomes a fade or nothing.
+ */
+export const motion = {
+  fast: 140,
+  base: 220,
+  slow: 320,
+  /** Press-in: firm, no overshoot. */
+  pressIn: { speed: 50, bounciness: 0 },
+  /** Release: settles back with a hint of give. */
+  pressOut: { speed: 24, bounciness: 4 },
+  /** Selection changes (segmented-control thumb). */
+  select: { speed: 20, bounciness: 2 },
+  /** Scale of a pressed control. */
+  pressedScale: 0.97,
+  /** Scale of a pressed small control (round icon buttons, toggles): smaller things need a bit more travel. */
+  pressedScaleSmall: 0.94,
+  /** Opacity multiplier of a pressed control. */
+  pressedOpacity: 0.85,
 } as const;
 
 /* ─── Festival accent utilities ─────────────────────────── */

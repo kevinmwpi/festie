@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { colors, layout, radii, spacing } from '@festival/ui';
+import { colors, continuous, elevation, IconButton, layout, radii, spacing, textStyles } from '@festival/ui';
 import React from 'react';
 import {
   KeyboardAvoidingView,
@@ -14,16 +14,25 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
- * Bottom sheet in the app's card language (40px top corners, white surface over a dimmed backdrop).
- * Tapping the backdrop or the hardware back button closes it.
+ * Bottom sheet: a white `card`-radius surface over a dimmed backdrop, with a grabber, an optional
+ * `title2` title and a close button. Tapping the backdrop, the close button, the hardware back button or
+ * the VoiceOver escape gesture (two-finger Z) closes it. `showCloseButton={false}` is for sheets that end
+ * in their own Cancel row (`ActionSheet`).
  */
 export function BottomSheet({
   visible,
   onClose,
   title,
   subtitle,
+  showCloseButton = true,
   children,
-}: React.PropsWithChildren<{ visible: boolean; onClose: () => void; title?: string; subtitle?: string }>) {
+}: React.PropsWithChildren<{
+  visible: boolean;
+  onClose: () => void;
+  title?: string;
+  subtitle?: string;
+  showCloseButton?: boolean;
+}>) {
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
@@ -32,33 +41,36 @@ export function BottomSheet({
         <View
           style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.sm }]}
           accessibilityViewIsModal
-          // VoiceOver's two-finger Z gesture; the backdrop button is unreachable from inside a modal view.
           onAccessibilityEscape={onClose}
         >
-          <View style={styles.grabber} importantForAccessibility="no" />
+          <View style={styles.grabber} importantForAccessibility="no" accessibilityElementsHidden />
           <ScrollView
             bounces={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
           >
-            {title ? (
-              <View style={styles.titleRow}>
-                <Text style={[styles.title, styles.titleText]} accessibilityRole="header">
-                  {title}
-                </Text>
-                <Pressable
-                  onPress={onClose}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close"
-                  hitSlop={4}
-                  style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.6 }]}
-                >
-                  <Ionicons name="close" size={22} color={colors.textPrimary} />
-                </Pressable>
+            {title || showCloseButton ? (
+              <View style={styles.headerRow}>
+                <View style={styles.headerText}>
+                  {title ? (
+                    <Text style={styles.title} accessibilityRole="header">
+                      {title}
+                    </Text>
+                  ) : null}
+                  {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+                </View>
+                {showCloseButton ? (
+                  <IconButton
+                    icon={<Ionicons name="close" size={20} color={colors.textPrimary} />}
+                    accessibilityLabel="Close"
+                    onPress={onClose}
+                  />
+                ) : null}
               </View>
+            ) : subtitle ? (
+              <Text style={styles.subtitle}>{subtitle}</Text>
             ) : null}
-            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
             {children}
           </ScrollView>
         </View>
@@ -90,7 +102,7 @@ export function ActionSheet({
   onClose: () => void;
 }) {
   return (
-    <BottomSheet visible={visible} onClose={onClose} title={title} subtitle={message}>
+    <BottomSheet visible={visible} onClose={onClose} title={title} subtitle={message} showCloseButton={false}>
       <View style={styles.actions}>
         {actions.map((action) => (
           <Pressable
@@ -123,54 +135,44 @@ export function ActionSheet({
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(20, 24, 18, 0.35)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.scrim },
   sheet: {
+    ...continuous,
+    ...elevation.floating,
     backgroundColor: colors.surface,
     borderTopLeftRadius: radii.card,
     borderTopRightRadius: radii.card,
     maxHeight: '88%',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: layout.cardPadding,
     paddingTop: spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 12,
   },
   grabber: {
     alignSelf: 'center',
-    backgroundColor: 'rgba(44, 51, 39, 0.18)',
-    borderRadius: 3,
+    backgroundColor: colors.fillStrong,
+    borderRadius: radii.xs,
     height: 5,
-    marginBottom: spacing.sm,
-    width: 40,
+    marginBottom: spacing.xs,
+    width: 36,
   },
   content: { gap: spacing.md, paddingBottom: spacing.sm },
-  titleRow: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.sm },
-  titleText: { flex: 1 },
-  closeButton: {
-    alignItems: 'center',
-    backgroundColor: '#F6F7F5',
-    borderRadius: layout.minTouchTarget / 2,
-    height: layout.minTouchTarget,
-    justifyContent: 'center',
-    marginTop: -spacing.xs,
-    width: layout.minTouchTarget,
-  },
-  title: { color: colors.textPrimary, fontFamily: 'Georgia', fontSize: 24, fontStyle: 'italic', fontWeight: '700' },
-  subtitle: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: -spacing.xs },
+  headerRow: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.ms },
+  headerText: { flex: 1, gap: spacing.xs, paddingTop: spacing.sm },
+  title: { ...textStyles.title2, color: colors.textPrimary },
+  subtitle: { ...textStyles.subheadline, color: colors.textSecondary },
   actions: { gap: spacing.sm },
   action: {
+    ...continuous,
     alignItems: 'center',
-    backgroundColor: '#F6F7F5',
-    borderRadius: radii.md + 4,
+    backgroundColor: colors.fill,
+    borderRadius: radii.md,
     justifyContent: 'center',
-    minHeight: layout.minTouchTarget + 8,
+    minHeight: layout.buttonHeight,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.ms,
   },
-  actionPressed: { opacity: 0.7 },
-  actionLabel: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  actionPressed: { backgroundColor: colors.fillStrong },
+  actionLabel: { ...textStyles.headline, color: colors.textPrimary, textAlign: 'center' },
   actionDestructive: { color: colors.destructive },
-  cancel: { backgroundColor: colors.surface, borderColor: colors.borderCard, borderWidth: 1, marginTop: spacing.xs },
-  cancelLabel: { color: colors.link, fontSize: 16, fontWeight: '700' },
+  cancel: { backgroundColor: colors.surface, borderColor: colors.separator, borderWidth: 1, marginTop: spacing.xs },
+  cancelLabel: { ...textStyles.headline, color: colors.link, textAlign: 'center' },
 });

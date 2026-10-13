@@ -15,17 +15,25 @@ import { cancelReminderForEntity, syncMeetupReminders } from '@festival/notifica
 import {
   Badge,
   colors,
+  continuous,
+  deriveAccentColors,
   DestructiveButton,
+  elevation,
   EmptyState,
   IconButton,
   layout,
+  PressableScale,
   radii,
   SecondaryButton,
   showToast,
   spacing,
+  tabularNums,
   TextLink,
+  textStyles,
+  upright,
   useOfflineStatus,
 } from '@festival/ui';
+import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
@@ -47,10 +55,14 @@ import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useAddTotemPhoto } from '@/src/hooks/use-totem-photo';
 import { stopLocationSharingForGroup } from '@/src/location/LocationSharingProvider';
 import { cancelCrewReminders } from '@/src/notifications/crew-reminders';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
 /** Meetups that started more than this long ago move under "Earlier". */
 const MEETUP_GRACE_MS = 60 * 60 * 1000;
+
+/** Edge of the member avatars (the `Avatar` default); row separators start where the name does. */
+const MEMBER_AVATAR_SIZE = 44;
 
 function memberName(member: GroupMember): string {
   if (member.is_blocked) return 'Blocked user';
@@ -80,7 +92,7 @@ function MemberRow({
         muted={member.is_blocked}
       />
       <View style={styles.memberInfo}>
-        <Text style={[styles.memberName, member.is_blocked && styles.memberNameMuted]} numberOfLines={1}>
+        <Text style={[styles.memberName, member.is_blocked && styles.memberNameMuted]} numberOfLines={3}>
           {isMe ? `${name} (you)` : name}
         </Text>
         {member.role === 'admin' ? <Badge label="Admin" /> : null}
@@ -100,7 +112,7 @@ function MemberRow({
       accessibilityLabel={`${name}${member.role === 'admin' ? ', admin' : ''}`}
       accessibilityHint={member.is_blocked ? 'Shows options like unblock or report' : 'Shows options like report or block'}
       accessibilityState={{ busy }}
-      style={({ pressed }) => [styles.memberRow, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.memberRow, pressed && styles.memberRowPressed]}
     >
       {content}
       {busy ? (
@@ -108,7 +120,13 @@ function MemberRow({
       ) : member.is_blocked ? (
         <Text style={styles.blockedAction}>Unblock</Text>
       ) : (
-        <Text style={styles.chevron}>›</Text>
+        <Ionicons
+          name="chevron-forward"
+          size={17}
+          color={colors.textTertiary}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
       )}
     </Pressable>
   );
@@ -139,18 +157,31 @@ function MeetupCard({
 }) {
   // Without the festival's time zone a label would be in device time (§5.5): show none until it's known.
   const when = clock.timeZone ? `${clock.date(meetup.starts_at)} · ${clock.time(meetup.starts_at)}` : null;
+  const whenSpoken = clock.timeZone ? `${clock.date(meetup.starts_at)}, ${clock.time(meetup.starts_at)}` : null;
+  const byLine = isMine ? 'Created by you' : `By ${creatorName}`;
+  // One VoiceOver stop for the meetup's facts; the options button, notes and photo controls stay separate.
+  const infoLabel = [meetup.title, whenSpoken, placeLabel, byLine, meetup.pending_sync === 1 ? 'Waiting to sync' : null]
+    .filter(Boolean)
+    .join(', ');
   return (
     <View style={styles.meetupCard}>
       <View style={styles.meetupHeader}>
-        <View style={styles.meetupDot} />
-        <View style={styles.meetupInfo}>
+        {/* The slot is one title line tall, so the dot centres on the title's first line. */}
+        <View style={styles.meetupDotSlot}>
+          <View style={styles.meetupDot} />
+        </View>
+        <View style={styles.meetupInfo} accessible accessibilityLabel={infoLabel}>
           <Text style={styles.meetupTitle}>{meetup.title}</Text>
-          {when ? <Text style={styles.meetupTime}>{when.toUpperCase()}</Text> : null}
+          {when ? <Text style={styles.meetupTime}>{when}</Text> : null}
           {placeLabel ? <Text style={styles.meetupPlace}>{placeLabel}</Text> : null}
-          <Text style={styles.meetupBy}>{isMine ? 'Created by you' : `By ${creatorName}`}</Text>
+          <Text style={styles.meetupBy}>{byLine}</Text>
           {meetup.pending_sync === 1 ? <Badge label="Waiting to sync" /> : null}
         </View>
-        <IconButton icon="⋯" accessibilityLabel={`Options for ${meetup.title}`} onPress={onMore} />
+        <IconButton
+          icon={<Ionicons name="ellipsis-horizontal" size={20} color={colors.textPrimary} />}
+          accessibilityLabel={`Options for ${meetup.title}`}
+          onPress={onMore}
+        />
       </View>
       {meetup.notes ? <Text style={styles.meetupNotes}>{meetup.notes}</Text> : null}
       {meetup.totem_path ? (
@@ -179,6 +210,9 @@ export default function GroupDetailScreen() {
   const group = detail.data?.group ?? null;
   const bundle = useFestivalBundle(group?.festival_id ?? null);
   const festival = bundle.data?.festival ?? null;
+  const activeFestivalAccent = useAppStore((state) => state.activeFestivalAccent);
+  const screenBg = deriveAccentColors(festival?.accent_color || activeFestivalAccent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
   const clock = useFestivalClock(festival);
   const { addPhoto, uploadingId } = useAddTotemPhoto();
   const me = getCachedProfile()?.id ?? null;
@@ -494,7 +528,7 @@ export default function GroupDetailScreen() {
       );
     }
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: screenBg }]}>
         <SubScreenHeader title="Crew" />
         <View style={styles.statePad}>{body}</View>
       </View>
@@ -504,7 +538,7 @@ export default function GroupDetailScreen() {
   const memberCount = members.length;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: screenBg }]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: tabBarClearance }}
@@ -514,50 +548,65 @@ export default function GroupDetailScreen() {
       >
         <SubScreenHeader
           title={group.name}
-          label={[festival?.name, `${memberCount} member${memberCount === 1 ? '' : 's'}`].filter(Boolean).join(' · ').toUpperCase()}
+          label={[festival?.name, `${memberCount} member${memberCount === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}
         />
 
         <View style={styles.inner}>
           {/* Invite */}
           <View style={styles.card}>
             <View style={styles.codeRow}>
-              <Text style={styles.sectionLabel}>INVITE CODE</Text>
+              <Text style={styles.sectionHeader} accessibilityRole="header">
+                Invite code
+              </Text>
               <View style={styles.codePill} accessible accessibilityLabel={`Invite code ${group.invite_code.split('').join(' ')}`}>
-                <Text style={styles.codeValue}>{group.invite_code}</Text>
+                {/* One line at every text size: a wrap would split the code mid-word and read as a different
+                    code, so at the largest sizes it shrinks to fit instead. The pill's label has the full code. */}
+                <Text style={styles.codeValue} numberOfLines={1} adjustsFontSizeToFit>
+                  {group.invite_code}
+                </Text>
               </View>
             </View>
             <SecondaryButton label="Share invite" onPress={() => void shareInvite()} />
             {isAdmin ? (
-              <TextLink label={rotating ? 'Getting a new code…' : 'Get a new code'} onPress={confirmRotate} accessibilityLabel="Get a new invite code" />
+              <TextLink
+                label={rotating ? 'Getting a new code…' : 'Get a new code'}
+                busy={rotating}
+                onPress={confirmRotate}
+                accessibilityLabel="Get a new invite code"
+                role="button"
+              />
             ) : null}
           </View>
 
           {/* Quick actions */}
           <View style={styles.actionRow}>
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel="Crew schedule"
-              style={({ pressed }) => [styles.actionButton, styles.actionButtonPrimary, pressed && styles.pressed]}
+              style={[styles.actionButton, styles.actionButtonPrimary]}
               onPress={() => router.push(`/(tabs)/group/${groupId}/schedule`)}
             >
-              <Text style={styles.actionButtonLabel}>📅 Crew Schedule</Text>
-            </Pressable>
-            <Pressable
+              <Ionicons name="calendar-outline" size={20} color={colors.textPrimary} />
+              <Text style={styles.actionButtonLabel}>Crew schedule</Text>
+            </PressableScale>
+            {/* "Meetup" is the word the empty-meetups line below tells people to tap: keep the two in step. */}
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel="New meetup"
-              style={({ pressed }) => [styles.actionButton, styles.actionButtonSecondary, pressed && styles.pressed]}
+              style={[styles.actionButton, styles.actionButtonSecondary]}
               onPress={() => router.push(`/(tabs)/group/${groupId}/meetup/create`)}
             >
-              <Text style={styles.actionButtonLabel}>📍 Meetup</Text>
-            </Pressable>
+              <Ionicons name="location-outline" size={20} color={colors.link} />
+              <Text style={[styles.actionButtonLabel, styles.actionButtonLabelSecondary]}>Meetup</Text>
+            </PressableScale>
           </View>
 
           <LocationSharingCard groupId={groupId} groupName={group.name} resolveGroupName={resolveGroupName} />
 
           {/* Meetups */}
           <View style={styles.card}>
-            <Text style={styles.sectionLabel} accessibilityRole="header">
-              UPCOMING MEETUPS
+            <Text style={styles.sectionHeader} accessibilityRole="header">
+              Upcoming meetups
             </Text>
             {festival ? null : <Text style={styles.mutedText}>Times appear once the festival is downloaded.</Text>}
             {upcoming.length === 0 ? (
@@ -582,6 +631,7 @@ export default function GroupDetailScreen() {
               <TextLink
                 label={showEarlier ? 'Hide earlier meetups' : `Show earlier meetups (${earlier.length})`}
                 onPress={() => setShowEarlier((value) => !value)}
+                role="button"
               />
             ) : null}
             {showEarlier
@@ -604,21 +654,25 @@ export default function GroupDetailScreen() {
 
           {/* Members */}
           <View style={styles.card}>
-            <Text style={styles.sectionLabel} accessibilityRole="header">
-              MEMBERS · {memberCount}
+            <Text style={[styles.sectionHeader, tabularNums]} accessibilityRole="header">
+              Members · {memberCount}
             </Text>
-            {members.map((member) => {
-              const isMe = member.user_id === me;
-              return (
-                <MemberRow
-                  key={member.id}
-                  member={member}
-                  isMe={isMe}
-                  busy={busyMemberId === member.user_id}
-                  onPress={isMe ? undefined : () => setMemberSheet(member)}
-                />
-              );
-            })}
+            <View>
+              {members.map((member, index) => {
+                const isMe = member.user_id === me;
+                return (
+                  <React.Fragment key={member.id}>
+                    {index > 0 ? <View style={styles.memberSeparator} /> : null}
+                    <MemberRow
+                      member={member}
+                      isMe={isMe}
+                      busy={busyMemberId === member.user_id}
+                      onPress={isMe ? undefined : () => setMemberSheet(member)}
+                    />
+                  </React.Fragment>
+                );
+              })}
+            </View>
           </View>
 
           <StaleDataNote error={detail.refreshError} />
@@ -628,6 +682,7 @@ export default function GroupDetailScreen() {
             <TextLink
               label="Report this crew"
               onPress={() => setReportTarget({ type: 'group', id: group.id, label: 'Report this crew' })}
+              role="button"
             />
             <DestructiveButton label="Leave crew" onPress={confirmLeave} loading={leaving} />
           </View>
@@ -653,74 +708,88 @@ export default function GroupDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* The festival wash (`screenBg`) is applied inline; it is translucent over the Stack's `colors.background`. */
   container: { flex: 1 },
-  statePad: { padding: spacing.lg },
+  statePad: { padding: layout.screenGutter },
   scroll: { flex: 1 },
-  inner: { gap: spacing.md, paddingHorizontal: spacing.lg },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  inner: { gap: spacing.md, paddingHorizontal: layout.screenGutter },
 
   card: {
+    ...continuous,
+    ...elevation.card,
     backgroundColor: colors.surface,
+    borderColor: colors.borderCard,
     borderRadius: radii.card,
     borderWidth: 1,
-    borderColor: colors.borderCard,
-    padding: spacing.xl,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
     gap: spacing.md,
+    padding: layout.cardPadding,
   },
-  sectionLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2 },
-  mutedText: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  sectionHeader: { ...textStyles.footnote, color: colors.textSecondary, fontWeight: '600' },
+  mutedText: { ...textStyles.subheadline, color: colors.textSecondary },
 
-  codeRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
-  codePill: { backgroundColor: '#F0F4FF', borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2 },
-  codeValue: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', letterSpacing: 3 },
+  codeRow: {
+    alignItems: 'center',
+    columnGap: spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: spacing.sm,
+  },
+  codePill: { backgroundColor: colors.inputBg, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  codeValue: { ...textStyles.title3, ...upright, ...tabularNums, color: colors.textPrimary, fontWeight: '700', letterSpacing: 3 },
 
+  /* Quick actions: flat, like buttons */
   actionRow: { flexDirection: 'row', gap: spacing.sm },
   actionButton: {
-    flex: 1,
+    ...continuous,
     alignItems: 'center',
+    borderRadius: radii.md,
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
     justifyContent: 'center',
-    borderRadius: radii.xl,
-    minHeight: layout.minTouchTarget + 12,
+    minHeight: layout.buttonHeight,
     paddingHorizontal: spacing.md,
-    shadowColor: colors.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    paddingVertical: spacing.sm,
   },
   actionButtonPrimary: { backgroundColor: colors.primary },
-  actionButtonSecondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderCard },
-  actionButtonLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  /* Matches the shared SecondaryButton: tinted fill, `link` label. */
+  actionButtonSecondary: { backgroundColor: colors.tintedFill },
+  actionButtonLabel: { ...textStyles.headline, color: colors.textPrimary, flexShrink: 1, textAlign: 'center' },
+  actionButtonLabelSecondary: { color: colors.link },
 
+  /* Member rows run edge to edge inside the card so the pressed highlight spans its full width. */
   memberRow: {
     alignItems: 'center',
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
     flexDirection: 'row',
-    gap: spacing.md,
-    minHeight: 60,
-    paddingTop: spacing.sm,
+    gap: spacing.ms,
+    marginHorizontal: -layout.cardPadding,
+    minHeight: layout.minTouchTarget,
+    paddingHorizontal: layout.cardPadding,
+    paddingVertical: spacing.sm,
   },
-  memberInfo: { flex: 1, gap: 4, alignItems: 'flex-start' },
-  memberName: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
-  memberNameMuted: { color: colors.textSecondary, fontStyle: 'italic' },
-  chevron: { color: colors.textSecondary, fontSize: 24, fontWeight: '300' },
-  blockedAction: { color: colors.link, fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
+  memberRowPressed: { backgroundColor: colors.fill },
+  memberSeparator: {
+    backgroundColor: colors.separator,
+    height: StyleSheet.hairlineWidth,
+    marginLeft: MEMBER_AVATAR_SIZE + spacing.ms,
+    marginRight: -layout.cardPadding,
+  },
+  memberInfo: { alignItems: 'flex-start', flex: 1, gap: spacing.xs },
+  memberName: { ...textStyles.headline, color: colors.textPrimary },
+  memberNameMuted: { color: colors.textSecondary },
+  blockedAction: { ...textStyles.subheadline, color: colors.link, fontWeight: '600' },
 
-  meetupCard: { borderTopColor: colors.border, borderTopWidth: 1, gap: spacing.sm, paddingTop: spacing.md },
+  meetupCard: { borderTopColor: colors.separator, borderTopWidth: StyleSheet.hairlineWidth, gap: spacing.sm, paddingTop: spacing.md },
   meetupHeader: { flexDirection: 'row', gap: spacing.md },
-  meetupDot: { backgroundColor: colors.primary, borderRadius: 5, height: 10, marginTop: 6, width: 10 },
-  meetupInfo: { flex: 1, gap: 3, alignItems: 'flex-start' },
-  meetupTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
-  meetupTime: { color: colors.textSecondary, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  meetupPlace: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
-  meetupBy: { color: colors.textSecondary, fontSize: 12 },
-  meetupNotes: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  meetupDotSlot: { height: textStyles.headline.lineHeight, justifyContent: 'center' },
+  meetupDot: { backgroundColor: colors.primary, borderRadius: radii.pill, height: spacing.ms, width: spacing.ms },
+  meetupInfo: { alignItems: 'flex-start', flex: 1, gap: spacing.xxs },
+  meetupTitle: { ...textStyles.headline, color: colors.textPrimary },
+  meetupTime: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary, fontWeight: '600' },
+  meetupPlace: { ...textStyles.footnote, color: colors.textPrimary, fontWeight: '600' },
+  meetupBy: { ...textStyles.caption1, color: colors.textSecondary },
+  meetupNotes: { ...textStyles.subheadline, color: colors.textSecondary },
 
   dangerZone: { gap: spacing.md, paddingTop: spacing.sm },
 });

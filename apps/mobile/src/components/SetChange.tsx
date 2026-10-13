@@ -1,5 +1,5 @@
 import { describeSetChange, isCancelledSet, type SetChange, type SetChangeFields } from '@festival/domain';
-import { Badge, colors, radii, spacing } from '@festival/ui';
+import { Badge, colors, continuous, radii, spacing, textStyles } from '@festival/ui';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native';
 
@@ -137,22 +137,22 @@ export function ScheduleChangesNotice<T extends ChangedPick>({
 }
 
 const styles = StyleSheet.create({
-  detail: { color: colors.textSecondary, fontSize: 12, fontWeight: '600', lineHeight: 16 },
+  detail: { ...textStyles.caption1, color: colors.textSecondary, fontWeight: '600' },
   detailMoved: { color: colors.link },
   detailCancelled: { color: colors.destructive },
 
+  // Schedule changes use the amber warning family, like conflicts (docs/design-system.md).
   notice: {
-    backgroundColor: colors.surface,
-    borderColor: '#F2C46D',
+    ...continuous,
+    backgroundColor: colors.warningBg,
     borderRadius: radii.md,
-    borderWidth: 1,
     gap: spacing.xs,
     padding: spacing.md,
   },
-  noticeTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  noticeTitle: { ...textStyles.subheadline, color: colors.warningText, fontWeight: '600', marginBottom: 2 },
   noticeRow: { gap: 2, minHeight: 44, justifyContent: 'center', paddingVertical: 4 },
   noticeRowTop: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
-  noticeArtist: { color: colors.textPrimary, flexShrink: 1, fontSize: 14, fontWeight: '700' },
-  noticeDetail: { color: colors.textSecondary, fontSize: 12, lineHeight: 16 },
+  noticeArtist: { ...textStyles.subheadline, color: colors.textPrimary, flexShrink: 1, fontWeight: '600' },
+  noticeDetail: { ...textStyles.caption1, color: colors.textSecondary },
   pressed: { opacity: 0.6 },
 });

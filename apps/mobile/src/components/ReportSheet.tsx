@@ -6,7 +6,20 @@ import {
   type ReportReason,
   type ReportTargetType,
 } from '@festival/data-access';
-import { colors, FieldInput, FieldLabel, InlineMessage, PrimaryButton, radii, showToast, spacing } from '@festival/ui';
+import {
+  colors,
+  continuous,
+  FieldInput,
+  FieldLabel,
+  InlineMessage,
+  layout,
+  PrimaryButton,
+  radii,
+  showToast,
+  spacing,
+  tabularNums,
+  textStyles,
+} from '@festival/ui';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -76,7 +89,7 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
       subtitle="Reports are anonymous to the person you report. Our team reviews every report."
     >
       <FieldLabel>Reason</FieldLabel>
-      <View style={styles.reasons} accessibilityRole="radiogroup">
+      <View style={styles.reasons} accessibilityRole="radiogroup" accessibilityLabel="Reason">
         {REPORT_REASONS.map((value) => {
           const selected = reason === value;
           return (
@@ -86,7 +99,7 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
               accessibilityRole="radio"
               accessibilityState={{ checked: selected }}
               accessibilityLabel={REPORT_REASON_LABELS[value]}
-              style={({ pressed }) => [styles.reason, selected && styles.reasonSelected, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.reason, selected && styles.reasonSelected, pressed && styles.reasonPressed]}
             >
               <View style={[styles.radio, selected && styles.radioSelected]} />
               <Text style={styles.reasonLabel}>{REPORT_REASON_LABELS[value]}</Text>
@@ -96,18 +109,20 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
       </View>
 
       <FieldLabel>Details (optional)</FieldLabel>
-      <FieldInput
-        value={details}
-        onChangeText={setDetails}
-        placeholder="Anything that helps us understand"
-        multiline
-        maxLength={REPORT_DETAILS_MAX_LENGTH}
-        style={styles.details}
-        accessibilityLabel="Details, optional"
-      />
-      <Text style={styles.counter}>
-        {details.length}/{REPORT_DETAILS_MAX_LENGTH}
-      </Text>
+      <View style={styles.detailsGroup}>
+        <FieldInput
+          value={details}
+          onChangeText={setDetails}
+          placeholder="Anything that helps us understand"
+          multiline
+          maxLength={REPORT_DETAILS_MAX_LENGTH}
+          style={styles.details}
+          accessibilityLabel="Details, optional"
+        />
+        <Text style={styles.counter} accessibilityLabel={`${details.length} of ${REPORT_DETAILS_MAX_LENGTH} characters`}>
+          {details.length}/{REPORT_DETAILS_MAX_LENGTH}
+        </Text>
+      </View>
 
       <InlineMessage message={error} />
       <PrimaryButton label="Send report" onPress={() => void submit()} disabled={!reason} loading={submitting} />
@@ -115,23 +130,30 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
   );
 }
 
+/** Diameter of the radio ring. */
+const RADIO_SIZE = 20;
+
 const styles = StyleSheet.create({
   reasons: { gap: spacing.xs },
   reason: {
+    ...continuous,
     alignItems: 'center',
     borderColor: colors.borderCard,
     borderRadius: radii.md,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: spacing.sm + 4,
-    minHeight: 48,
+    gap: spacing.ms,
+    minHeight: layout.minTouchTarget + spacing.xs,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  reasonSelected: { backgroundColor: '#F0F4FF', borderColor: colors.primary },
-  pressed: { opacity: 0.7 },
-  radio: { borderColor: 'rgba(44, 51, 39, 0.35)', borderRadius: 10, borderWidth: 2, height: 20, width: 20 },
+  reasonSelected: { backgroundColor: colors.inputBg, borderColor: colors.primary },
+  reasonPressed: { backgroundColor: colors.fill },
+  // The ring is the control's outline: `inputBorder` keeps it at 3:1 or more (WCAG 1.4.11).
+  radio: { borderColor: colors.inputBorder, borderRadius: radii.pill, borderWidth: 2, height: RADIO_SIZE, width: RADIO_SIZE },
   radioSelected: { backgroundColor: colors.link, borderColor: colors.link },
-  reasonLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
+  reasonLabel: { ...textStyles.body, color: colors.textPrimary, flexShrink: 1 },
+  detailsGroup: { gap: spacing.xs },
   details: { minHeight: 88, paddingTop: spacing.md, textAlignVertical: 'top' },
-  counter: { alignSelf: 'flex-end', color: colors.textSecondary, fontSize: 12, marginTop: -spacing.sm },
+  counter: { ...textStyles.caption1, ...tabularNums, alignSelf: 'flex-end', color: colors.textSecondary },
 });

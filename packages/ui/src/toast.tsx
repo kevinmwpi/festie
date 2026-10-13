@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, layout, radii, spacing } from './theme';
+import { useReduceMotion } from './press';
+import { colors, continuous, elevation, layout, motion, radii, spacing, textStyles } from './theme';
 
 export type ToastTone = 'neutral' | 'success' | 'error';
 
@@ -14,8 +15,8 @@ interface ToastMessage {
 type ToastListener = (toast: ToastMessage) => void;
 
 const MAX_QUEUED = 3;
-const ENTER_MS = 220;
-const EXIT_MS = 180;
+const ENTER_MS = motion.base;
+const EXIT_MS = motion.fast + 40;
 
 const listeners = new Set<ToastListener>();
 /** Toasts raised before any `ToastHost` mounted (e.g. during launch); shown once one mounts. */
@@ -68,7 +69,7 @@ function visibleDurationMs(message: string): number {
 
 const TONE_STYLES: Record<ToastTone, { backgroundColor: string; color: string; dot: string }> = {
   neutral: { backgroundColor: colors.surface, color: colors.textPrimary, dot: colors.primary },
-  success: { backgroundColor: colors.successBg, color: '#1F5C2E', dot: colors.success },
+  success: { backgroundColor: colors.successBg, color: colors.successText, dot: colors.successText },
   error: { backgroundColor: colors.destructiveBg, color: colors.destructive, dot: colors.destructive },
 };
 
@@ -77,25 +78,29 @@ const TONE_STYLES: Record<ToastTone, { backgroundColor: string; color: string; d
  * as the last child of the app root so it draws above screens.
  *
  * @param bottomOffset distance from the bottom edge; defaults to `layout.tabBarClearance` so the
- *   toast floats above the tab bar.
+ *   toast floats above the tab bar. While the keyboard is open the toast sits just above it instead
+ *   (e.g. the "New code sent" toast on the sign-in code screen, whose number pad is always up).
  */
 export function ToastHost({ bottomOffset = layout.tabBarClearance }: { bottomOffset?: number }) {
   const [queue, setQueue] = useState<ToastMessage[]>([]);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const progress = useRef(new Animated.Value(0)).current;
-  const reduceMotion = useRef(false);
+  const reduceMotion = useReduceMotion();
   const current = queue[0] ?? null;
 
   useEffect(() => {
-    let mounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        if (mounted) reduceMotion.current = enabled;
-      })
-      .catch(() => undefined);
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
-      reduceMotion.current = enabled;
-    });
+    // iOS reports the keyboard before it animates in; Android only after.
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (event) => setKeyboardHeight(event.endCoordinates.height));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
+  useEffect(() => {
     const listener: ToastListener = (toast) => {
       setQueue((previous) => {
         // Drop exact repeats of a toast that is already showing or waiting.
@@ -113,9 +118,7 @@ export function ToastHost({ bottomOffset = layout.tabBarClearance }: { bottomOff
     }
 
     return () => {
-      mounted = false;
       listeners.delete(listener);
-      subscription.remove();
     };
   }, []);
 
@@ -145,12 +148,15 @@ export function ToastHost({ bottomOffset = layout.tabBarClearance }: { bottomOff
   }
 
   const tone = TONE_STYLES[current.tone];
-  const translateY = reduceMotion.current
+  const translateY = reduceMotion
     ? 0
     : progress.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
 
   return (
-    <View pointerEvents="box-none" style={[styles.host, { bottom: bottomOffset }]}>
+    <View
+      pointerEvents="box-none"
+      style={[styles.host, { bottom: keyboardHeight > 0 ? Math.max(bottomOffset, keyboardHeight + spacing.md) : bottomOffset }]}
+    >
       <Animated.View style={{ opacity: progress, transform: [{ translateY }] }}>
         <Pressable
           onPress={() => dismissCurrent(current.id)}
@@ -175,22 +181,19 @@ const styles = StyleSheet.create({
     right: spacing.md,
   },
   toast: {
+    ...continuous,
+    ...elevation.floating,
     alignItems: 'center',
     borderColor: colors.borderCard,
     borderRadius: radii.xl,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: spacing.sm + 2,
+    gap: spacing.ms,
     maxWidth: 520,
     minHeight: layout.minTouchTarget,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    paddingVertical: spacing.ms,
   },
-  dot: { borderRadius: 4, height: 8, width: 8 },
-  message: { flexShrink: 1, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  dot: { borderRadius: radii.xs, height: 8, width: 8 },
+  message: { ...textStyles.subheadline, flexShrink: 1, fontWeight: '600' },
 });

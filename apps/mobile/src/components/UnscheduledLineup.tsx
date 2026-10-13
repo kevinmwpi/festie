@@ -1,5 +1,5 @@
 import { formatArtistCount } from '@festival/domain';
-import { colors, HEADING_FONT, radii, SecondaryButton, spacing } from '@festival/ui';
+import { colors, continuous, elevation, radii, SecondaryButton, spacing, textStyles } from '@festival/ui';
 import type { UnscheduledArtist } from '@festival/data-access';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -75,7 +75,7 @@ export function UnscheduledArtistCard({ artist }: { artist: UnscheduledArtist })
           {artist.name}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {[artist.genre, 'Set time TBA'].filter(Boolean).join(' · ').toUpperCase()}
+          {[artist.genre, 'Set time to be announced'].filter(Boolean).join(' · ')}
         </Text>
       </View>
     </View>
@@ -84,49 +84,30 @@ export function UnscheduledArtistCard({ artist }: { artist: UnscheduledArtist })
 
 const styles = StyleSheet.create({
   notice: {
+    ...continuous,
+    ...elevation.card,
     backgroundColor: colors.surface,
-    borderColor: colors.borderCard,
     borderRadius: radii.card,
-    borderWidth: 1,
     gap: spacing.xs,
     padding: spacing.xl,
   },
-  noticeTitle: {
-    color: colors.textPrimary,
-    fontFamily: HEADING_FONT,
-    fontStyle: 'italic',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  noticeBody: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  noticeTitle: { ...textStyles.title3, color: colors.textPrimary },
+  noticeBody: { ...textStyles.subheadline, color: colors.textSecondary },
   noticeAction: { alignItems: 'flex-start', marginTop: spacing.sm },
-  sectionTitle: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginTop: spacing.sm,
-    textTransform: 'uppercase',
-  },
-  footnote: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, paddingHorizontal: spacing.xs },
+  // Section header: footnote 600 in textSecondary, sentence case (docs/design-system.md).
+  sectionTitle: { ...textStyles.footnote, color: colors.textSecondary, fontWeight: '600', marginTop: spacing.sm },
+  footnote: { ...textStyles.footnote, color: colors.textSecondary, paddingHorizontal: spacing.xs },
   card: {
+    ...continuous,
+    ...elevation.card,
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderColor: colors.borderCard,
     borderRadius: radii.card,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.lg,
     padding: spacing.lg,
   },
-  cardText: { flex: 1, gap: 4 },
-  artistName: {
-    color: colors.textPrimary,
-    fontFamily: HEADING_FONT,
-    fontStyle: 'italic',
-    fontSize: 19,
-    fontWeight: '700',
-    lineHeight: 23,
-  },
-  meta: { color: colors.textSecondary, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  cardText: { flex: 1, gap: spacing.xxs },
+  artistName: { ...textStyles.title3, color: colors.textPrimary },
+  meta: { ...textStyles.caption1, color: colors.textSecondary, fontWeight: '600' },
 });

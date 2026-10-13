@@ -1,11 +1,24 @@
-import { colors, radii, SecondaryButton, showToast, spacing } from '@festival/ui';
+import {
+  colors,
+  continuous,
+  elevation,
+  layout,
+  radii,
+  SecondaryButton,
+  showToast,
+  spacing,
+  tabularNums,
+  textStyles,
+} from '@festival/ui';
 import React from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { formatAgo, useNow } from '@/src/hooks/use-now';
 import { STOP_NOT_CONFIRMED_MESSAGE, useLocationSharing } from '@/src/location/LocationSharingProvider';
 
 import { LocationSharingSheet } from './LocationSharingSheet';
+
+const ACCESS_OFF_TITLE = 'Location access is off';
 
 function formatRemaining(expiresAt: number, now: number): string {
   const minutes = Math.max(0, Math.round((expiresAt - now) / 60_000));
@@ -42,7 +55,7 @@ export function LocationSharingCard({
   let detail = 'Let this crew see where you are on the map while Festie is open.';
   if (isThisGroup) {
     if (sharing.status === 'permission_denied') {
-      title = 'Location access is off';
+      title = ACCESS_OFF_TITLE;
       detail = sharing.canAskAgain
         ? "Festie can't read your location, so your crew can't see you. To keep sharing, turn location back on — iOS will ask you next."
         : "Festie can't read your location, so your crew can't see you. Turn on location access in Settings.";
@@ -59,6 +72,19 @@ export function LocationSharingCard({
   } else if (otherGroupName) {
     detail = `You're sharing with ${otherGroupName}. Starting here stops that.`;
   }
+
+  // iOS has no live regions (Android's is on the title below), so VoiceOver hears status changes here.
+  // Starting and expiry already speak through toasts (the sheet's and the provider's; a second announcement
+  // would cut them off), stopping is the user's own Stop tap, and `paused` only happens in the background,
+  // so this covers losing location access and getting it back. The first render stays quiet.
+  const previousTitle = React.useRef(title);
+  React.useEffect(() => {
+    const previous = previousTitle.current;
+    previousTitle.current = title;
+    if (Platform.OS === 'ios' && previous !== title && (title === ACCESS_OFF_TITLE || previous === ACCESS_OFF_TITLE)) {
+      AccessibilityInfo.announceForAccessibility(title);
+    }
+  }, [title]);
 
   const stop = React.useCallback(async () => {
     setStopping(true);
@@ -84,12 +110,17 @@ export function LocationSharingCard({
   return (
     <View style={styles.card}>
       <View style={styles.row}>
-        <View style={[styles.dot, isThisGroup && sharing.status === 'sharing' ? styles.dotOn : isThisGroup ? styles.dotWarn : null]} />
+        {/* Decorative: the title says the same. The slot is one title line tall, so the dot centres on it. */}
+        <View style={styles.dotSlot}>
+          <View style={[styles.dot, isThisGroup && sharing.status === 'sharing' ? styles.dotOn : isThisGroup ? styles.dotWarn : null]} />
+        </View>
         <View style={styles.text}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.detail} accessibilityLiveRegion="polite">
-            {detail}
+          {/* The title changes only with the sharing state, so TalkBack announces real changes (VoiceOver is
+              handled above); the detail line ticks every 30 seconds and is not a live region. */}
+          <Text style={styles.title} accessibilityRole="header" accessibilityLiveRegion="polite">
+            {title}
           </Text>
+          <Text style={styles.detail}>{detail}</Text>
         </View>
       </View>
       {isThisGroup ? (
@@ -118,26 +149,27 @@ export function LocationSharingCard({
   );
 }
 
+/** Diameter of the status dot. */
+const DOT_SIZE = spacing.ms;
+
 const styles = StyleSheet.create({
   card: {
+    ...continuous,
+    ...elevation.card,
     backgroundColor: colors.surface,
     borderColor: colors.borderCard,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: spacing.md,
-    padding: spacing.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    padding: layout.cardPadding,
   },
   row: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.md },
-  dot: { backgroundColor: 'rgba(44, 51, 39, 0.2)', borderRadius: 6, height: 12, marginTop: 5, width: 12 },
-  dotOn: { backgroundColor: '#3E9B57' },
-  dotWarn: { backgroundColor: '#D99A00' },
-  text: { flex: 1, gap: 4 },
-  title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
-  detail: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
+  dotSlot: { height: textStyles.headline.lineHeight, justifyContent: 'center' },
+  dot: { backgroundColor: colors.textTertiary, borderRadius: radii.pill, height: DOT_SIZE, width: DOT_SIZE },
+  dotOn: { backgroundColor: colors.successText },
+  dotWarn: { backgroundColor: colors.warningText },
+  text: { flex: 1, gap: spacing.xs },
+  title: { ...textStyles.headline, color: colors.textPrimary },
+  detail: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary },
   actions: { gap: spacing.sm },
 });

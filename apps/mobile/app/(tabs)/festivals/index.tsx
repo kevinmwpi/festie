@@ -2,20 +2,27 @@ import { getLocalFestivals, refreshFestivalCatalog, type Festival } from '@festi
 import {
   Badge,
   colors,
+  continuous,
   deriveAccentColors,
+  elevation,
   EmptyState,
+  iconRadius,
   IconButton,
   layout,
+  motion,
+  PressableScale,
   radii,
   SecondaryButton,
   spacing,
+  tabularNums,
   TextLink,
+  textStyles,
   useOfflineStatus,
 } from '@festival/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Avatar } from '@/src/components/Avatar';
 import { FestivalDisclaimer } from '@/src/components/FestivalNotes';
@@ -32,12 +39,27 @@ import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { ensureActiveFestival, useAppStore } from '@/src/state/app-store';
 import { hasFestivalEnded, localTodayKey, orderFestivalsForList } from '@/src/state/default-festival';
 
+/** Edge of the festival's accent swatch tile. */
+const SWATCH_SIZE = 64;
+/** Edge of the follow toggle, white ring included. */
+const TOGGLE_SIZE = 48;
+/** Width of the toggle's white cut-out ring. */
+const TOGGLE_RING = 4;
+/** Card outline. 2pt in both states, so the selected (ink) outline does not shift the layout. */
+const CARD_BORDER = 2;
+/**
+ * From the xxxLarge text size up (iOS `fontScale` 1.35 and the accessibility sizes) the swatch moves
+ * above the name: beside the tile and the toggle the name would get only a few characters per line.
+ */
+const STACK_FONT_SCALE = 1.3;
+
 function FestivalCard({
   festival,
   isFollowing,
   isActive,
   ended,
   busy,
+  stacked,
   onToggle,
   onSelect,
 }: {
@@ -46,71 +68,65 @@ function FestivalCard({
   isActive: boolean;
   ended: boolean;
   busy: boolean;
+  stacked: boolean;
   onToggle: () => void;
   onSelect: () => void;
 }) {
   const accent = deriveAccentColors(festival.accent_color ?? colors.primary);
   const dates = formatFestivalDateRange(festival);
   const meta = [festival.venue_name, dates].filter(Boolean).join(' • ');
-  // The festival's licensed photo (credited under Settings → Photo credits) fills the icon box; the
-  // flag stays for festivals without one and whenever the photo cannot load (e.g. offline, never cached).
+  // The festival's licensed photo (credited under Settings → Photo credits) fills the swatch; the flag
+  // stays for festivals without one and whenever the photo cannot load (e.g. offline, never cached).
   const image = useImageFallback(festival.image_url);
 
-  const [pressed, setPressed] = React.useState(false);
-
   // The card body and the follow toggle are sibling buttons: a toggle nested inside an accessible
-  // Pressable is one VoiceOver element with it and could never be focused or activated.
+  // Pressable is one VoiceOver element with it and could never be focused or activated. The body is the
+  // visible card (wash, outline and padding), so the card scales as one when pressed. The toggle sits in
+  // a sibling slot over the card's trailing edge. The slot is a plain View, not a button: it catches taps
+  // in the strip around the toggle (the gap before it, the trailing padding, above and below it), so a tap
+  // that misses the toggle does nothing, as before, and does not open the festival.
   return (
-    <View
-      style={[
-        styles.card,
-        // Card background = soft tint of the festival accent, as in the reference.
-        { backgroundColor: accent.bgTint },
-        isActive && styles.cardActive,
-        pressed && { transform: [{ scale: 0.98 }] },
-      ]}
-    >
-      <View style={styles.cardInner}>
-        <Pressable
-          onPress={onSelect}
-          onPressIn={() => setPressed(true)}
-          onPressOut={() => setPressed(false)}
-          accessibilityRole="button"
-          accessibilityLabel={`${festival.name}${festival.is_demo ? ', sample festival' : ''}${ended ? ', ended' : ''}, ${meta}${isFollowing ? ', following' : ''}`}
-          accessibilityHint="Opens this festival's lineup"
-          accessibilityState={{ selected: isActive }}
-          style={styles.cardBody}
-        >
-          <View style={[styles.iconBox, { backgroundColor: accent.solid }]}>
-            {image.showImage && festival.image_url ? (
-              <RemoteImage uri={festival.image_url} onError={image.onError} style={styles.iconImage} />
-            ) : (
-              <Ionicons name="flag" size={28} color={colors.textPrimary} />
-            )}
-          </View>
+    <View>
+      <PressableScale
+        onPress={onSelect}
+        accessibilityRole="button"
+        accessibilityLabel={`${festival.name}${festival.is_demo ? ', sample festival' : ''}${ended ? ', ended' : ''}, ${meta}${isFollowing ? ', following' : ''}`}
+        accessibilityHint="Opens this festival's lineup"
+        accessibilityState={{ selected: isActive }}
+        style={[
+          styles.card,
+          stacked ? styles.cardStacked : styles.cardRow,
+          // Card wash = soft tint of the festival's own accent. It is translucent, so it carries no shadow.
+          { backgroundColor: accent.bgTint },
+          isActive && styles.cardActive,
+        ]}
+      >
+        <View style={[styles.iconBox, { backgroundColor: accent.solid }]}>
+          {image.showImage && festival.image_url ? (
+            <RemoteImage uri={festival.image_url} onError={image.onError} style={styles.iconImage} />
+          ) : (
+            <Ionicons name="flag" size={28} color={colors.textPrimary} />
+          )}
+        </View>
 
-          <View style={styles.cardText}>
-            {festival.is_demo ? <Badge label="Sample" tone="sample" /> : null}
-            {ended && !festival.is_demo ? <Badge label="Ended" tone="neutral" /> : null}
-            <Text style={styles.festivalName} numberOfLines={2}>
-              {festival.name}
-            </Text>
-            <Text style={styles.festivalMeta}>{meta.toUpperCase()}</Text>
-          </View>
-        </Pressable>
+        <View style={[styles.cardText, stacked ? styles.cardTextStacked : styles.cardTextRow]}>
+          {festival.is_demo ? <Badge label="Sample" tone="sample" /> : null}
+          {ended && !festival.is_demo ? <Badge label="Ended" tone="neutral" /> : null}
+          <Text style={styles.festivalName}>{festival.name}</Text>
+          <Text style={styles.festivalMeta}>{meta}</Text>
+        </View>
+      </PressableScale>
 
-        <Pressable
+      <View style={[styles.toggleSlot, stacked ? styles.toggleSlotStacked : styles.toggleSlotRow]}>
+        <PressableScale
           onPress={onToggle}
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel={isFollowing ? `Unfollow ${festival.name}` : `Follow ${festival.name}`}
           accessibilityState={{ selected: isFollowing, busy }}
           hitSlop={4}
-          style={({ pressed: togglePressed }) => [
-            styles.toggleButton,
-            isFollowing ? styles.toggleFollowing : styles.toggleNotFollowing,
-            togglePressed && { transform: [{ scale: 0.88 }] },
-          ]}
+          pressedScale={motion.pressedScaleSmall}
+          style={[styles.toggleButton, isFollowing ? styles.toggleFollowing : styles.toggleNotFollowing]}
         >
           {busy ? (
             <ActivityIndicator size="small" color={colors.textPrimary} />
@@ -119,7 +135,7 @@ function FestivalCard({
           ) : (
             <Ionicons name="add" size={20} color={colors.textPrimary} />
           )}
-        </Pressable>
+        </PressableScale>
       </View>
     </View>
   );
@@ -127,6 +143,7 @@ function FestivalCard({
 
 export default function FestivalsScreen() {
   const tabBarClearance = useTabBarClearance();
+  const stackCards = useWindowDimensions().fontScale > STACK_FONT_SCALE;
   const isOffline = useOfflineStatus();
   const profile = useCurrentProfile().data;
   const activeFestivalId = useAppStore((s) => s.activeFestivalId);
@@ -196,7 +213,7 @@ export default function FestivalsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: screenBg }]}>
       <ScreenHeader
-        crumbs={['Explore Festivals', activeName]}
+        crumbs={['Explore festivals', activeName]}
         right={
           <IconButton
             icon={
@@ -214,8 +231,10 @@ export default function FestivalsScreen() {
       />
 
       <View style={styles.countBar}>
-        <Text style={styles.countLabel}>All Events</Text>
-        <Text style={styles.countFollowing}>{followingIds.size} Following</Text>
+        <Text style={styles.countLabel} accessibilityRole="header">
+          All events
+        </Text>
+        <Text style={styles.countFollowing}>{followingIds.size} following</Text>
       </View>
 
       <ScrollView
@@ -239,6 +258,7 @@ export default function FestivalsScreen() {
             isActive={festival.id === activeFestivalId}
             ended={hasFestivalEnded(festival, today)}
             busy={busyId === festival.id}
+            stacked={stackCards}
             onToggle={() => void handleToggle(festival)}
             onSelect={() => handleSelect(festival)}
           />
@@ -263,122 +283,108 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   countBar: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: layout.screenGutter,
     paddingVertical: spacing.sm,
   },
-  countLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    color: colors.textSecondary,
-  },
-  countFollowing: {
-    color: colors.textPrimary,
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
+  countLabel: { ...textStyles.footnote, color: colors.textSecondary, fontWeight: '600' },
+  countFollowing: { ...textStyles.footnote, ...tabularNums, color: colors.textPrimary, fontWeight: '600' },
 
   scroll: { flex: 1 },
   scrollContent: {
-    paddingHorizontal: spacing.lg,
     gap: spacing.md,
+    paddingHorizontal: layout.screenGutter,
   },
 
-  /* Festival card — bg = festival tint, rounded-[40px] */
+  /*
+   * Festival card: the body button is the card, washed in the festival's accent. In the row layout its
+   * trailing padding is reserved for the follow toggle and is covered by the toggle slot below.
+   */
   card: {
+    ...continuous,
+    borderColor: colors.borderCard,
     borderRadius: radii.card,
-    borderWidth: 2,
-    borderColor: 'rgba(0,0,0,0.05)',
-    // Padding lives on the body button (and the toggle's margin) so the whole card stays tappable.
-    paddingRight: spacing.xl,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    borderWidth: CARD_BORDER,
+    padding: layout.cardPadding,
   },
-  cardActive: {
-    borderColor: 'rgba(0,0,0,0.15)',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  cardInner: {
-    flexDirection: 'row',
+  cardRow: {
     alignItems: 'center',
-    gap: spacing.md,
-  },
-  cardBody: {
-    alignItems: 'center',
-    flex: 1,
     flexDirection: 'row',
     gap: spacing.md,
-    paddingLeft: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingRight: layout.cardPadding + TOGGLE_SIZE + spacing.md,
   },
+  cardStacked: { alignItems: 'flex-start', gap: spacing.ms },
+  // The current festival: an ink outline (≥ 3:1 on every wash), the colour of the app's primary selection.
+  cardActive: { borderColor: colors.textPrimary },
   iconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 24,
+    ...continuous,
     alignItems: 'center',
+    borderRadius: iconRadius(SWATCH_SIZE),
+    height: SWATCH_SIZE,
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    // Clips the festival photo to the tile's corners. Safe here: the swatch carries no shadow.
+    overflow: 'hidden',
+    width: SWATCH_SIZE,
   },
-  // Fills the icon box; its own radius keeps the box's shadow (overflow: hidden would clip it on iOS).
-  iconImage: { ...StyleSheet.absoluteFillObject, borderRadius: 24 },
-  cardText: { flex: 1, gap: 4 },
-  festivalName: {
-    color: colors.textPrimary,
-    fontFamily: 'Georgia',
-    fontStyle: 'italic',
-    fontSize: 20,
-    fontWeight: '700',
-    lineHeight: 24,
+  // The festival photo fills the swatch; the accent shows behind it while it loads.
+  iconImage: { ...StyleSheet.absoluteFillObject },
+  cardText: { gap: spacing.xs },
+  cardTextRow: { flex: 1 },
+  cardTextStacked: { alignSelf: 'stretch' },
+  festivalName: { ...textStyles.title2, color: colors.textPrimary },
+  festivalMeta: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary },
+
+  /*
+   * Follow toggle: a 48pt soft square with a white cut-out ring, over the card's trailing edge. Its slot
+   * is a non-pressable strip from the card's trailing edge to 16pt before the toggle: taps there land on
+   * the slot, not on the card body beneath it.
+   */
+  toggleSlot: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: CARD_BORDER + layout.cardPadding,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: CARD_BORDER + layout.cardPadding + TOGGLE_SIZE + spacing.md,
   },
-  festivalMeta: {
-    color: colors.textSecondary,
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1.5,
+  // Row cards: the full height of the card, the card's trailing padding (see `cardRow`).
+  toggleSlotRow: { bottom: 0 },
+  // Stacked cards: only the swatch row, with the toggle level with the swatch; the name below stays tappable.
+  toggleSlotStacked: {
+    height: CARD_BORDER + layout.cardPadding + SWATCH_SIZE,
+    paddingTop: CARD_BORDER + layout.cardPadding,
   },
-  /* Follow toggle — 48×48, white border */
   toggleButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    ...continuous,
+    ...elevation.raised,
     alignItems: 'center',
+    borderColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: TOGGLE_RING,
+    height: TOGGLE_SIZE,
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    width: TOGGLE_SIZE,
   },
   toggleFollowing: { backgroundColor: colors.success },
-  toggleNotFollowing: { backgroundColor: '#FFFFFF' },
+  toggleNotFollowing: { backgroundColor: colors.surface },
 
-  /* "Don't see your festival? Suggest it" under the list */
+  /*
+   * "Don't see your festival? Suggest it" under the list. The link's 12pt hit slop above and below needs
+   * room inside the row (a slop never reaches past its parent), so the row pads to the 44pt target.
+   */
   suggestRow: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
     justifyContent: 'center',
-    minHeight: layout.minTouchTarget,
     paddingHorizontal: spacing.sm,
-    paddingTop: spacing.xs,
+    paddingVertical: spacing.ms,
   },
-  suggestText: { color: colors.textSecondary, fontSize: 14 },
+  // Same role as the link's label (`subheadline`), so the phrase sits on one baseline.
+  suggestText: { ...textStyles.subheadline, color: colors.textSecondary },
 });

@@ -4,17 +4,24 @@ import {
   Badge,
   Chip,
   colors,
+  continuous,
   deriveAccentColors,
+  elevation,
   EmptyState,
+  iconRadius,
   layout,
+  motion,
+  PressableScale,
   radii,
   spacing,
+  tabularNums,
+  textStyles,
   useOfflineStatus,
 } from '@festival/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { ArtistAvatar } from '@/src/components/ArtistAvatar';
 import { FestivalDisclaimer, TimeZoneHint } from '@/src/components/FestivalNotes';
@@ -40,6 +47,19 @@ const ALL = 'all';
 const NO_ROWS: LineupRow[] = [];
 const NO_ARTISTS: UnscheduledArtist[] = [];
 
+/** Edge of the artist tile (photo or monogram) beside the text, and above it when the text is large. */
+const MONOGRAM_SIZE = 112;
+const MONOGRAM_SIZE_STACKED = 80;
+/** The add button: a 44pt target with a white cut-out ring, overhanging the tile's corner. */
+const ADD_BUTTON_SIZE = layout.minTouchTarget;
+const ADD_BUTTON_RING = 4;
+const ADD_BUTTON_OVERHANG = spacing.sm;
+/**
+ * From the xxxLarge text size up (iOS `fontScale` 1.35 and the accessibility sizes) the tile moves
+ * above the text: beside the 112pt tile the artist name would get only a few characters per line.
+ */
+const STACK_FONT_SCALE = 1.3;
+
 /* ─── Artist Card ─────────────────────────────────────────── */
 
 function ArtistCard({
@@ -47,77 +67,116 @@ function ArtistCard({
   clock,
   overlapsPick,
   busy,
+  stacked,
   onToggle,
 }: {
   row: LineupRow;
   clock: FestivalClock;
   overlapsPick: boolean;
   busy: boolean;
+  stacked: boolean;
   onToggle: () => void;
 }) {
   const isSelected = Boolean(row.selection_id);
   const timeRange = clock.range(row.start_time, row.end_time);
   const day = clock.day(row.start_time);
+  const showConflict = Boolean(row.is_conflicting);
+  const showOverlap = !isSelected && overlapsPick;
+  const showPending = isSelected && row.selection_pending === 1;
+  // Schedule changes (moved / cancelled sets): a chip, a detail line, and a struck-through name and time.
   const change = describeSetChange(row, clock.timeZone);
   const cancelled = change?.status === 'cancelled';
   // A cancelled set can still be removed from the schedule, but not added.
   const canToggle = isSelected || !cancelled;
   const changeSuffix = change ? `. ${change.accessibilityLabel}` : '';
 
+  // VoiceOver reads the set as one element (who, where, when, any schedule change, status) and then
+  // reaches its add button.
+  const summary = [
+    row.artist_name,
+    row.stage_name,
+    `${day}, ${timeRange}`,
+    change?.accessibilityLabel ?? null,
+    showConflict ? 'Conflict' : null,
+    showOverlap ? 'Overlaps a pick' : null,
+    showPending ? 'Waiting to sync' : null,
+    isSelected ? 'In your schedule' : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  const monogramSize = stacked ? MONOGRAM_SIZE_STACKED : MONOGRAM_SIZE;
+  // The tile is the first child, at the card content's origin in both layouts: this puts the add
+  // button on its bottom-right corner, overhanging it.
+  const addButtonOffset = monogramSize - ADD_BUTTON_SIZE + ADD_BUTTON_OVERHANG;
+
+  // Screen reader order: the set, then its add button. The summary element wraps the (hidden) tile as
+  // well as the text, so its frame starts at the content's top-left corner, above and before the button.
+  // VoiceOver orders elements by position, so a summary that started below the button (the stacked
+  // layout) would be read after it. The button is rendered after the summary for TalkBack, which follows
+  // the view order. The button stays a sibling: inside an accessible View it could not be focused.
   return (
     <View style={styles.artistCard}>
-      <View style={styles.cardInner}>
-        <View style={styles.imageWrap}>
-          <ArtistAvatar name={row.artist_name} colorKey={row.artist_id} imageUrl={row.artist_image_url} />
-          {canToggle ? (
-            <Pressable
-              onPress={onToggle}
-              disabled={busy}
-              accessibilityRole="button"
-              accessibilityLabel={`${isSelected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}${changeSuffix}`}
-              accessibilityState={{ selected: isSelected, busy }}
-              hitSlop={4}
-              style={({ pressed }) => [
-                styles.addButton,
-                isSelected ? styles.addButtonSelected : styles.addButtonDefault,
-                pressed && { transform: [{ scale: 0.88 }] },
-              ]}
-            >
-              {busy ? (
-                <ActivityIndicator size="small" color={colors.textPrimary} />
-              ) : (
-                <Ionicons name={isSelected ? 'checkmark' : 'add'} size={18} color={colors.textPrimary} />
-              )}
-            </Pressable>
-          ) : null}
+      {/* Positioning box for the add button: its origin is the summary's, so the tile's. */}
+      <View>
+        <View style={stacked ? styles.summaryStacked : styles.summaryRow} accessible accessibilityLabel={summary}>
+          {/* The licensed photo when there is one, else the monogram; both with the app-icon corner. */}
+          <ArtistAvatar
+            name={row.artist_name}
+            colorKey={row.artist_id}
+            imageUrl={row.artist_image_url}
+            size={monogramSize}
+            radius={iconRadius(monogramSize)}
+          />
+
+          <View style={[styles.artistContent, !stacked && styles.artistContentRow]}>
+            <View style={styles.stagePill}>
+              <Text style={styles.stagePillText} numberOfLines={2}>
+                {row.stage_name}
+              </Text>
+            </View>
+
+            <View style={styles.nameRow}>
+              <Text style={[styles.artistName, cancelled && cancelledTextStyle]}>{row.artist_name}</Text>
+              {isSelected ? (
+                <Ionicons name="heart" size={20} color={colors.textPrimary} accessibilityLabel="In your schedule" style={styles.heart} />
+              ) : null}
+            </View>
+
+            <View style={styles.badgeRow}>
+              <SetChangeBadge change={change} />
+              {showConflict ? <Badge label="Conflict" tone="warning" /> : null}
+              {showOverlap ? <Badge label="Overlaps a pick" tone="neutral" /> : null}
+              {showPending ? <Badge label="Waiting to sync" tone="neutral" /> : null}
+            </View>
+
+            <Text style={[styles.artistTime, cancelled && cancelledTextStyle]}>{`${day} · ${timeRange}`}</Text>
+            <SetChangeDetail change={change} />
+          </View>
         </View>
 
-        <View style={styles.artistContent}>
-          <View style={styles.stagePill}>
-            <Text style={styles.stagePillText} numberOfLines={1}>
-              {row.stage_name}
-            </Text>
-          </View>
-
-          <View style={styles.nameRow}>
-            <Text style={[styles.artistName, cancelled && cancelledTextStyle]} numberOfLines={2}>
-              {row.artist_name}
-            </Text>
-            {isSelected ? (
-              <Ionicons name="heart" size={20} color={colors.textPrimary} accessibilityLabel="In your schedule" />
-            ) : null}
-          </View>
-
-          <View style={styles.badgeRow}>
-            <SetChangeBadge change={change} />
-            {row.is_conflicting ? <Badge label="Conflict" tone="warning" /> : null}
-            {!isSelected && overlapsPick ? <Badge label="Overlaps a pick" tone="neutral" /> : null}
-            {isSelected && row.selection_pending === 1 ? <Badge label="Waiting to sync" tone="neutral" /> : null}
-          </View>
-
-          <Text style={[styles.artistTime, cancelled && cancelledTextStyle]}>{`${day} · ${timeRange}`.toUpperCase()}</Text>
-          <SetChangeDetail change={change} />
-        </View>
+        {canToggle ? (
+          <PressableScale
+            onPress={onToggle}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={`${isSelected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}${changeSuffix}`}
+            accessibilityState={{ selected: isSelected, busy }}
+            hitSlop={4}
+            pressedScale={motion.pressedScaleSmall}
+            style={[
+              styles.addButton,
+              { left: addButtonOffset, top: addButtonOffset },
+              isSelected ? styles.addButtonSelected : styles.addButtonDefault,
+            ]}
+          >
+            {busy ? (
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+            ) : (
+              <Ionicons name={isSelected ? 'checkmark' : 'add'} size={18} color={colors.textPrimary} />
+            )}
+          </PressableScale>
+        ) : null}
       </View>
     </View>
   );
@@ -127,6 +186,7 @@ function ArtistCard({
 
 export default function LineupScreen() {
   const tabBarClearance = useTabBarClearance();
+  const stackCards = useWindowDimensions().fontScale > STACK_FONT_SCALE;
   const festivalId = useAppStore((s) => s.activeFestivalId);
   const activeFestivalAccent = useAppStore((s) => s.activeFestivalAccent);
   const screenBg = deriveAccentColors(activeFestivalAccent).bgTint;
@@ -200,7 +260,7 @@ export default function LineupScreen() {
     await Promise.all([bundle.refetch(), lineup.refetch()]);
   }, [bundle, lineup]);
 
-  const header = <ScreenHeader crumbs={['Browse Lineup', festival?.name]} />;
+  const header = <ScreenHeader crumbs={['Browse lineup', festival?.name]} />;
 
   if (!festivalId) {
     return (
@@ -229,6 +289,7 @@ export default function LineupScreen() {
     <View style={[styles.container, { backgroundColor: screenBg }]}>
       {header}
 
+      {/* Day and stage filters only make sense once at least one set has a time. */}
       {festival && rows.length > 0 ? (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.filterRow}>
@@ -237,16 +298,14 @@ export default function LineupScreen() {
               const label = day === ALL ? 'All' : formatWeekdayDayLabel(day, clock.timeZone);
               const a11y = day === ALL ? 'All days' : clock.date(day, { weekday: 'long', month: 'long', day: 'numeric' });
               return (
-                <Pressable
+                <Chip
                   key={day}
-                  onPress={() => setDayFilter(day)}
-                  accessibilityRole="button"
+                  variant="ink"
+                  label={label}
                   accessibilityLabel={a11y}
-                  accessibilityState={{ selected: active }}
-                  style={[styles.dayPill, active && styles.dayPillActive]}
-                >
-                  <Text style={[styles.dayPillLabel, active && styles.dayPillLabelActive]}>{label}</Text>
-                </Pressable>
+                  active={active}
+                  onPress={() => setDayFilter(day)}
+                />
               );
             })}
           </ScrollView>
@@ -256,6 +315,7 @@ export default function LineupScreen() {
               {[ALL, ...stages].map((stage) => (
                 <Chip
                   key={stage}
+                  accentColor={activeFestivalAccent}
                   active={stageFilter === stage}
                   onPress={() => setStageFilter(stage)}
                   label={stage === ALL ? 'All stages' : stage}
@@ -316,6 +376,7 @@ export default function LineupScreen() {
                       clock={clock}
                       overlapsPick={overlapIds.has(row.id)}
                       busy={busyIds.has(row.id)}
+                      stacked={stackCards}
                       onToggle={() => void toggle(row)}
                     />
                   ))
@@ -348,113 +409,68 @@ const styles = StyleSheet.create({
   // a share of the free height away from the list below.
   chipScroller: { flexGrow: 0 },
   container: { flex: 1 },
-  statePad: { padding: spacing.lg },
+  statePad: { padding: layout.screenGutter },
 
-  /* Day pills — dark = active, white = inactive */
+  /*
+   * Filter rows: the day picker uses ink chips (the screen's primary selector), the stage row accent
+   * chips. The vertical padding keeps the chips' 44pt hit slop inside the horizontal ScrollView.
+   */
   filterRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  dayPill: {
-    borderRadius: radii.pill,
-    justifyContent: 'center',
-    minHeight: layout.minTouchTarget,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  dayPillActive: {
-    backgroundColor: colors.textPrimary,
-  },
-  dayPillLabel: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  dayPillLabelActive: {
-    color: '#FFFFFF',
+    paddingHorizontal: layout.screenGutter,
+    paddingVertical: spacing.xs,
   },
 
   scroll: { flex: 1 },
-  scrollContent: { padding: spacing.lg, gap: spacing.md },
+  scrollContent: { gap: spacing.md, paddingHorizontal: layout.screenGutter, paddingTop: spacing.lg },
 
-  /* Artist card — white, 40px radius */
+  /* Artist card: white, `card` radius, the tile beside (or above) the set's details. */
   artistCard: {
+    ...continuous,
+    ...elevation.card,
     backgroundColor: colors.surface,
+    borderColor: colors.borderCard,
     borderRadius: radii.card,
-    padding: spacing.xl,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    padding: layout.cardPadding,
   },
-  cardInner: { flexDirection: 'row', gap: spacing.xl },
+  summaryRow: { flexDirection: 'row', gap: spacing.xl },
+  summaryStacked: { gap: spacing.md },
 
-  imageWrap: { position: 'relative', flexShrink: 0 },
-  /* Add button — 44×44, white border, floats on the tile corner */
+  /* Add button: a 44pt soft square with a white cut-out ring, on the tile's corner. */
   addButton: {
-    position: 'absolute',
-    bottom: -8,
-    right: -8,
-    width: 44,
-    height: 44,
-    borderRadius: 16,
+    ...continuous,
+    ...elevation.raised,
     alignItems: 'center',
+    borderColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: ADD_BUTTON_RING,
+    height: ADD_BUTTON_SIZE,
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    position: 'absolute',
+    width: ADD_BUTTON_SIZE,
   },
   addButtonDefault: { backgroundColor: colors.primary },
   addButtonSelected: { backgroundColor: colors.success },
 
-  artistContent: { flex: 1, gap: 4, justifyContent: 'center' },
+  artistContent: { gap: spacing.xs, justifyContent: 'center' },
+  artistContentRow: { flex: 1 },
+  /* Stage pill: the stage name as entered, in link blue on the pale-blue tag fill. */
   stagePill: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F0F4FF',
+    backgroundColor: colors.inputBg,
     borderRadius: radii.pill,
+    marginBottom: spacing.xs,
     maxWidth: '100%',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    marginBottom: 4,
+    paddingHorizontal: spacing.ms,
+    paddingVertical: spacing.xs,
   },
-  stagePillText: {
-    color: colors.link,
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
-  nameRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
-  artistName: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontFamily: 'Georgia',
-    fontStyle: 'italic',
-    fontSize: 22,
-    fontWeight: '700',
-    lineHeight: 26,
-  },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  artistTime: {
-    color: colors.textSecondary,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-  },
+  stagePillText: { ...textStyles.footnote, color: colors.link, fontWeight: '600' },
+  nameRow: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.xs },
+  artistName: { ...textStyles.title3, color: colors.textPrimary, flex: 1 },
+  // Optical: centres the 20pt heart on the name's first line (title3 line height 25).
+  heart: { marginTop: spacing.xxs },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  artistTime: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary, fontWeight: '600' },
 });

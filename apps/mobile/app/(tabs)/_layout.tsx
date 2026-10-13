@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { configureReminderNotifications } from '@festival/notification-utils';
-import { colors } from '@festival/ui';
+import { colors, elevation, layout, radii, spacing, textStyles } from '@festival/ui';
 import { PlatformPressable } from '@react-navigation/elements';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
@@ -15,7 +15,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /**
  * Unfocused tab ink. `colors.textSecondary` (70 %) is tuned for white and tinted surfaces; on the solid
- * accent fill its 9 px labels drop to ~3.6:1. At 85 % the labels stay ≥ 4.9:1 on every accent
+ * accent fill its small labels drop to ~3.6:1. At 85 % the labels stay ≥ 4.9:1 on every accent
  * `accessibleAccent` can produce (§5.8) while still reading lighter than the focused tab.
  */
 const UNFOCUSED_TAB_INK = 'rgba(44, 51, 39, 0.85)';
@@ -24,7 +24,7 @@ const UNFOCUSED_TAB_INK = 'rgba(44, 51, 39, 0.85)';
 const TAB_BAR_HEIGHT = 80;
 /**
  * Box React Navigation gives each tab icon. Its default (31×28) is sized for a bare glyph; ours stacks a
- * 26 pt glyph, a gap and a label (≈ 42 pt), which would overflow it and the pill.
+ * 26 pt glyph, a gap and an 11 pt label (≈ 43 pt), which would overflow it and the pill.
  */
 const TAB_ICON_BOX_HEIGHT = 52;
 /** Space between the floating pill and the home indicator area below it. */
@@ -52,8 +52,8 @@ function TabButton(props: BottomTabBarButtonProps) {
   return (
     <PlatformPressable
       {...props}
-      // A borderless ripple spills past the pill's rounded ends; keep it inside the tab.
-      android_ripple={{ color: 'rgba(44, 51, 39, 0.10)', borderless: false }}
+      // A borderless ripple spills past the pill's rounded ends; keep it inside the tab, in neutral ink.
+      android_ripple={{ color: colors.fillStrong, borderless: false }}
       style={[props.style, styles.tabButton]}
     />
   );
@@ -63,11 +63,14 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const cfg = TAB_CONFIG[name];
   if (!cfg) return null;
   // Dark ink on the pastel accent keeps ≥ 4.5:1; unfocused tabs read as lighter ink, not lower opacity.
+  // The focused tab is marked by its filled icon and heavier label, not by a size jump.
   const tint = focused ? colors.textPrimary : UNFOCUSED_TAB_INK;
   return (
     <View style={styles.iconContainer}>
       <Ionicons name={focused ? cfg.iconFocused : cfg.icon} size={26} color={tint} />
-      <Text style={[styles.iconLabel, { color: tint }, focused && styles.iconLabelFocused]} maxFontSizeMultiplier={1.2}>
+      {/* Fixed size like iOS tab bars: the pill has a fixed height (labels are short and the Large Content
+          Viewer is the system's answer for tab bars). */}
+      <Text style={[styles.iconLabel, { color: tint }, focused && styles.iconLabelFocused]} allowFontScaling={false}>
         {cfg.label}
       </Text>
     </View>
@@ -90,27 +93,28 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
+        // Centre each tab's icon stack in the full height of the pill (see TabButton).
         tabBarButton: TabButton,
         tabBarIconStyle: { width: '100%', height: TAB_ICON_BOX_HEIGHT },
         tabBarStyle: {
           backgroundColor: accent,
           borderTopWidth: 0,
-          borderRadius: 32,
+          borderRadius: radii.pill,
           height: TAB_BAR_HEIGHT,
           paddingTop: 0,
           paddingBottom: 0,
-          marginHorizontal: 20,
+          marginHorizontal: layout.screenGutter,
           marginBottom: TAB_BAR_GAP + insets.bottom,
           position: 'absolute',
-          shadowColor: colors.textPrimary,
-          shadowOpacity: 0.14,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 6 },
-          elevation: 8,
+          borderCurve: 'continuous',
+          ...elevation.floating,
+          // Android only: clip the tab ripple to the pill's rounded ends. Android draws `elevation` from
+          // the view's outline, so the shadow survives the clip; iOS would clip its layer shadow, so the
+          // pill stays unclipped there (the ripple is Android-only anyway).
           overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
-          // subtle white border as in reference: border border-white/20
+          // Subtle white edge, as in the reference (border-white/20).
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.2)',
+          borderColor: 'rgba(255, 255, 255, 0.2)',
         },
       }}
     >
@@ -129,16 +133,14 @@ const styles = StyleSheet.create({
   tabButton: { justifyContent: 'center', padding: 0 },
   iconContainer: {
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
     justifyContent: 'center',
   },
   iconLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    ...textStyles.caption2,
+    fontWeight: '500',
   },
   iconLabelFocused: {
-    fontWeight: '800',
+    fontWeight: '700',
   },
 });
