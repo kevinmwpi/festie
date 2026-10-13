@@ -212,9 +212,33 @@ decisions, translated to web conventions:
 - Long-form measure of about 60–75 characters, line height around 1.6, clear h2/h3 rhythm, sentence-case
   metadata, and an "On this page" index on long documents.
 - Visible focus rings, 44px navigation targets, a skip link, hover and pressed states on links, print
-  styles, `prefers-reduced-motion` respected. No JavaScript, web fonts, trackers or third-party requests.
-- GSAP and other animation libraries are deliberately not used: static legal and support pages gain nothing
-  from scripted motion, and the site has no build step.
+  styles, `prefers-reduced-motion` respected. No trackers or third-party requests on any page.
+- The legal and support pages use no JavaScript and no web fonts: static documents gain nothing from scripted
+  motion.
+
+### Home page
+
+The home page is the one place where motion decorates; the Motion rules above still hold for the app and every
+other page. Its styles and script live in `docs/legal/home.css` and `docs/legal/home.js`, which the generator
+inlines into `index.html`.
+
+- **The wordmark stays and the page moves around it.** A ring of tiles showing what the app does turns around
+  the Fredoka "Festie" logotype, self-hosted from the app's bundled font with its OFL licence beside it. As you
+  scroll, the ring lifts away and the wordmark stays fixed behind the sections as a 7% watermark.
+- **Sections change colour square by square**, like a schedule grid filling in: the pink wash, then the
+  `primary` blue, `success` mint and peach accents at full strength, with ink text (at least 8:1). Links stay
+  on white panels, because `link` on those pastels is under 4.5:1.
+- **One arrival moment**: the wordmark's letters bounce in one after another and the ring settles around them.
+- **A tilted tape** of what the app does scrolls across the top of the features, like a festival wristband.
+- **Each feature card has a small looping motif** (the clash flag, crew faces, a dropped pin, the 1/4/8 h
+  control, signal bars). Motifs and ring tiles are hidden from assistive technology; the text carries the
+  meaning. With a mouse or trackpad, a card leans a few degrees toward the pointer.
+- **Motion is a layer, never a requirement.** It runs only when JavaScript is on and Reduce Motion is off.
+  Otherwise the page is static (solid section colours, a still ring, no fixed wordmark) with every word in
+  place. Only `transform`, `opacity` and one background canvas animate. No animation libraries: CSS and about
+  150 lines of plain JavaScript, so the site still has no build step.
+- Ring tiles show generic examples (times, a crew code, a clash), never a real festival, artist or poster
+  (`docs/legal/ip-review.md`).
 
 ## Not in scope (deliberately)
 

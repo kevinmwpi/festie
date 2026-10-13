@@ -74,28 +74,15 @@ li::marker { color: var(--muted); }
 .toc li + li { margin-top: 0; }
 .toc a { display: flex; align-items: center; min-height: 44px; padding: 4px 0; line-height: 1.35; text-decoration: none; }
 .toc a:hover { text-decoration-line: underline; }
-.home { padding: 16px 0 32px; }
-.home section + section { margin-top: 2.25rem; }
-.home h2 { margin-top: 0; }
-.home p, .home ul:not(.features) { max-width: var(--measure); }
-.app-icon { display: block; width: 88px; height: 88px; border-radius: 22.37%; box-shadow: 0 1px 2px rgba(44, 51, 39, .1), 0 6px 16px rgba(44, 51, 39, .14); margin: 0 0 20px; }
-.lead { font-size: 1.3rem; line-height: 1.3; font-weight: 600; margin: 0 0 .6em; }
-.meta { font-size: .88rem; color: var(--muted); }
-.features { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; }
-.features li { margin: 0; padding: 20px; background: var(--fill); border-radius: 18px; }
-.features h3 { margin: 0 0 .25em; }
-.features p { margin: 0; }
 footer { padding-bottom: 40px; color: var(--muted); }
 footer p, footer ul { font-size: .82rem; }
 .footer-links { list-style: none; display: flex; flex-wrap: wrap; column-gap: 1.25rem; margin: 0; padding: 4px 0 0; border-top: 1px solid var(--rule); }
 .footer-links li + li { margin-top: 0; }
 .footer-links a { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
-@media (min-width: 600px) { h1 { font-size: 2.35rem; } .home section + section { margin-top: 3rem; } }
+@media (min-width: 600px) { h1 { font-size: 2.35rem; } }
 @media (min-width: 720px) {
   .toc ol { columns: 2; column-gap: 32px; }
   .toc li { break-inside: avoid; }
-  .features { grid-template-columns: 1fr 1fr; gap: 16px; }
-  .features li:first-child { grid-column: 1 / -1; }
 }
 @media print {
   :root { --bg: #FFFFFF; --card: #FFFFFF; --text: #000000; --muted: #000000; --link: #000000; --link-pressed: #000000; --fill: transparent; }
@@ -103,13 +90,257 @@ footer p, footer ul { font-size: .82rem; }
   .skip, header nav, .toc, .footer-links { display: none; }
   header, main, footer { max-width: none; padding: 0; }
   article { margin: 0; padding: 0; border-radius: 0; box-shadow: none; }
-  .features li { padding: 0; }
-  .app-icon { box-shadow: none; }
   a[href^="http"]::after { content: " (" attr(href) ")"; }
   h2, h3 { break-after: avoid; }
   p, li { break-inside: avoid; }
 }
 </style>
+<link rel="preload" href="fredoka-bold.ttf" as="font" type="font/ttf" crossorigin>
+<style>
+/*
+ * Home page only (docs/site/index.html). The legal and support pages use SITE_CSS alone and stay script-free.
+ * Motion needs the `motion` class on <html>, which the inline script in <head> adds when JavaScript runs and
+ * Reduce Motion is off. Without it the page is static: solid section colours, a still ring, no fixed wordmark.
+ * Rules: docs/design-system.md ("Website").
+ */
+@font-face {
+  font-family: "Fredoka";
+  src: url("fredoka-bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  /* Sections use the app's pastel accents at full strength; text on them is --text (at least 8:1). */
+  --sec-hero: #FFF5F9; --sec-features: #B2CEFE; --sec-privacy: #B2D8B2; --sec-help: #FFD6A5; --sec-end: #FFF5F9;
+  /* Squares at the front of a block transition: a step deeper than the sections, plus the ink. */
+  --spark-blue: #8FB8F8; --spark-mint: #8DC58D; --spark-peach: #F5B872; --spark-pink: #FF9CCB; --spark-lilac: #B49CFF;
+  /* Ring tiles and feature motifs: pastel fills with the dark ink in both schemes. */
+  --pink: #FFB3D9; --blue: #B2CEFE; --peach: #FFD6A5; --lilac: #C8B6FF; --mint: #B2D8B2; --lemon: #FDFD96; --white: #FFFFFF;
+  --tile-ink: #2C3327; --warn-bg: #FFF4D6; --warn-text: #7A4A00;
+  --wordmark: "Fredoka", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  --system: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mark-size: min(17rem, 22vw, 30svh);
+  --mark-y: 40svh;
+  /* Ring: radius, tile size, tile count and one full turn */
+  --R: min(38vw, 520px);
+  --cw: clamp(56px, calc(var(--R) * .27), 148px);
+  --ch: calc(var(--cw) * 1.34);
+  --n: 20;
+  --spin: 80s;
+}
+@media (max-width: 599px) { :root { --R: 40vw; } }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sec-hero: #1B1D1A; --sec-features: #394048; --sec-privacy: #394238; --sec-help: #494236; --sec-end: #1B1D1A;
+    /* 45% pastel on the dark ground, so light text stays readable over them */
+    --spark-blue: #5F6D80; --spark-mint: #5F715E; --spark-peach: #827058; --spark-pink: #826170; --spark-lilac: #696281;
+  }
+}
+
+.skip { z-index: 4; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+body > header { position: absolute; top: 0; left: 0; right: 0; z-index: 3; }
+body > header, body > footer { max-width: calc(1120px + 2 * var(--gutter)); }
+main { max-width: none; padding: 0; }
+.blocks { display: none; }
+
+/* ─── Hero: the wordmark with a ring of app moments around it ─── */
+.hero { position: relative; z-index: 1; }
+.hero-stage { position: relative; height: clamp(340px, 60svh, 660px); overflow-x: clip; pointer-events: none; }
+.mark { position: absolute; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%);
+  font: 700 var(--mark-size)/.9 var(--wordmark); letter-spacing: -.015em; white-space: nowrap; color: var(--text); }
+.mark-letters span { display: inline-block; }
+.ring-wrap { position: absolute; left: 50%; top: 50%; width: 0; height: 0; perspective: calc(var(--R) * 3.6); }
+/* Tiles stand like spokes, so they are edge-on at the front and back and face you at the sides. */
+.ring { position: absolute; margin: 0; padding: 0; list-style: none; transform-style: preserve-3d;
+  animation: spin var(--spin) linear infinite paused; }
+.slot { position: absolute; left: calc(var(--cw) / -2); top: calc(var(--ch) / -2); width: var(--cw); height: var(--ch);
+  margin: 0; transform-style: preserve-3d;
+  transform: rotateY(calc(var(--i) * 360deg / var(--n))) translateZ(var(--R)) rotateY(90deg); }
+.tile { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between;
+  gap: calc(var(--cw) * .04); padding: calc(var(--cw) * .11) calc(var(--cw) * .1); border-radius: 14px; overflow: hidden;
+  background: var(--c); color: var(--tile-ink); box-shadow: inset 0 0 0 1px rgba(44, 51, 39, .08);
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  /* Fades on the far side of the ring: the same turn as .ring, offset by the tile's place on it. */
+  animation: depth var(--spin) linear infinite paused; animation-delay: calc((var(--i) / var(--n) - 1) * var(--spin)); }
+.tile + .tile { transform: rotateY(180deg); }
+.tk { font: 800 calc(var(--cw) * .075)/1.2 var(--system); letter-spacing: .08em; text-transform: uppercase; }
+.tb { font: italic 700 calc(var(--cw) * .3)/1 var(--display); font-variant-numeric: tabular-nums; }
+.tb svg { width: calc(var(--cw) * .3); height: calc(var(--cw) * .3); display: block; }
+.ts { font: 500 calc(var(--cw) * .085)/1.25 var(--system); }
+.tcode { font: 700 calc(var(--cw) * .13)/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; }
+.tbadge { align-self: flex-start; padding: .2em .65em; border-radius: 999px; background: var(--warn-bg); color: var(--warn-text);
+  font: 700 calc(var(--cw) * .08)/1.3 var(--system); }
+.tfaces { display: flex; }
+.tfaces i { display: grid; place-items: center; width: calc(var(--cw) * .25); height: calc(var(--cw) * .25); margin-right: calc(var(--cw) * -.05);
+  border-radius: 50%; background: var(--white); box-shadow: 0 0 0 2px var(--c); font: 700 calc(var(--cw) * .1)/1 var(--system); font-style: normal; }
+.tile-icon { justify-content: center; align-items: center; }
+.tile-icon img { display: block; width: 72%; height: auto; border-radius: 22.37%; }
+@keyframes spin { from { transform: rotateX(-9deg) rotateY(0deg); } to { transform: rotateX(-9deg) rotateY(-360deg); } }
+@keyframes depth { 0%, 26% { opacity: 1; } 40% { opacity: .28; } 50% { opacity: .08; } 60% { opacity: .28; } 74%, 100% { opacity: 1; } }
+@media (max-width: 599px) {
+  .slot:nth-child(even) { display: none; }
+  .tk, .ts { display: none; }
+  .tile { justify-content: center; align-items: center; }
+}
+
+.hero-copy { position: relative; z-index: 1; display: grid; justify-items: center; gap: 16px; max-width: 42rem; margin: 0 auto;
+  padding: 8px var(--gutter) clamp(56px, 11svh, 112px); text-align: center; }
+.app-icon { display: block; width: 64px; height: 64px; border-radius: 22.37%; box-shadow: 0 1px 2px rgba(44, 51, 39, .1), 0 6px 16px rgba(44, 51, 39, .14); }
+.lead { margin: 0; font: italic 700 clamp(1.6rem, 3.6vw, 2.4rem)/1.15 var(--display); text-wrap: balance; }
+.hero-text { margin: 0; max-width: 36rem; }
+.meta { display: inline-flex; align-items: center; min-height: 36px; margin: 0; padding: 0 14px; border-radius: 999px;
+  background: var(--card); box-shadow: inset 0 0 0 1px var(--rule); color: var(--muted); font-size: .85rem; font-weight: 600; }
+.cue { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 6px; color: var(--text); font-weight: 600; font-size: .9rem; text-decoration: none; }
+.cue:hover { color: var(--text); text-decoration-line: underline; }
+.cue svg { flex: none; }
+
+/* ─── Sections ─── */
+.sec { position: relative; z-index: 1; }
+.sec-features { background: var(--sec-features); }
+.sec-privacy { background: var(--sec-privacy); }
+.sec-help { background: var(--sec-help); }
+.sec-features { overflow-x: clip; }
+/* A tilted strip of what the app does, like a festival wristband, crossing into the features */
+.tape { width: 112%; margin: 0 -6%; padding: 14px 0; overflow: hidden; background: var(--text); color: var(--bg); transform: rotate(-2.5deg); }
+.tape-track { display: flex; width: max-content; }
+.tape-track span { display: flex; align-items: center; gap: 28px; padding-right: 28px; white-space: nowrap; font: italic 700 clamp(1.4rem, 3vw, 2.1rem)/1.2 var(--display); }
+.tape-track i { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--c); }
+.sec-inner { display: grid; gap: 28px; max-width: 1120px; margin: 0 auto; padding: clamp(72px, 14svh, 150px) var(--gutter); }
+.sec h2 { margin: 0; font: italic 700 clamp(2.2rem, 5.4vw, 4rem)/1.05 var(--display); letter-spacing: -.01em; }
+@media (min-width: 900px) {
+  .sec-inner { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; align-items: start; }
+  .sec-head { position: sticky; top: 22svh; }
+  .sec-privacy .sec-inner, .sec-help .sec-inner { min-height: 84svh; }
+}
+.feat-list, .checks { margin: 0; padding: 0; list-style: none; }
+.feat-list { display: grid; gap: 16px; }
+.feat-list li + li, .checks li + li { margin-top: 0; }
+.feat { display: grid; grid-template-columns: minmax(0, 1fr) 156px; align-items: center; gap: 22px; padding: 22px 22px 22px 26px;
+  background: var(--card); border-radius: var(--radius); box-shadow: 0 3px 10px rgba(44, 51, 39, .06); }
+.feat h3 { margin: 0 0 .3em; font-size: 1.12rem; line-height: 1.3; }
+.feat > div:first-child { min-width: 0; }
+.feat p { margin: 0; color: var(--muted); }
+@media (max-width: 560px) { .feat { grid-template-columns: minmax(0, 1fr); padding: 18px; } .motif { order: -1; } }
+.panel { padding: clamp(22px, 4vw, 34px); background: var(--card); border-radius: var(--radius); box-shadow: 0 3px 10px rgba(44, 51, 39, .06); }
+.panel p { margin: 0; }
+.checks { display: grid; gap: 14px; margin-bottom: 22px; }
+.checks li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; }
+.checks svg { display: block; width: 30px; height: 30px; }
+.checks circle { fill: var(--mint); }
+.checks path { fill: none; stroke: var(--tile-ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 18; stroke-dashoffset: 0; }
+
+/* ─── Feature motifs: a small moving picture of each feature (decorative; the text says it all) ─── */
+.motif { position: relative; height: 116px; border-radius: 18px; overflow: hidden; background: var(--m); color: var(--tile-ink);
+  font: 700 .68rem/1.2 var(--system); font-variant-numeric: tabular-nums; }
+.motif i, .motif b, .motif em { font-style: normal; font-weight: inherit; }
+.m-schedule { --m: var(--lilac); }
+.m-schedule .lane { position: absolute; left: 8%; right: 8%; top: var(--y); height: 17%; }
+.m-schedule .lane i { position: absolute; top: 0; bottom: 0; left: var(--x); width: var(--w); border-radius: 6px; background: rgba(255, 255, 255, .55); }
+.m-schedule .lane i.pick { background: var(--white); }
+.m-schedule .lane i.clash { box-shadow: inset 0 0 0 2px var(--warn-text); }
+.m-schedule .now { position: absolute; inset: 8% 8% 6% 8%; }
+.m-schedule .now::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; border-radius: 2px; background: var(--tile-ink); }
+.m-schedule .flag { position: absolute; right: 7%; top: 6%; padding: 2px 7px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-text); font-size: .62rem; }
+.m-crew { --m: var(--pink); display: grid; align-content: center; justify-items: center; gap: 9px; }
+.m-crew .set, .m-crew .code { padding: 4px 9px; border-radius: 8px; background: var(--white); }
+.m-crew .code { background: rgba(255, 255, 255, .6); font: 700 .72rem/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .14em; }
+.m-crew .faces { display: flex; }
+.m-crew .faces i { display: grid; place-items: center; width: 28px; height: 28px; margin-left: -7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--pink); }
+.m-crew .faces i:first-child { margin-left: 0; }
+.m-meet { --m: var(--mint); }
+.m-meet .road { position: absolute; border-radius: 9px; background: rgba(255, 255, 255, .7); }
+.m-meet .r1 { left: -10%; right: -10%; top: 62%; height: 9px; transform: rotate(-8deg); }
+.m-meet .r2 { top: -10%; bottom: -10%; left: 28%; width: 9px; transform: rotate(14deg); }
+.m-meet .pin { position: absolute; left: 50%; top: 18%; width: 26px; height: 34px; margin-left: -13px; }
+.m-meet .pin svg { display: block; width: 100%; height: 100%; }
+.m-meet .pin path { fill: var(--pink); stroke: var(--tile-ink); stroke-width: 2; }
+.m-meet .pin circle { fill: var(--tile-ink); }
+.m-meet .ripple { position: absolute; left: 50%; top: calc(18% + 32px); width: 30px; height: 12px; margin: -6px 0 0 -15px; border-radius: 50%; border: 2px solid var(--tile-ink); opacity: 0; }
+.m-meet .when { position: absolute; right: 8%; top: 9%; padding: 3px 8px; border-radius: 999px; background: var(--white); }
+.m-loc { --m: var(--blue); display: grid; align-content: center; justify-items: center; gap: 16px; }
+.m-loc .seg { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); width: 80%; padding: 3px; border-radius: 10px; background: rgba(255, 255, 255, .5); }
+.m-loc .seg b { position: relative; z-index: 1; padding: 5px 0; text-align: center; }
+.m-loc .thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); border-radius: 8px; background: var(--white);
+  box-shadow: 0 1px 3px rgba(44, 51, 39, .15); transform: translateX(100%); }
+.m-loc .dot { position: relative; width: 14px; height: 14px; border-radius: 50%; background: var(--tile-ink); box-shadow: 0 0 0 3px var(--white); }
+.m-loc .dot::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid var(--white); opacity: 0; }
+.m-off { --m: var(--peach); display: grid; align-content: center; justify-items: center; gap: 12px; }
+.m-off .bars { display: flex; align-items: flex-end; gap: 4px; height: 34px; }
+.m-off .bars i { width: 8px; border-radius: 3px; background: var(--tile-ink); opacity: .22; }
+.m-off .bars i:nth-child(1) { height: 25%; } .m-off .bars i:nth-child(2) { height: 50%; --b: 1; }
+.m-off .bars i:nth-child(3) { height: 75%; --b: 2; } .m-off .bars i:nth-child(4) { height: 100%; --b: 3; }
+.m-off .states { position: relative; width: 100%; height: 24px; }
+.m-off .states b { position: absolute; left: 50%; top: 0; transform: translateX(-50%); padding: 4px 9px; border-radius: 999px; background: var(--white); white-space: nowrap; opacity: 0; }
+.m-off .states .s-saved { opacity: 1; }
+
+/* ─── Motion (JavaScript on, Reduce Motion off) ─── */
+.motion .hero { min-height: 100svh; padding-top: calc(var(--mark-y) + var(--mark-size) * .55 + 5rem); }
+.motion .hero-stage { position: fixed; inset: 0; z-index: 0; height: auto; overflow: hidden; }
+.motion .mark, .motion .ring-wrap { top: var(--mark-y); }
+/* --hero-p goes from 0 to 1 over the first half of the hero (home.js): the ring lifts away and the wordmark settles
+   into a watermark before the hero text scrolls over it. */
+.motion .mark { opacity: calc(1 - min(1, var(--hero-p, 0) * 2.4) * .93); transform: translate(-50%, -50%) scale(calc(1 - var(--hero-p, 0) * .08)); }
+.motion .ring-wrap { opacity: calc(1 - var(--hero-p, 0) * 1.7); transform: translateY(calc(var(--hero-p, 0) * -14svh)); }
+.motion .ring, .motion .tile { animation-play-state: running; }
+/* Arrival: the letters bounce in one by one and the ring settles around them. */
+.motion .mark-letters span { animation: letter-in .9s cubic-bezier(.3, 1.45, .5, 1) both calc(var(--l) * 70ms + 120ms); }
+.motion .ring-wrap { animation: ring-in 1.6s cubic-bezier(.2, .7, .2, 1) backwards; }
+.motion .tape-track { animation: tape 38s linear infinite; }
+.motion.ring-off .ring-wrap { visibility: hidden; }
+.motion.ring-off .ring, .motion.ring-off .tile { animation-play-state: paused; }
+.motion .blocks { display: block; position: fixed; left: 0; top: 0; z-index: -1; width: 100%; height: 100lvh; }
+.motion .sec { background: transparent; }
+.motion body > footer { position: relative; z-index: 1; }
+.motion .cue svg { animation: bob 2.4s ease-in-out infinite; }
+.motion .feat, .motion .panel { transform: translateY(28px); transition: transform .8s cubic-bezier(.2, .7, .2, 1); }
+.motion .feat.in, .motion .panel.in { transform: none; }
+/* With a mouse, a card leans toward the pointer and its motif drifts a little (home.js sets --tx and --ty, -0.5 to 0.5). */
+.motion .feat.in { transform: perspective(900px) rotateX(calc(var(--ty, 0) * -5deg)) rotateY(calc(var(--tx, 0) * 6deg)); transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+.motion .feat .motif { transform: translate(calc(var(--tx, 0) * 8px), calc(var(--ty, 0) * 6px)); transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+.motion .checks path { stroke-dashoffset: 18; transition: stroke-dashoffset .5s ease-out calc(var(--k) * .12s + .3s); }
+.motion .panel.in .checks path { stroke-dashoffset: 0; }
+.motion .m-schedule .now { animation: sweep 7s linear infinite; }
+.motion .m-schedule .flag { animation: blink 2.4s ease-in-out infinite; }
+.motion .m-crew .faces i { animation: pop 6s cubic-bezier(.3, 1.4, .5, 1) infinite calc(var(--d) * .3s); }
+.motion .m-meet .pin { animation: drop 3.6s cubic-bezier(.3, 1.3, .5, 1) infinite; }
+.motion .m-meet .ripple { animation: ripple 3.6s ease-out infinite; }
+.motion .m-loc .thumb { animation: seg 6s cubic-bezier(.5, 0, .2, 1) infinite; }
+.motion .m-loc .dot::after { animation: pulse 2s ease-out infinite; }
+.motion .m-off .bars i { animation: bars 8s ease-in-out infinite calc(var(--b, 0) * .08s); }
+.motion .m-off .s-none { animation: say-none 8s linear infinite; }
+.motion .m-off .s-saved { opacity: 0; animation: say-saved 8s linear infinite; }
+.motion .m-off .s-synced { animation: say-synced 8s linear infinite; }
+@keyframes bob { 50% { transform: translateY(4px); } }
+@keyframes letter-in { from { opacity: 0; transform: translateY(45%) scale(.6) rotate(-8deg); } to { opacity: 1; transform: none; } }
+@keyframes ring-in { from { opacity: 0; scale: .82; } }
+@keyframes tape { to { transform: translateX(-50%); } }
+@keyframes sweep { from { transform: translateX(0); } to { transform: translateX(100%); } }
+@keyframes blink { 50% { opacity: .45; } }
+@keyframes pop { 0%, 4% { transform: scale(0); } 12%, 82% { transform: scale(1); } 90%, 100% { transform: scale(0); } }
+@keyframes drop { 0% { transform: translateY(-30px); opacity: 0; } 14% { transform: none; opacity: 1; } 86% { transform: none; opacity: 1; } 100% { transform: none; opacity: 0; } }
+@keyframes ripple { 0%, 14% { transform: scale(.4); opacity: 0; } 18% { opacity: .7; } 50%, 100% { transform: scale(2.2); opacity: 0; } }
+@keyframes seg { 0%, 28% { transform: translateX(0); } 33%, 61% { transform: translateX(100%); } 66%, 94% { transform: translateX(200%); } 100% { transform: translateX(0); } }
+@keyframes pulse { from { transform: scale(1); opacity: .9; } to { transform: scale(2.6); opacity: 0; } }
+@keyframes bars { 0%, 18% { opacity: 1; } 24%, 66% { opacity: .22; } 72%, 100% { opacity: 1; } }
+@keyframes say-none { 0%, 22% { opacity: 0; } 25%, 38% { opacity: 1; } 41%, 100% { opacity: 0; } }
+@keyframes say-saved { 0%, 41% { opacity: 0; } 44%, 63% { opacity: 1; } 66%, 100% { opacity: 0; } }
+@keyframes say-synced { 0%, 12% { opacity: 1; } 15%, 70% { opacity: 0; } 73%, 100% { opacity: 1; } }
+
+@media print {
+  .blocks, .ring-wrap, .cue, .motif, .tape { display: none !important; }
+  body > header { position: static; }
+  .hero-stage { position: static !important; height: auto; }
+  .mark { position: static; transform: none !important; opacity: 1 !important; font-size: 3rem; }
+  .hero, .motion .hero { min-height: 0; padding-top: 0; }
+  .sec { background: none !important; }
+  .sec-inner { display: block; padding: 0; min-height: 0 !important; }
+  .feat, .panel { padding: 0; box-shadow: none; transform: none !important; }
+  .app-icon { box-shadow: none; }
+}
+</style>
+<script>if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('motion');</script>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
@@ -118,44 +349,219 @@ footer p, footer ul { font-size: .82rem; }
 <nav aria-label="Festie pages"><ul role="list"><li><a href="privacy.html">Privacy Policy</a></li><li><a href="terms.html">Terms of Use</a></li><li><a href="support.html">Support</a></li></ul></nav>
 </header>
 <main id="content">
-<div class="home">
-<section class="hero" aria-labelledby="festie">
-<img class="app-icon" src="apple-touch-icon.png" width="88" height="88" alt="">
-<h1 id="festie">Festie</h1>
+<canvas class="blocks" aria-hidden="true"></canvas>
+<section class="hero" data-pane aria-labelledby="festie">
+<div class="hero-stage">
+<div class="ring-wrap" aria-hidden="true"><ul class="ring" role="list"><li class="slot" style="--i:0;--c:var(--pink)"><div class="tile tile-icon"><img src="apple-touch-icon.png" width="60" height="60" alt=""></div><div class="tile tile-icon"><img src="apple-touch-icon.png" width="60" height="60" alt=""></div></li><li class="slot" style="--i:1;--c:var(--blue)"><div class="tile"><span class="tk">Main stage</span><span class="tb">9:40</span><span class="ts">pm · 3 going</span></div><div class="tile"><span class="tk">Main stage</span><span class="tb">9:40</span><span class="ts">pm · 3 going</span></div></li><li class="slot" style="--i:2;--c:var(--lemon)"><div class="tile"><span class="tbadge">Clash</span><span class="tb">10:15</span><span class="ts">Tent and Lakeside</span></div><div class="tile"><span class="tbadge">Clash</span><span class="tb">10:15</span><span class="ts">Tent and Lakeside</span></div></li><li class="slot" style="--i:3;--c:var(--mint)"><div class="tile"><span class="tk">Meetup</span><span class="tb">11:05</span><span class="ts">At the totem</span></div><div class="tile"><span class="tk">Meetup</span><span class="tb">11:05</span><span class="ts">At the totem</span></div></li><li class="slot" style="--i:4;--c:var(--white)"><div class="tile"><span class="tk">Crew code</span><span class="tcode">K7Q2PM</span><span class="ts">Join with a code</span></div><div class="tile"><span class="tk">Crew code</span><span class="tcode">K7Q2PM</span><span class="ts">Join with a code</span></div></li><li class="slot" style="--i:5;--c:var(--lilac)"><div class="tile"><span class="tk">Sharing</span><span class="tb">4 h</span><span class="ts">Only while open</span></div><div class="tile"><span class="tk">Sharing</span><span class="tb">4 h</span><span class="ts">Only while open</span></div></li><li class="slot" style="--i:6;--c:var(--peach)"><div class="tile"><span class="tk">No signal</span><span class="tb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ts">Saved on your phone</span></div><div class="tile"><span class="tk">No signal</span><span class="tb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ts">Saved on your phone</span></div></li><li class="slot" style="--i:7;--c:var(--blue)"><div class="tile"><span class="tk">Your picks</span><span class="tb">12</span><span class="ts">sets this weekend</span></div><div class="tile"><span class="tk">Your picks</span><span class="tb">12</span><span class="ts">sets this weekend</span></div></li><li class="slot" style="--i:8;--c:var(--pink)"><div class="tile"><span class="tk">Your crew</span><span class="tfaces"><i>A</i><i>J</i><i>M</i></span><span class="ts">Picked this set</span></div><div class="tile"><span class="tk">Your crew</span><span class="tfaces"><i>A</i><i>J</i><i>M</i></span><span class="ts">Picked this set</span></div></li><li class="slot" style="--i:9;--c:var(--mint)"><div class="tile"><span class="tk">Up next</span><span class="tb">8:20</span><span class="ts">Lakeside stage</span></div><div class="tile"><span class="tk">Up next</span><span class="tb">8:20</span><span class="ts">Lakeside stage</span></div></li><li class="slot" style="--i:10;--c:var(--lilac)"><div class="tile tile-icon"><img src="apple-touch-icon.png" width="60" height="60" alt=""></div><div class="tile tile-icon"><img src="apple-touch-icon.png" width="60" height="60" alt=""></div></li><li class="slot" style="--i:11;--c:var(--peach)"><div class="tile"><span class="tk">Main stage</span><span class="tb">9:40</span><span class="ts">pm · 3 going</span></div><div class="tile"><span class="tk">Main stage</span><span class="tb">9:40</span><span class="ts">pm · 3 going</span></div></li><li class="slot" style="--i:12;--c:var(--lemon)"><div class="tile"><span class="tbadge">Clash</span><span class="tb">10:15</span><span class="ts">Tent and Lakeside</span></div><div class="tile"><span class="tbadge">Clash</span><span class="tb">10:15</span><span class="ts">Tent and Lakeside</span></div></li><li class="slot" style="--i:13;--c:var(--pink)"><div class="tile"><span class="tk">Meetup</span><span class="tb">11:05</span><span class="ts">At the totem</span></div><div class="tile"><span class="tk">Meetup</span><span class="tb">11:05</span><span class="ts">At the totem</span></div></li><li class="slot" style="--i:14;--c:var(--blue)"><div class="tile"><span class="tk">Crew code</span><span class="tcode">K7Q2PM</span><span class="ts">Join with a code</span></div><div class="tile"><span class="tk">Crew code</span><span class="tcode">K7Q2PM</span><span class="ts">Join with a code</span></div></li><li class="slot" style="--i:15;--c:var(--mint)"><div class="tile"><span class="tk">Sharing</span><span class="tb">4 h</span><span class="ts">Only while open</span></div><div class="tile"><span class="tk">Sharing</span><span class="tb">4 h</span><span class="ts">Only while open</span></div></li><li class="slot" style="--i:16;--c:var(--lilac)"><div class="tile"><span class="tk">No signal</span><span class="tb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ts">Saved on your phone</span></div><div class="tile"><span class="tk">No signal</span><span class="tb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ts">Saved on your phone</span></div></li><li class="slot" style="--i:17;--c:var(--white)"><div class="tile"><span class="tk">Your picks</span><span class="tb">12</span><span class="ts">sets this weekend</span></div><div class="tile"><span class="tk">Your picks</span><span class="tb">12</span><span class="ts">sets this weekend</span></div></li><li class="slot" style="--i:18;--c:var(--peach)"><div class="tile"><span class="tk">Your crew</span><span class="tfaces"><i>A</i><i>J</i><i>M</i></span><span class="ts">Picked this set</span></div><div class="tile"><span class="tk">Your crew</span><span class="tfaces"><i>A</i><i>J</i><i>M</i></span><span class="ts">Picked this set</span></div></li><li class="slot" style="--i:19;--c:var(--blue)"><div class="tile"><span class="tk">Up next</span><span class="tb">8:20</span><span class="ts">Lakeside stage</span></div><div class="tile"><span class="tk">Up next</span><span class="tb">8:20</span><span class="ts">Lakeside stage</span></div></li></ul></div>
+<h1 class="mark" id="festie"><span class="sr-only">Festie</span><span class="mark-letters" aria-hidden="true"><span style="--l:0">F</span><span style="--l:1">e</span><span style="--l:2">s</span><span style="--l:3">t</span><span style="--l:4">i</span><span style="--l:5">e</span></span></h1>
+</div>
+<div class="hero-copy">
+<img class="app-icon" src="apple-touch-icon.png" width="64" height="64" alt="">
 <p class="lead">Plan your festival with your crew.</p>
-<p>Festie helps you plan a music festival with your crew: build your schedule, see which sets your friends picked, set up meetups and, only when you choose, share your location with your crew.</p>
+<p class="hero-text">Festie helps you plan a music festival with your crew: build your schedule, see which sets your friends picked, set up meetups and, only when you choose, share your location with your crew.</p>
 <p class="meta">Free, for iPhone. No ads, no tracking.</p>
+<a class="cue" href="#what-you-can-do">What you can do<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
+</div>
 </section>
-<section aria-labelledby="what-you-can-do">
-<h2 id="what-you-can-do">What you can do</h2>
-<ul class="features" role="list">
-<li><h3>Your schedule</h3><p>Pick the sets you want to see; Festie flags clashes, and the map shows what is up next on each stage.</p></li>
-<li><h3>Your crew's picks</h3><p>Create a crew, invite friends with a 6-character code or a link, and see which sets everyone picked.</p></li>
-<li><h3>Meetups</h3><p>Plan a meetup with a time, a stage or a pin on the festival map, and an optional totem photo so your crew can spot where to meet.</p></li>
-<li><h3>Location only when you choose</h3><p>Share your location with the crew you choose, for 1, 4 or 8 hours or until you stop (24 hours at most), and only while Festie is open. It is visible to your crew for at most 15 minutes after the last update, then deleted.</p></li>
-<li><h3>Works without signal</h3><p>Schedules, crews and meetups are saved on your phone and sync when you are back online, and you can download the festival map.</p></li>
+<section class="sec sec-features" data-pane aria-labelledby="what-you-can-do">
+<div class="tape" aria-hidden="true"><div class="tape-track"><span>Your schedule<i style="--c:var(--pink)"></i></span><span>Your crew's picks<i style="--c:var(--lemon)"></i></span><span>Meetups<i style="--c:var(--mint)"></i></span><span>Totem photos<i style="--c:var(--blue)"></i></span><span>Location only when you choose<i style="--c:var(--peach)"></i></span><span>Works without signal<i style="--c:var(--lilac)"></i></span><span>No ads, no tracking<i style="--c:var(--pink)"></i></span><span>Your schedule<i style="--c:var(--pink)"></i></span><span>Your crew's picks<i style="--c:var(--lemon)"></i></span><span>Meetups<i style="--c:var(--mint)"></i></span><span>Totem photos<i style="--c:var(--blue)"></i></span><span>Location only when you choose<i style="--c:var(--peach)"></i></span><span>Works without signal<i style="--c:var(--lilac)"></i></span><span>No ads, no tracking<i style="--c:var(--pink)"></i></span></div></div>
+<div class="sec-inner">
+<div class="sec-head"><h2 id="what-you-can-do">What you can do</h2></div>
+<ul class="feat-list" role="list">
+<li class="feat"><div><h3>Your schedule</h3><p>Pick the sets you want to see; Festie flags clashes, and the map shows what is up next on each stage.</p></div><div class="motif m-schedule" aria-hidden="true"><span class="lane" style="--y:22%"><i style="--x:0%;--w:38%"></i><i class="pick" style="--x:52%;--w:40%"></i></span><span class="lane" style="--y:46%"><i class="pick clash" style="--x:10%;--w:36%"></i><i style="--x:52%;--w:36%"></i></span><span class="lane" style="--y:70%"><i class="pick clash" style="--x:26%;--w:30%"></i><i style="--x:62%;--w:32%"></i></span><span class="now"></span><em class="flag">Clash</em></div></li>
+<li class="feat"><div><h3>Your crew's picks</h3><p>Create a crew, invite friends with a 6-character code or a link, and see which sets everyone picked.</p></div><div class="motif m-crew" aria-hidden="true"><span class="set">10:30 · Lakeside</span><span class="faces"><i style="--d:0;--c:var(--blue)">A</i><i style="--d:1;--c:var(--mint)">J</i><i style="--d:2;--c:var(--peach)">M</i><i style="--d:3;--c:var(--lilac)">S</i></span><span class="code">K7Q2PM</span></div></li>
+<li class="feat"><div><h3>Meetups</h3><p>Plan a meetup with a time, a stage or a pin on the festival map, and an optional totem photo so your crew can spot where to meet.</p></div><div class="motif m-meet" aria-hidden="true"><span class="road r1"></span><span class="road r2"></span><span class="ripple"></span><span class="pin"><svg viewBox="0 0 26 34"><path d="M13 32s11-10.4 11-19a11 11 0 0 0-22 0c0 8.6 11 19 11 19z"/><circle cx="13" cy="13" r="4"/></svg></span><span class="when">11:05</span></div></li>
+<li class="feat"><div><h3>Location only when you choose</h3><p>Share your location with the crew you choose, for 1, 4 or 8 hours or until you stop (24 hours at most), and only while Festie is open. It is visible to your crew for at most 15 minutes after the last update, then deleted.</p></div><div class="motif m-loc" aria-hidden="true"><span class="seg"><i class="thumb"></i><b>1 h</b><b>4 h</b><b>8 h</b></span><span class="dot"></span></div></li>
+<li class="feat"><div><h3>Works without signal</h3><p>Schedules, crews and meetups are saved on your phone and sync when you are back online, and you can download the festival map.</p></div><div class="motif m-off" aria-hidden="true"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="states"><b class="s-none">No signal</b><b class="s-saved">Saved on your phone</b><b class="s-synced">Synced</b></span></div></li>
 </ul>
+</div>
 </section>
-<section aria-labelledby="private-by-design">
-<h2 id="private-by-design">Private by design</h2>
-<ul>
-<li>No ads, no tracking, and no analytics, crash-reporting or advertising SDKs.</li>
-<li>Photos are stripped of their location and camera details before they leave your phone.</li>
-<li>Your own location dot on the map stays on your phone.</li>
-<li>Festie does not access your contacts or your microphone.</li>
-<li>You can delete your account at any time in Settings.</li>
+<section class="sec sec-privacy" data-pane aria-labelledby="private-by-design">
+<div class="sec-inner">
+<div class="sec-head"><h2 id="private-by-design">Private by design</h2></div>
+<div class="panel">
+<ul class="checks" role="list">
+<li style="--k:0"><svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="15"/><path d="m9.5 15.5 4 4 7-8"/></svg><span>No ads, no tracking, and no analytics, crash-reporting or advertising SDKs.</span></li>
+<li style="--k:1"><svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="15"/><path d="m9.5 15.5 4 4 7-8"/></svg><span>Photos are stripped of their location and camera details before they leave your phone.</span></li>
+<li style="--k:2"><svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="15"/><path d="m9.5 15.5 4 4 7-8"/></svg><span>Your own location dot on the map stays on your phone.</span></li>
+<li style="--k:3"><svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="15"/><path d="m9.5 15.5 4 4 7-8"/></svg><span>Festie does not access your contacts or your microphone.</span></li>
+<li style="--k:4"><svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="15"/><path d="m9.5 15.5 4 4 7-8"/></svg><span>You can delete your account at any time in Settings.</span></li>
 </ul>
 <p><a href="privacy.html">Read the privacy policy</a></p>
-</section>
-<section aria-labelledby="help">
-<h2 id="help">Help</h2>
-<p>For help with Festie, see the <a href="support.html">Support page</a> or email <a href="mailto:support@joinfestie.com">support@joinfestie.com</a>.</p>
-</section>
 </div>
+</div>
+</section>
+<section class="sec sec-help" data-pane aria-labelledby="help">
+<div class="sec-inner">
+<div class="sec-head"><h2 id="help">Help</h2></div>
+<div class="panel"><p>For help with Festie, see the <a href="support.html">Support page</a> or email <a href="mailto:support@joinfestie.com">support@joinfestie.com</a>.</p></div>
+</div>
+</section>
 </main>
 <footer>
 <ul class="footer-links" role="list"><li><a href="privacy.html">Privacy Policy</a></li><li><a href="terms.html">Terms of Use</a></li><li><a href="support.html">Support</a></li><li><a href="mailto:support@joinfestie.com">support@joinfestie.com</a></li></ul>
 <p>Festie is an independent app and is not affiliated with or endorsed by any festival, organizer or artist.</p>
 </footer>
+<script>
+/*
+ * Home page motion (docs/site/index.html): the squares that swap one section's colour for the next behind
+ * the page, the hero ring and wordmark fading as you scroll, the cards rising into place and leaning toward the
+ * pointer. The ring, the wordmark's arrival, the tape and the feature motifs themselves are CSS (docs/legal/home.css). Everything needs the `motion` class on <html>:
+ * the inline script in <head> adds it when Reduce Motion is off, and this script follows that setting.
+ */
+(() => {
+  const root = document.documentElement;
+  const canvas = document.querySelector('.blocks');
+  const hero = document.querySelector('.hero');
+  if (!canvas || !hero) return;
+  const ctx = canvas.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  // Each pane has a colour; the canvas paints it and swaps to the next pane's colour square by square.
+  const panes = [...document.querySelectorAll('[data-pane]'), document.querySelector('body > footer')];
+  const paneColors = ['--sec-hero', '--sec-features', '--sec-privacy', '--sec-help', '--sec-end'];
+  const sparkColors = ['--spark-blue', '--spark-mint', '--spark-peach', '--spark-pink', '--spark-lilac'];
+  let width = 0, height = 0, cols = 0, rows = 0, fills = [], sparks = [], ink = '', grids = [], queued = false;
+
+  // A fixed pseudo-random value per square, so a transition looks the same scrolling down and back up.
+  const noise = (x, y, z) => {
+    let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2246822519);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+
+  function readColors() {
+    const style = getComputedStyle(root);
+    fills = paneColors.map((name) => style.getPropertyValue(name).trim());
+    sparks = sparkColors.map((name) => style.getPropertyValue(name).trim());
+    // The ink squares are see-through, so text that sits over one stays readable.
+    const hex = style.getPropertyValue('--text').trim().replace('#', '');
+    const n = parseInt(hex.length === 3 ? hex.replace(/./g, '$&$&') : hex, 16);
+    ink = `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.3)`;
+  }
+
+  function layout() {
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    width = canvas.clientWidth;
+    height = canvas.clientHeight;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const cell = width < 600 ? 40 : 64;
+    cols = Math.ceil(width / cell);
+    rows = Math.ceil(height / cell);
+    // For each transition: when every square flips (bottom rows first, scattered) and which spark it shows.
+    grids = panes.slice(1).map((_, k) => {
+      const at = new Float32Array(cols * rows);
+      const spark = new Float32Array(cols * rows);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          at[r * cols + c] = 0.72 * (1 - (r + 0.5) / rows) + 0.28 * noise(c, r, k + 1);
+          spark[r * cols + c] = noise(c, r, k + 101);
+        }
+      }
+      return { at, spark };
+    });
+  }
+
+  function draw() {
+    queued = false;
+    if (!root.classList.contains('motion')) return;
+    const view = window.innerHeight;
+    // 0 while the next pane's top is below the window, 1 once it has risen to a quarter of the way down.
+    const progress = panes.slice(1).map((pane) => Math.min(1, Math.max(0, (view - pane.getBoundingClientRect().top) / (view * 0.75))));
+    if (progress.every((p) => p === 0 || p === 1)) {
+      ctx.fillStyle = fills[progress.filter((p) => p === 1).length];
+      ctx.fillRect(0, 0, width, height);
+    } else {
+      const cellW = width / cols;
+      const cellH = height / rows;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const i = r * cols + c;
+          let fill = fills[0];
+          let inked = false;
+          for (let k = 0; k < progress.length; k++) {
+            const p = progress[k];
+            const { at, spark } = grids[k];
+            if (p <= at[i]) continue;
+            // Squares that have only just flipped show a deeper pastel, or now and then a wash of ink.
+            const edge = p < 1 && p - at[i] < 0.07;
+            inked = edge && spark[i] < 0.1;
+            fill = edge && !inked ? sparks[Math.floor(spark[i] * 50) % sparks.length] : fills[k + 1];
+          }
+          const x = Math.floor(c * cellW), y = Math.floor(r * cellH), w = Math.ceil(cellW), h = Math.ceil(cellH);
+          ctx.fillStyle = fill;
+          ctx.fillRect(x, y, w, h);
+          if (inked) {
+            ctx.fillStyle = ink;
+            ctx.fillRect(x, y, w, h);
+          }
+        }
+      }
+    }
+    const heroProgress = Math.min(1, Math.max(0, -hero.getBoundingClientRect().top / (hero.offsetHeight * 0.55)));
+    root.style.setProperty('--hero-p', heroProgress.toFixed(3));
+    root.classList.toggle('ring-off', heroProgress > 0.62);
+  }
+
+  const queue = () => {
+    if (!queued) {
+      queued = true;
+      requestAnimationFrame(draw);
+    }
+  };
+  const restyle = () => {
+    readColors();
+    queue();
+  };
+
+  // Cards rise a little as they come into view; they are readable in place before that.
+  const rise = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+        rise.unobserve(entry.target);
+      }
+    }
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.feat, .panel').forEach((el) => rise.observe(el));
+
+  // With a mouse or trackpad, a feature card leans toward the pointer (home.css turns --tx/--ty into the tilt).
+  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    document.querySelectorAll('.feat').forEach((card) => {
+      card.addEventListener('pointermove', (event) => {
+        const box = card.getBoundingClientRect();
+        card.style.setProperty('--tx', ((event.clientX - box.left) / box.width - 0.5).toFixed(3));
+        card.style.setProperty('--ty', ((event.clientY - box.top) / box.height - 0.5).toFixed(3));
+      });
+      card.addEventListener('pointerleave', () => {
+        card.style.removeProperty('--tx');
+        card.style.removeProperty('--ty');
+      });
+    });
+  }
+
+  try {
+    readColors();
+    layout();
+    draw();
+  } catch (error) {
+    root.classList.remove('motion');
+    throw error;
+  }
+  addEventListener('scroll', queue, { passive: true });
+  addEventListener('resize', () => {
+    layout();
+    queue();
+  });
+  addEventListener('load', queue);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', restyle);
+  new MutationObserver(restyle).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  reduce.addEventListener('change', () => {
+    root.classList.toggle('motion', !reduce.matches);
+    queue();
+  });
+})();
+</script>
 </body>
 </html>

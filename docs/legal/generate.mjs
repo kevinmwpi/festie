@@ -9,10 +9,13 @@
  *                                           email is not set (pre-submission); writes nothing
  *
  * Sources (edit these):  docs/legal/privacy-policy.md, docs/legal/terms-of-use.md, docs/legal/support.md,
- *                        docs/legal/values.json (template values)
+ *                        docs/legal/values.json (template values), docs/legal/home.css and home.js (the
+ *                        home page's own styles and motion, inlined into index.html)
  * Outputs (never edit):  docs/site/{index,privacy,terms,support}.html,
  *                        docs/site/favicon.png and docs/site/apple-touch-icon.png (copied byte for byte
  *                        from apps/mobile/assets/images/favicon.png and icon.png),
+ *                        docs/site/fredoka-bold.ttf and fredoka-ofl.txt (the app's wordmark font and its
+ *                        licence, from apps/mobile/assets/fonts),
  *                        apps/mobile/app/legal/{privacy-policy,terms-of-use}.tsx
  *
  * The visual rules for both outputs are in docs/design-system.md ("Website"; the in-app screens use the
@@ -75,6 +78,8 @@ const canonicalUrl = (key) => (key === 'index' ? `${SITE_URL}/` : `${SITE_URL}/$
 const ASSETS = [
   { from: 'apps/mobile/assets/images/favicon.png', to: 'docs/site/favicon.png' },
   { from: 'apps/mobile/assets/images/icon.png', to: 'docs/site/apple-touch-icon.png' },
+  { from: 'apps/mobile/assets/fonts/Fredoka-Bold.ttf', to: 'docs/site/fredoka-bold.ttf' },
+  { from: 'apps/mobile/assets/fonts/Fredoka-OFL.txt', to: 'docs/site/fredoka-ofl.txt' },
 ];
 
 const PLACEHOLDER = /__[A-Z][A-Z0-9_]*__/g;
@@ -331,28 +336,15 @@ li::marker { color: var(--muted); }
 .toc li + li { margin-top: 0; }
 .toc a { display: flex; align-items: center; min-height: 44px; padding: 4px 0; line-height: 1.35; text-decoration: none; }
 .toc a:hover { text-decoration-line: underline; }
-.home { padding: 16px 0 32px; }
-.home section + section { margin-top: 2.25rem; }
-.home h2 { margin-top: 0; }
-.home p, .home ul:not(.features) { max-width: var(--measure); }
-.app-icon { display: block; width: 88px; height: 88px; border-radius: 22.37%; box-shadow: 0 1px 2px rgba(44, 51, 39, .1), 0 6px 16px rgba(44, 51, 39, .14); margin: 0 0 20px; }
-.lead { font-size: 1.3rem; line-height: 1.3; font-weight: 600; margin: 0 0 .6em; }
-.meta { font-size: .88rem; color: var(--muted); }
-.features { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; }
-.features li { margin: 0; padding: 20px; background: var(--fill); border-radius: 18px; }
-.features h3 { margin: 0 0 .25em; }
-.features p { margin: 0; }
 footer { padding-bottom: 40px; color: var(--muted); }
 footer p, footer ul { font-size: .82rem; }
 .footer-links { list-style: none; display: flex; flex-wrap: wrap; column-gap: 1.25rem; margin: 0; padding: 4px 0 0; border-top: 1px solid var(--rule); }
 .footer-links li + li { margin-top: 0; }
 .footer-links a { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
-@media (min-width: 600px) { h1 { font-size: 2.35rem; } .home section + section { margin-top: 3rem; } }
+@media (min-width: 600px) { h1 { font-size: 2.35rem; } }
 @media (min-width: 720px) {
   .toc ol { columns: 2; column-gap: 32px; }
   .toc li { break-inside: avoid; }
-  .features { grid-template-columns: 1fr 1fr; gap: 16px; }
-  .features li:first-child { grid-column: 1 / -1; }
 }
 @media print {
   :root { --bg: #FFFFFF; --card: #FFFFFF; --text: #000000; --muted: #000000; --link: #000000; --link-pressed: #000000; --fill: transparent; }
@@ -360,8 +352,6 @@ footer p, footer ul { font-size: .82rem; }
   .skip, header nav, .toc, .footer-links { display: none; }
   header, main, footer { max-width: none; padding: 0; }
   article { margin: 0; padding: 0; border-radius: 0; box-shadow: none; }
-  .features li { padding: 0; }
-  .app-icon { box-shadow: none; }
   a[href^="http"]::after { content: " (" attr(href) ")"; }
   h2, h3 { break-after: avoid; }
   p, li { break-inside: avoid; }
@@ -376,7 +366,7 @@ const NAV = [
 
 const HOME_TITLE = 'Festie: plan your festival with your crew';
 
-function pageShell({ key, title, description, body, values }) {
+function pageShell({ key, title, description, body, values, head = '', end = '' }) {
   const pageTitle = key === 'index' ? HOME_TITLE : `${title} · Festie`;
   const url = canonicalUrl(key);
   const nav = NAV.map(
@@ -409,7 +399,7 @@ function pageShell({ key, title, description, body, values }) {
 <style>
 ${SITE_CSS}
 </style>
-</head>
+${head}</head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <header>
@@ -423,7 +413,7 @@ ${body}
 <ul class="footer-links" role="list">${footerLinks}</ul>
 <p>Festie is an independent app and is not affiliated with or endorsed by any festival, organizer or artist.</p>
 </footer>
-</body>
+${end}</body>
 </html>
 `;
 }
@@ -474,17 +464,19 @@ function renderHtml(doc, key, values) {
 
 /**
  * The home page: what the app does, built only from facts stated in the repository (README, the
- * privacy policy and support page, app.json). It claims nothing about availability.
+ * privacy policy and support page, app.json). It claims nothing about availability. Its styles and motion
+ * live in docs/legal/home.css and home.js; without JavaScript, or with Reduce Motion, it is a static page.
  */
 const HOME_FEATURES = [
-  ['Your schedule', 'Pick the sets you want to see; Festie flags clashes, and the map shows what is up next on each stage.'],
-  ["Your crew's picks", 'Create a crew, invite friends with a 6-character code or a link, and see which sets everyone picked.'],
-  ['Meetups', 'Plan a meetup with a time, a stage or a pin on the festival map, and an optional totem photo so your crew can spot where to meet.'],
+  ['Your schedule', 'Pick the sets you want to see; Festie flags clashes, and the map shows what is up next on each stage.', 'schedule'],
+  ["Your crew's picks", 'Create a crew, invite friends with a 6-character code or a link, and see which sets everyone picked.', 'crew'],
+  ['Meetups', 'Plan a meetup with a time, a stage or a pin on the festival map, and an optional totem photo so your crew can spot where to meet.', 'meetup'],
   [
     'Location only when you choose',
     'Share your location with the crew you choose, for 1, 4 or 8 hours or until you stop (24 hours at most), and only while Festie is open. It is visible to your crew for at most 15 minutes after the last update, then deleted.',
+    'location',
   ],
-  ['Works without signal', 'Schedules, crews and meetups are saved on your phone and sync when you are back online, and you can download the festival map.'],
+  ['Works without signal', 'Schedules, crews and meetups are saved on your phone and sync when you are back online, and you can download the festival map.', 'offline'],
 ];
 
 const HOME_PRIVACY = [
@@ -495,6 +487,81 @@ const HOME_PRIVACY = [
   'You can delete your account at any time in Settings.',
 ];
 
+/** A small moving picture beside each feature (home.css animates them). Decorative: the text says it all. */
+const HOME_MOTIFS = {
+  schedule: [
+    '<div class="motif m-schedule" aria-hidden="true">',
+    '<span class="lane" style="--y:22%"><i style="--x:0%;--w:38%"></i><i class="pick" style="--x:52%;--w:40%"></i></span>',
+    '<span class="lane" style="--y:46%"><i class="pick clash" style="--x:10%;--w:36%"></i><i style="--x:52%;--w:36%"></i></span>',
+    '<span class="lane" style="--y:70%"><i class="pick clash" style="--x:26%;--w:30%"></i><i style="--x:62%;--w:32%"></i></span>',
+    '<span class="now"></span><em class="flag">Clash</em></div>',
+  ].join(''),
+  crew: [
+    '<div class="motif m-crew" aria-hidden="true"><span class="set">10:30 · Lakeside</span>',
+    '<span class="faces"><i style="--d:0;--c:var(--blue)">A</i><i style="--d:1;--c:var(--mint)">J</i>',
+    '<i style="--d:2;--c:var(--peach)">M</i><i style="--d:3;--c:var(--lilac)">S</i></span>',
+    '<span class="code">K7Q2PM</span></div>',
+  ].join(''),
+  meetup: [
+    '<div class="motif m-meet" aria-hidden="true"><span class="road r1"></span><span class="road r2"></span>',
+    '<span class="ripple"></span><span class="pin"><svg viewBox="0 0 26 34"><path d="M13 32s11-10.4 11-19a11 11 0 0 0-22 0c0 8.6 11 19 11 19z"/>',
+    '<circle cx="13" cy="13" r="4"/></svg></span><span class="when">11:05</span></div>',
+  ].join(''),
+  location: [
+    '<div class="motif m-loc" aria-hidden="true"><span class="seg"><i class="thumb"></i><b>1 h</b><b>4 h</b><b>8 h</b></span>',
+    '<span class="dot"></span></div>',
+  ].join(''),
+  offline: [
+    '<div class="motif m-off" aria-hidden="true"><span class="bars"><i></i><i></i><i></i><i></i></span>',
+    '<span class="states"><b class="s-none">No signal</b><b class="s-saved">Saved on your phone</b><b class="s-synced">Synced</b></span></div>',
+  ].join(''),
+};
+
+/** The hero ring: things the app shows, as small tiles. Generic examples, no real festival or artist. */
+const RING_TILES = [
+  '<img src="apple-touch-icon.png" width="60" height="60" alt="">',
+  '<span class="tk">Main stage</span><span class="tb">9:40</span><span class="ts">pm · 3 going</span>',
+  '<span class="tbadge">Clash</span><span class="tb">10:15</span><span class="ts">Tent and Lakeside</span>',
+  '<span class="tk">Meetup</span><span class="tb">11:05</span><span class="ts">At the totem</span>',
+  '<span class="tk">Crew code</span><span class="tcode">K7Q2PM</span><span class="ts">Join with a code</span>',
+  '<span class="tk">Sharing</span><span class="tb">4 h</span><span class="ts">Only while open</span>',
+  '<span class="tk">No signal</span><span class="tb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="ts">Saved on your phone</span>',
+  '<span class="tk">Your picks</span><span class="tb">12</span><span class="ts">sets this weekend</span>',
+  '<span class="tk">Your crew</span><span class="tfaces"><i>A</i><i>J</i><i>M</i></span><span class="ts">Picked this set</span>',
+  '<span class="tk">Up next</span><span class="tb">8:20</span><span class="ts">Lakeside stage</span>',
+];
+/** Tile colours, one per slot: the first lap and the second lap use different orders. */
+const RING_COLORS = [
+  'pink', 'blue', 'lemon', 'mint', 'white', 'lilac', 'peach', 'blue', 'pink', 'mint',
+  'lilac', 'peach', 'lemon', 'pink', 'blue', 'mint', 'lilac', 'white', 'peach', 'blue',
+];
+
+function ringHtml() {
+  const slots = RING_COLORS.map((color, i) => {
+    const html = RING_TILES[i % RING_TILES.length];
+    const face = `<div class="tile${i % RING_TILES.length === 0 ? ' tile-icon' : ''}">${html}</div>`;
+    return `<li class="slot" style="--i:${i};--c:var(--${color})">${face}${face}</li>`;
+  });
+  return `<div class="ring-wrap" aria-hidden="true"><ul class="ring" role="list">${slots.join('')}</ul></div>`;
+}
+
+/** The tilted strip at the top of the features: what the app does, twice over so it loops without a seam. */
+const TAPE_WORDS = ['Your schedule', "Your crew's picks", 'Meetups', 'Totem photos', 'Location only when you choose', 'Works without signal', 'No ads, no tracking'];
+const TAPE_COLORS = ['pink', 'lemon', 'mint', 'blue', 'peach', 'lilac', 'pink'];
+
+function tapeHtml() {
+  const run = TAPE_WORDS.map((word, k) => `<span>${escapeHtml(word)}<i style="--c:var(--${TAPE_COLORS[k]})"></i></span>`).join('');
+  return `<div class="tape" aria-hidden="true"><div class="tape-track">${run}${run}</div></div>`;
+}
+
+const CHEVRON =
+  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+const CHECK = '<svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="15"/><path d="m9.5 15.5 4 4 7-8"/></svg>';
+/** Runs in <head> before first paint, so the static layout never flashes. home.js follows later changes. */
+const MOTION_SWITCH = "if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('motion');";
+
+const readSource = (file) => readFileSync(rel(file), 'utf8').replace(/\r\n/g, '\n').trim();
+
 function renderIndex(values) {
   // TODO: once App Store listing 6761392490 is live, link to it here (APP_STORE_URL in
   // apps/mobile/src/config/app-info.ts) and add an apple-itunes-app meta tag for this page. Nothing in the
@@ -504,34 +571,57 @@ function renderIndex(values) {
     ? `For help with Festie, see the ${supportLink} or email ${textToHtml(SUPPORT_EMAIL_TOKEN, values)}.`
     : `For help with Festie, see the ${supportLink}.`;
   const body = [
-    '<div class="home">',
-    '<section class="hero" aria-labelledby="festie">',
-    '<img class="app-icon" src="apple-touch-icon.png" width="88" height="88" alt="">',
-    '<h1 id="festie">Festie</h1>',
+    '<canvas class="blocks" aria-hidden="true"></canvas>',
+    '<section class="hero" data-pane aria-labelledby="festie">',
+    '<div class="hero-stage">',
+    ringHtml(),
+    `<h1 class="mark" id="festie"><span class="sr-only">Festie</span><span class="mark-letters" aria-hidden="true">${[...'Festie'].map((letter, l) => `<span style="--l:${l}">${letter}</span>`).join('')}</span></h1>`,
+    '</div>',
+    '<div class="hero-copy">',
+    '<img class="app-icon" src="apple-touch-icon.png" width="64" height="64" alt="">',
     '<p class="lead">Plan your festival with your crew.</p>',
-    '<p>Festie helps you plan a music festival with your crew: build your schedule, see which sets your friends picked, set up meetups and, only when you choose, share your location with your crew.</p>',
+    '<p class="hero-text">Festie helps you plan a music festival with your crew: build your schedule, see which sets your friends picked, set up meetups and, only when you choose, share your location with your crew.</p>',
     '<p class="meta">Free, for iPhone. No ads, no tracking.</p>',
+    `<a class="cue" href="#what-you-can-do">What you can do${CHEVRON}</a>`,
+    '</div>',
     '</section>',
-    '<section aria-labelledby="what-you-can-do">',
-    '<h2 id="what-you-can-do">What you can do</h2>',
-    '<ul class="features" role="list">',
-    ...HOME_FEATURES.map(([title, text]) => `<li><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></li>`),
+    '<section class="sec sec-features" data-pane aria-labelledby="what-you-can-do">',
+    tapeHtml(),
+    '<div class="sec-inner">',
+    '<div class="sec-head"><h2 id="what-you-can-do">What you can do</h2></div>',
+    '<ul class="feat-list" role="list">',
+    ...HOME_FEATURES.map(
+      ([title, text, motif]) => `<li class="feat"><div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></div>${HOME_MOTIFS[motif]}</li>`,
+    ),
     '</ul>',
+    '</div>',
     '</section>',
-    '<section aria-labelledby="private-by-design">',
-    '<h2 id="private-by-design">Private by design</h2>',
-    '<ul>',
-    ...HOME_PRIVACY.map((text) => `<li>${escapeHtml(text)}</li>`),
+    '<section class="sec sec-privacy" data-pane aria-labelledby="private-by-design">',
+    '<div class="sec-inner">',
+    '<div class="sec-head"><h2 id="private-by-design">Private by design</h2></div>',
+    '<div class="panel">',
+    '<ul class="checks" role="list">',
+    ...HOME_PRIVACY.map((text, k) => `<li style="--k:${k}">${CHECK}<span>${escapeHtml(text)}</span></li>`),
     '</ul>',
     '<p><a href="privacy.html">Read the privacy policy</a></p>',
-    '</section>',
-    '<section aria-labelledby="help">',
-    '<h2 id="help">Help</h2>',
-    `<p>${help}</p>`,
-    '</section>',
     '</div>',
+    '</div>',
+    '</section>',
+    '<section class="sec sec-help" data-pane aria-labelledby="help">',
+    '<div class="sec-inner">',
+    '<div class="sec-head"><h2 id="help">Help</h2></div>',
+    `<div class="panel"><p>${help}</p></div>`,
+    '</div>',
+    '</section>',
   ].join('\n');
-  return pageShell({ key: 'index', title: 'Festie', description: 'Festie: plan your festival with your crew.', body, values });
+  const head = [
+    '<link rel="preload" href="fredoka-bold.ttf" as="font" type="font/ttf" crossorigin>',
+    `<style>\n${readSource('docs/legal/home.css')}\n</style>`,
+    `<script>${MOTION_SWITCH}</script>`,
+    '',
+  ].join('\n');
+  const end = `<script>\n${readSource('docs/legal/home.js')}\n</script>\n`;
+  return pageShell({ key: 'index', title: 'Festie', description: 'Festie: plan your festival with your crew.', body, values, head, end });
 }
 
 /* ─── In-app screen (React Native) ─────────────────────────────────────── */
