@@ -32,6 +32,6 @@ export function ArtistMonogram({ name, colorKey, size = 112, radius }: { name: s
 
 const styles = StyleSheet.create({
   tile: { ...continuous, alignItems: 'center', justifyContent: 'center' },
-  // SF Pro Rounded, like the titles beside the tile.
-  initials: { color: colors.textPrimary, fontFamily: fontFamily.rounded, fontWeight: '700', opacity: 0.85 },
+  // Bold italic Georgia, like the artist name beside the tile.
+  initials: { color: colors.textPrimary, fontFamily: fontFamily.display, fontStyle: 'italic', fontWeight: '700', opacity: 0.85 },
 });

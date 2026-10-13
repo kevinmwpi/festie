@@ -23,39 +23,44 @@ help someone find a set, a friend or a meeting point does not belong.
 
 ## Typography
 
-Body text is the system font (SF Pro). Titles use **SF Pro Rounded** (`fontFamily: 'ui-rounded'`, mapped
-by React Native to `UIFontDescriptorSystemDesignRounded`): still a native, Dynamic-Type-ready system font,
-and a quiet echo of the rounded Fredoka wordmark. The wordmark itself is the only custom face and appears
-only as the "Festie" logotype. Georgia italic is retired.
+Body text is the system font (SF Pro). Titles use Festie's display face: **Georgia, bold italic**
+(`fontFamily.display`, built into iOS), the slightly cursive titles that give the app its character. The
+Fredoka wordmark appears only as the "Festie" logotype. Text that borrows a title size but is not a title
+(invite codes, sign-in code digits, initials) spreads `upright` to stay in the system face.
 
 Use the `textStyles` roles. Sizes are Apple's defaults at the standard content size; React Native scales them
 (and their line heights) with the user's text size.
 
 | Role | Size / line | Weight | Family | Use for |
 |---|---|---|---|---|
-| `largeTitle` | 34 / 41 | 700 | Rounded | Rare: a screen's single hero title |
-| `title1` | 28 / 34 | 700 | Rounded | Pushed-screen titles (`SubScreenHeader`), auth screen titles |
-| `title2` | 22 / 28 | 700 | Rounded | Card and sheet titles, festival and crew names |
-| `title3` | 20 / 25 | 600 | Rounded | Artist names on cards, in-card section titles |
-| `headline` | 17 / 22 | 600 | SF Pro | Button labels, row titles that need emphasis |
+| `largeTitle` | 34 / 41 | 700 italic | Georgia | Rare: a screen's single hero title |
+| `title1` | 28 / 34 | 700 italic | Georgia | Pushed-screen titles (`SubScreenHeader`), auth screen titles |
+| `title2` | 22 / 28 | 700 italic | Georgia | Card and sheet titles, festival and crew names |
+| `title3` | 20 / 25 | 700 italic | Georgia | Artist names on cards, in-card section titles |
+| `headline` | 17 / 22 | 600 | SF Pro | Row titles that need emphasis |
 | `body` | 17 / 22 | 400 | SF Pro | List row titles, form fields, long text |
 | `callout` | 16 / 21 | 400 | SF Pro | Secondary body copy inside cards |
 | `subheadline` | 15 / 20 | 400 | SF Pro | Supporting lines, row subtitles, descriptions |
 | `footnote` | 13 / 18 | 400 | SF Pro | Section headers (600), helper text, metadata, chips (600) |
 | `caption1` | 12 / 16 | 400 | SF Pro | Badges (600), timestamps, dense metadata |
-| `caption2` | 11 / 13 | 400 | SF Pro | Tab bar labels, timeline micro-text. Nothing smaller. |
+| `caption2` | 11 / 13 | 400 | SF Pro | Tab bar labels, timeline micro-text |
+| `label` | 10 / 14 | 800, caps, +2 | SF Pro | The line under a screen title (header subtitles) |
+| `buttonCaps` | 13 / 18 | 800, caps, +2 | SF Pro | Primary and destructive button labels |
+| `buttonText` | 13 / 18 | 700 | SF Pro | Secondary button labels |
 
 Rules:
 
-- **Sentence case everywhere.** The old 9–10pt, weight-800, uppercase, letter-spaced micro-labels are
-  retired: section headers are `footnote` 600 in `textSecondary`; badges are `caption1` 600. Do not add
-  `textTransform: 'uppercase'` or `.toUpperCase()`, and never uppercase a user's name.
+- **Spaced capitals only in two places**: the line under a screen title (`label`) and primary and
+  destructive button labels (`buttonCaps`); both styles uppercase through `textTransform`, so source strings
+  stay sentence case. Everything else is sentence case: section headers are `footnote` 600 in
+  `textSecondary`, badges `caption1` 600. Never `.toUpperCase()` a string in code.
 - Change emphasis with `fontWeight` (400 / 600 / 700), never by inventing a size. 500 (Medium) appears only where
   iOS uses it natively: unselected tab-bar and segmented-control labels, and the map's small pin times.
-- No `letterSpacing` except on codes (invite and sign-in codes), where it separates characters.
+- No `letterSpacing` except on codes (invite and sign-in codes) and the two spaced-capitals styles.
 - **Times, counts and codes use tabular figures** (`...tabularNums`) so columns line up. Chip and badge
   labels have them built in.
-- Minimum size is 11. Text never sits in a fixed-height box: use `minHeight` and let it wrap.
+- Minimum size is 11, except the 10pt `label` capitals under titles. Text never sits in a fixed-height box:
+  use `minHeight` and let it wrap.
 - `allowFontScaling={false}` only for glyphs inside fixed decorative tiles (avatars, monograms, the tab bar),
   each with a comment. Where geometry must hold (the schedule timeline), cap growth with
   `maxFontSizeMultiplier` and keep the full text in the accessibility label.
@@ -138,8 +143,8 @@ One light source from above; shadows are tinted with the ink, never pure black.
 
 Use the shared primitives; do not restyle them locally.
 
-- **Buttons** (`PrimaryButton`, `SecondaryButton`, `DestructiveButton`): 52pt, `md` radius, `headline`
-  sentence-case labels. Primary is the pastel fill (festival accent when given); secondary is the tinted
+- **Buttons** (`PrimaryButton`, `SecondaryButton`, `DestructiveButton`): 52pt, `md` radius. Primary and
+  destructive labels are `buttonCaps`; secondary labels are `buttonText`. Primary is the pastel fill (festival accent when given); secondary is the tinted
   blue fill with a `link` label; destructive is `destructiveBg` with a `destructive` label. Disabled is
   50% opacity; loading swaps the label for a spinner and sets `busy`.
 - **TextLink**: underlined `link`; pass `role="button"` when it performs an action instead of navigating,
@@ -154,10 +159,10 @@ Use the shared primitives; do not restyle them locally.
   (`accessory="none"` for in-place actions, `"external"` for links that leave the app). A trailing verb the
   row performs ("Unblock") uses `valueTone="action"`.
 - **Headers**: tab roots keep the Fredoka wordmark over a `subheadline` breadcrumb; pushed screens use
-  `SubScreenHeader` (44pt round back button, `title1` title, `subheadline` label). Screens whose content already
+  `SubScreenHeader` (44pt round back button, `title1` title, `label` capitals line). Screens whose content already
   has the 20pt gutter (Settings, Edit profile, Blocked users, Delete account) use `@festival/ui`'s `ScreenHeader`,
   which has the same metrics.
-- **Sheets** (`BottomSheet`, `ActionSheet`): `card` top corners, a grabber, a `title2` title and a visible
+- **Sheets** (`BottomSheet`, `ActionSheet`): `card` top corners, a grabber, a `title2` (Georgia italic) title and a visible
   close button; the VoiceOver escape gesture closes them.
 - **States**: loading (`LoadingState`), empty (`EmptyState`), error with retry (`ErrorState`), offline and
   stale-data notes exist for every data screen. Keep their copy; restyle only through the primitives.
@@ -202,7 +207,7 @@ decisions, translated to web conventions:
 
 - Same ink, wash, link and card colours; a real dark theme via `prefers-color-scheme` with every pair
   checked to WCAG AA (most AAA).
-- System font stack; titles in `ui-rounded`. On iOS the base size follows Dynamic Type
+- System font stack; page titles in bold italic Georgia, as in the app. On iOS the base size follows Dynamic Type
   (`font: -apple-system-body`), because the app opens these pages in a Safari sheet. Sizes are in `rem`.
 - Long-form measure of about 60–75 characters, line height around 1.6, clear h2/h3 rhythm, sentence-case
   metadata, and an "On this page" index on long documents.

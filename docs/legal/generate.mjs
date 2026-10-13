@@ -267,8 +267,9 @@ function dateHtml(text) {
  *   the app icon 22.37% (iconRadius). The card shadow is elevation.card.
  *   Type: rem on a 17px root (HIG body). On iOS the root follows Dynamic Type (`-apple-system-body`),
  *   because the app opens these pages in a Safari sheet; the `-webkit-touch-callout` test keeps that to
- *   iOS, since macOS Safari would resolve the keyword to its 13px body. h1 ≈ largeTitle in SF Pro
- *   Rounded, h2 ≈ title3, h3 = headline, the "Last updated" line ≈ subheadline.
+ *   iOS, since macOS Safari would resolve the keyword to its 13px body. h1 ≈ largeTitle in the app's
+ *   display face (bold italic Georgia), h2 ≈ headline-weight system text, h3 = headline, the "Last updated"
+ *   line ≈ subheadline. The brand link keeps the rounded system stack.
  *   Measure: --measure is 56ch. A ch is the width of "0", wider than an average prose character, so 56ch
  *   is about 65 characters per line. header/main/footer add back the article's widest --pad (44px) and the
  *   gutter on each side, so the article's text column is exactly --measure once --pad reaches 44px.
@@ -280,6 +281,7 @@ const SITE_CSS = `
   --link: #2F5DA8; --link-pressed: #244A87; --rule: rgba(44, 51, 39, .12); --fill: rgba(44, 51, 39, .05);
   --gutter: 16px; --pad: clamp(20px, 5vw, 44px); --radius: 22px; --measure: 56ch;
   --rounded: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: Georgia, "Times New Roman", serif;
 }
 @media (min-width: 600px) { :root { --radius: 26px; } }
 @media (prefers-color-scheme: dark) {
@@ -307,7 +309,7 @@ header nav a[aria-current="page"] { color: var(--text); text-decoration-line: un
 article { background: var(--card); border-radius: var(--radius); padding: clamp(24px, 5vw, 40px) var(--pad) clamp(28px, 5vw, 44px); margin: 12px 0 32px; box-shadow: 0 3px 10px rgba(44, 51, 39, .05); }
 h1, h2, h3 { text-wrap: balance; }
 p, li { text-wrap: pretty; }
-h1 { font-family: var(--rounded); font-weight: 700; font-size: 2rem; line-height: 1.15; margin: 0 0 .4rem; }
+h1 { font-family: var(--display); font-style: italic; font-weight: 700; font-size: 2rem; line-height: 1.2; margin: 0 0 .4rem; }
 h2 { font-size: 1.3rem; line-height: 1.27; font-weight: 650; margin: 2.4em 0 .5em; }
 h3 { font-size: 1rem; line-height: 1.4; font-weight: 600; margin: 1.5em 0 .25em; }
 h2 + h3 { margin-top: .75em; }

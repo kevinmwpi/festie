@@ -11,6 +11,7 @@ import {
   tabularNums,
   TextLink,
   textStyles,
+  upright,
 } from '@festival/ui';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
@@ -336,7 +337,7 @@ const styles = StyleSheet.create({
   otpCellError: {
     borderColor: colors.destructive,
   },
-  otpText: { ...textStyles.title2, ...tabularNums, color: colors.textPrimary },
+  otpText: { ...textStyles.title2, ...upright, ...tabularNums, color: colors.textPrimary },
   links: {
     alignItems: 'center',
     // TextLink is 20pt tall with 12pt hitSlop above and below: 24pt apart, the touch areas don't overlap.

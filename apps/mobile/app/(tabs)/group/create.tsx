@@ -12,8 +12,9 @@ import {
   SectionCard,
   spacing,
   tabularNums,
-  textStyles,
   TextLink,
+  textStyles,
+  upright,
   useOfflineStatus,
 } from '@festival/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -161,6 +162,7 @@ const styles = StyleSheet.create({
   // block's full width to measure against all of it.
   codeValue: {
     ...textStyles.largeTitle,
+    ...upright,
     ...tabularNums,
     alignSelf: 'stretch',
     color: colors.textPrimary,

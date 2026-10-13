@@ -1,7 +1,7 @@
 /**
  * The "Festie" wordmark face: Fredoka Bold, a rounded geometric display font bundled as
  * `assets/fonts/Fredoka-Bold.ttf` (SIL Open Font License 1.1, `assets/fonts/Fredoka-OFL.txt`) and
- * loaded under this name by the root layout. It is the logotype only: titles use the system's SF Pro Rounded
+ * loaded under this name by the root layout. It is the logotype only: titles use bold italic Georgia
  * (`textStyles` in @festival/ui).
  * The file holds a single weight, so styles that use it set no `fontWeight` or `fontStyle`.
  */

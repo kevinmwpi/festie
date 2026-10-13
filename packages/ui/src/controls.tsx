@@ -221,9 +221,9 @@ export function BackChevron() {
 /* ─── ScreenHeader ──────────────────────────────────────── */
 
 export interface ScreenHeaderProps {
-  /** `title1` screen title (announced as a header). */
+  /** Bold italic `title1` screen title (announced as a header). */
   title: string;
-  /** Optional `subheadline` line under the title. */
+  /** Optional spaced-capitals line under the title. */
   subtitle?: string;
   /** Shows a 44×44 back button when set. */
   onBack?: () => void;
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.ms,
   },
-  destructiveLabel: { ...textStyles.headline, color: colors.destructive, textAlign: 'center' },
+  destructiveLabel: { ...textStyles.buttonCaps, color: colors.destructive, textAlign: 'center' },
 
   iconButton: {
     ...elevation.raised,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     marginLeft: -spacing.xs,
   },
   headerTitle: { ...textStyles.title1, color: colors.textPrimary },
-  headerSubtitle: { ...textStyles.subheadline, color: colors.textSecondary },
+  headerSubtitle: { ...textStyles.label, color: colors.textSecondary },
 
   badge: {
     alignSelf: 'flex-start',

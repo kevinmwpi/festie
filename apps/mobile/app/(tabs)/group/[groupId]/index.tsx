@@ -28,8 +28,9 @@ import {
   showToast,
   spacing,
   tabularNums,
-  textStyles,
   TextLink,
+  textStyles,
+  upright,
   useOfflineStatus,
 } from '@festival/ui';
 import { Ionicons } from '@expo/vector-icons';
@@ -735,7 +736,7 @@ const styles = StyleSheet.create({
     rowGap: spacing.sm,
   },
   codePill: { backgroundColor: colors.inputBg, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  codeValue: { ...textStyles.title3, ...tabularNums, color: colors.textPrimary, fontWeight: '700', letterSpacing: 3 },
+  codeValue: { ...textStyles.title3, ...upright, ...tabularNums, color: colors.textPrimary, fontWeight: '700', letterSpacing: 3 },
 
   /* Quick actions: flat, like buttons */
   actionRow: { flexDirection: 'row', gap: spacing.sm },

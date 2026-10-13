@@ -198,30 +198,38 @@ export const elevation = {
 } satisfies Record<string, ViewStyle>;
 
 /**
- * Font families. Text is the platform system font (SF Pro on iOS). Titles use SF Pro Rounded
- * (`ui-rounded`, mapped by React Native to `UIFontDescriptorSystemDesignRounded`): a native, Dynamic
- * Type-ready system font that echoes the rounded wordmark. Android has no rounded system design and
- * falls back to the default.
+ * Font families. Text is the platform system font (SF Pro on iOS). Titles use Festie's display face:
+ * Georgia, set bold italic (built into iOS; other platforms fall back to their serif).
  */
 export const fontFamily = {
   text: undefined as string | undefined,
-  rounded: Platform.select<string | undefined>({
-    ios: 'ui-rounded',
-    web: 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    default: undefined,
+  display: Platform.select<string | undefined>({
+    ios: 'Georgia',
+    web: 'Georgia, "Times New Roman", serif',
+    default: 'serif',
   }),
 };
 
+/** The display face as a style: bold italic Georgia, the brand's titles. */
+const displayFace = { fontFamily: fontFamily.display, fontStyle: 'italic', fontWeight: '700' } as const;
+
 /**
- * Apple's text styles at the default content size. React Native scales sizes and line heights with the
- * user's text size (`allowFontScaling`, on by default). Emphasise with `fontWeight`, never a new size:
- * `{ ...textStyles.footnote, fontWeight: '600' }`. Minimum size is 11 (`caption2`). Labels are sentence case.
+ * Upright system face, for text that spreads a title role but must not be italic serif (invite codes,
+ * sign-in code digits, initials): `{ ...textStyles.title2, ...upright }`.
+ */
+export const upright = { fontFamily: fontFamily.text, fontStyle: 'normal' } as const satisfies TextStyle;
+
+/**
+ * Text styles. Titles are the brand's bold italic Georgia; everything else follows Apple's text styles at
+ * the default content size. React Native scales sizes and line heights with the user's text size
+ * (`allowFontScaling`, on by default). Emphasise with `fontWeight`, never a new size:
+ * `{ ...textStyles.footnote, fontWeight: '600' }`.
  */
 export const textStyles = {
-  largeTitle: { fontFamily: fontFamily.rounded, fontSize: 34, lineHeight: 41, fontWeight: '700' },
-  title1: { fontFamily: fontFamily.rounded, fontSize: 28, lineHeight: 34, fontWeight: '700' },
-  title2: { fontFamily: fontFamily.rounded, fontSize: 22, lineHeight: 28, fontWeight: '700' },
-  title3: { fontFamily: fontFamily.rounded, fontSize: 20, lineHeight: 25, fontWeight: '600' },
+  largeTitle: { ...displayFace, fontSize: 34, lineHeight: 41 },
+  title1: { ...displayFace, fontSize: 28, lineHeight: 34 },
+  title2: { ...displayFace, fontSize: 22, lineHeight: 28 },
+  title3: { ...displayFace, fontSize: 20, lineHeight: 25 },
   headline: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
   body: { fontSize: 17, lineHeight: 22, fontWeight: '400' },
   callout: { fontSize: 16, lineHeight: 21, fontWeight: '400' },
@@ -229,6 +237,12 @@ export const textStyles = {
   footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
   caption1: { fontSize: 12, lineHeight: 16, fontWeight: '400' },
   caption2: { fontSize: 11, lineHeight: 13, fontWeight: '400' },
+  /** Spaced capitals: the line under a screen title (e.g. "PACKAGES/UI + APP COMPONENTS"). */
+  label: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
+  /** Primary and destructive button labels: spaced capitals. */
+  buttonCaps: { fontSize: 13, lineHeight: 18, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
+  /** Secondary button labels: bold, as written. */
+  buttonText: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
 } satisfies Record<string, TextStyle>;
 
 /** Tabular (fixed-width) digits for times, counts and codes, so numbers line up. */

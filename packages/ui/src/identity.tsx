@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { accessibleAccent, colors, continuous, fontFamily, layout, radii, spacing, textStyles } from './theme';
+import { accessibleAccent, colors, continuous, layout, radii, spacing, textStyles, upright } from './theme';
 
 /* ─── Avatar ────────────────────────────────────────────── */
 
@@ -80,7 +80,7 @@ export function Avatar({ name, avatarType, avatarValue, size = 44, accessibility
         allowFontScaling={false}
         style={[
           styles.avatarGlyph,
-          isEmoji ? { fontSize: Math.round(size * 0.48) } : { fontFamily: fontFamily.rounded, fontSize: Math.round(size * 0.36), fontWeight: '700' },
+          isEmoji ? { fontSize: Math.round(size * 0.48) } : { fontSize: Math.round(size * 0.36), fontWeight: '800' },
           muted && styles.avatarGlyphMuted,
         ]}
       >
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     padding: spacing.ms,
   },
   initialsLabel: { ...textStyles.footnote, color: colors.textSecondary, fontWeight: '600' },
-  initialsValue: { ...textStyles.title2, color: colors.textPrimary },
+  initialsValue: { ...textStyles.title2, ...upright, color: colors.textPrimary },
   pressed: { opacity: 0.7 },
 
   checkboxRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.ms, minHeight: layout.minTouchTarget, paddingVertical: spacing.xs },

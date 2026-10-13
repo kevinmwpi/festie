@@ -41,8 +41,8 @@ export function ScreenHeader({ crumbs, right }: { crumbs: Array<string | null | 
 }
 
 /**
- * Header for screens pushed inside a tab stack: a 44pt back button, a `title1` title and an optional
- * `subheadline` line.
+ * Header for screens pushed inside a tab stack: a 44pt back button, a bold italic `title1` title and an
+ * optional spaced-capitals line.
  */
 export function SubScreenHeader({
   title,
@@ -103,5 +103,5 @@ const styles = StyleSheet.create({
   subHeader: { gap: spacing.xs, paddingBottom: spacing.sm, paddingHorizontal: layout.screenGutter, paddingTop: spacing.md },
   subRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs, marginLeft: -spacing.xs },
   subTitle: { ...textStyles.title1, color: colors.textPrimary },
-  subLabel: { ...textStyles.subheadline, color: colors.textSecondary },
+  subLabel: { ...textStyles.label, color: colors.textSecondary },
 });

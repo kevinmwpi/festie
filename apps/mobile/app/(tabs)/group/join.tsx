@@ -9,6 +9,7 @@ import {
   spacing,
   tabularNums,
   textStyles,
+  upright,
   useOfflineStatus,
 } from '@festival/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -109,6 +110,7 @@ const styles = StyleSheet.create({
   content: { gap: spacing.md, padding: layout.screenGutter },
   codeInput: {
     ...textStyles.title2,
+    ...upright,
     ...tabularNums,
     letterSpacing: 6,
     textAlign: 'center',

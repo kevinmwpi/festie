@@ -35,6 +35,7 @@ export {
   spacing,
   tabularNums,
   textStyles,
+  upright,
 } from './theme';
 export { isReduceMotionEnabled, PressableScale, useReduceMotion, type PressableScaleProps } from './press';
 export {
@@ -460,9 +461,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.ms,
   },
   buttonDisabled: { opacity: 0.5 },
-  primaryButtonLabel: { ...textStyles.headline, color: colors.textPrimary, textAlign: 'center' },
+  primaryButtonLabel: { ...textStyles.buttonCaps, color: colors.textPrimary, textAlign: 'center' },
   secondaryButton: { backgroundColor: colors.tintedFill },
-  secondaryButtonLabel: { ...textStyles.headline, color: colors.link, textAlign: 'center' },
+  secondaryButtonLabel: { ...textStyles.buttonText, color: colors.link, textAlign: 'center' },
 
   /* Text link */
   textLink: { minHeight: 20 },
