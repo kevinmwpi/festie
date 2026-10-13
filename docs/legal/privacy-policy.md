@@ -10,9 +10,9 @@ placeholder: it stays in this file and the generator fills it in from docs/legal
 and EXPO_PUBLIC_SUPPORT_EMAIL (in-app screens).
 -->
 
-Last updated: October 5, 2026
+Last updated: October 12, 2026
 
-Festie is a festival planning app operated by Kevin M Pi ("Festie", "we", "us"). This policy explains what information the Festie app and its servers handle, why, who can see it, how long we keep it and the choices you have. If you have a question, email __SUPPORT_EMAIL__.
+Festie is a festival planning app operated by Kevin Pi. In this policy, "we", "us" and "our" mean Kevin Pi, and "Festie" means the app and its services. This policy explains what information the Festie app and our servers handle, why, who can see it, how long we keep it and the choices you have. If you have a question, email __SUPPORT_EMAIL__.
 
 ## Summary
 
@@ -69,7 +69,7 @@ Festie is a festival planning app operated by Kevin M Pi ("Festie", "we", "us").
 
 ### On your phone
 
-- To work offline at a festival, Festie keeps your sign-in session, a copy of your schedule, crews and meetups, changes waiting to sync, your reminders and your settings in the app's private storage on your phone, which iOS protects with its standard data protection. Signing out or deleting your account in the app removes your account data from the phone. If you are signed out without doing it yourself (for example, your sign-in expires or you deleted your account on another device), Festie keeps that copy, including changes not yet synced, so nothing is lost: it cannot be viewed while you are signed out, and it is removed when you sign in again and then sign out, when a different account (including a new one after a deletion) signs in on the phone, or when you delete the app. Deleting the app removes everything.
+- To work offline at a festival, Festie keeps your sign-in session, a copy of your schedule, crews and meetups, changes waiting to sync, your reminders and your settings in the app's private storage on your phone, which iOS protects with its standard data protection. Signing out or deleting your account in the app removes your account data from the phone. If you are signed out without doing it yourself (for example, your sign-in expires or you deleted your account on another device), Festie keeps that copy, including changes not yet synced, so nothing is lost. The app does not show it while you are signed out. It is removed when you sign in again and then sign out, when a different account (including a new one after a deletion) signs in on the phone, or when you delete the app. Deleting the app removes everything.
 - Set and meetup reminders are scheduled on your phone as local notifications. We do not use push notification servers.
 
 ## 2. What we do not collect
@@ -128,7 +128,7 @@ We disclose information to authorities only if the law requires it or where nece
 - **Rate-limit records:** about a day after they are created.
 - **Account, profile, picks, followed festivals, crews, meetups, photos and blocks:** until you delete them or delete your account.
 - **Meetups in a crew you leave:** they stay visible to that crew until a crew admin removes them or you delete your account. If a crew admin removes you from a crew, your meetups in that crew are deleted.
-- **Crews:** deleted automatically, with their meetups, when the last member leaves. Their photos are deleted with them when the last member deletes their account, and otherwise by routine cleanup within about a week.
+- **Crews:** deleted automatically, with their meetups, when the last member leaves. The crew's photos go at the same time when that member deleted their account; otherwise routine cleanup removes them within about a week.
 - **Totem photos:** deleted when you replace them or delete the meetup, except a photo someone has reported: it is kept until we finish reviewing the report, and then deleted if it is no longer used (deleting your account still deletes it straight away). Photo files left behind, for example by a deleted crew or an interrupted upload, are removed by routine cleanup within about a week.
 - **Reports and block notices:** kept as a moderation record. If you delete your account, reports you sent are kept without your name. Reports about you or your content keep the copy of the reported text taken at the time.
 - **Banned accounts:** if we ban an account for breaking our Terms of Use, we remove it from every crew and delete its meetups, totem photos and shared location. We keep its profile, sign-in account and email address, and any other content it posted that we have not removed, as a record of the ban and to stop it signing in again.
@@ -181,6 +181,6 @@ When we change this policy we will update the date at the top. If a change is si
 
 ## 12. Contact
 
-Kevin M Pi
+Kevin Pi
 
 Email: __SUPPORT_EMAIL__

@@ -1,7 +1,8 @@
-import { detectConflict } from '@festival/domain';
+import { detectConflict, isCancelledSet } from '@festival/domain';
 import { enqueue, flush, getDb, withDbTransaction } from '@festival/sync-engine';
 
 import { SELECTION_COLUMNS, mergeOwnSelections, withRefreshGuard } from './cache';
+import { QUALIFIED_SET_COLUMNS } from './festivals';
 import { createId } from './ids';
 import type { FestivalLineupRow, FestivalSet, LocalSelection, UserSetSelectionRow } from './models';
 import { selectAllRows } from './paging';
@@ -16,7 +17,7 @@ export interface ScheduleRow extends FestivalLineupRow {
   selection_pending: number | null;
 }
 
-const SCHEDULE_SELECT = `SELECT sets.id, sets.festival_id, sets.artist_id, sets.stage_id, sets.start_time, sets.end_time, sets.set_type,
+const SCHEDULE_SELECT = `SELECT ${QUALIFIED_SET_COLUMNS},
             artists.name AS artist_name, artists.image_url AS artist_image_url, artists.genre AS genre,
             stages.name AS stage_name, stages.zone AS stage_zone,
             user_set_selections.id AS selection_id, user_set_selections.selected_at AS selected_at,
@@ -145,9 +146,16 @@ export async function toggleSetSelection(festivalId: string, setId: string): Pro
   return true;
 }
 
-/** Ids of sets that overlap another set in `rows` (back-to-back sets do not conflict). */
-export function getConflictSetIds(rows: ReadonlyArray<Pick<FestivalSet, 'id' | 'start_time' | 'end_time'>>): Set<string> {
-  const ordered = [...rows].sort((left, right) => Date.parse(left.start_time) - Date.parse(right.start_time));
+/**
+ * Ids of sets that overlap another set in `rows`. Back-to-back sets do not conflict, and cancelled
+ * sets conflict with nothing.
+ */
+export function getConflictSetIds(
+  rows: ReadonlyArray<Pick<FestivalSet, 'id' | 'start_time' | 'end_time'> & { status?: string | null }>,
+): Set<string> {
+  const ordered = rows
+    .filter((row) => !isCancelledSet(row))
+    .sort((left, right) => Date.parse(left.start_time) - Date.parse(right.start_time));
   const conflictIds = new Set<string>();
 
   for (let index = 0; index < ordered.length; index += 1) {

@@ -1,4 +1,5 @@
 import { toggleSetSelection, toUserMessage, type Festival } from '@festival/data-access';
+import { isCancelledSet } from '@festival/domain';
 import { cancelReminderForEntity, scheduleSetReminder } from '@festival/notification-utils';
 import { showToast } from '@festival/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,6 +12,8 @@ export interface SelectableSet {
   start_time: string;
   artist_name: string;
   stage_name: string;
+  /** `sets.status`: a cancelled set gets no reminder. */
+  status?: string | null;
 }
 
 /** Shown at most once per app session so repeated picks do not nag. */
@@ -20,6 +23,7 @@ let deniedHintShown = false;
  * Adds or removes a set from the user's schedule (queued — works offline) and keeps its reminder in
  * step: adding schedules a reminder 15 minutes before the set's absolute start (asking for notification
  * permission the first time, in context), removing cancels it. A declined permission is explained once.
+ * A cancelled set never gets a reminder (screens only offer to remove one).
  */
 export function useSetSelection(festival: Pick<Festival, 'id' | 'timezone'> | null | undefined) {
   const queryClient = useQueryClient();
@@ -36,7 +40,9 @@ export function useSetSelection(festival: Pick<Festival, 'id' | 'timezone'> | nu
       try {
         const selected = await toggleSetSelection(festival.id, set.id);
         await invalidateSelectionQueries(queryClient);
-        if (selected) {
+        if (selected && isCancelledSet(set)) {
+          await cancelReminderForEntity('set', set.id);
+        } else if (selected) {
           const result = await scheduleSetReminder(
             { id: set.id, start_time: set.start_time, artist_name: set.artist_name, stage_name: set.stage_name, festival_id: festival.id },
             { timeZone: festival.timezone },

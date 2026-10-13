@@ -78,4 +78,12 @@ describe('getNextStageSet', () => {
     expect(getNextStageSet('main', sets, new Date('2026-08-01T19:30:00Z'))?.id).toBe('a');
     expect(getNextStageSet('main', sets, new Date('2026-08-01T23:00:00Z'))).toBeNull();
   });
+
+  it('skips cancelled sets', () => {
+    const sets = [
+      { id: 'gone', stage_id: 'main', start_time: '2026-08-01T20:00:00Z', status: 'cancelled' },
+      { id: 'next', stage_id: 'main', start_time: '2026-08-01T22:00:00Z', status: 'moved' },
+    ];
+    expect(getNextStageSet('main', sets, new Date('2026-08-01T19:30:00Z'))?.id).toBe('next');
+  });
 });

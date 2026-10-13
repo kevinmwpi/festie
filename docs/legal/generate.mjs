@@ -240,6 +240,16 @@ const plainText = (spans) => spans.map((s) => s.v).join('');
 function metaDescription(text, max = 155) {
   const clean = text.replace(/\s+/g, ' ').trim();
   if (clean.length <= max) return clean;
+  // Whole opening sentences first (a sentence ends at . ! or ? followed by a space, so the dot of an
+  // email address or a domain does not count), so a snippet never ends mid-name ("… mean Kevin"); a word
+  // boundary with an ellipsis only when the first sentence is itself too long.
+  let out = '';
+  for (const sentence of clean.split(/(?<=[.!?])\s+/)) {
+    const next = out ? `${out} ${sentence}` : sentence;
+    if (next.length > max) break;
+    out = next;
+  }
+  if (out) return out;
   const end = clean.lastIndexOf(' ', max - 1);
   return `${clean.slice(0, end > 0 ? end : max - 1).replace(/[\s,;:.(-]+$/, '')}…`;
 }

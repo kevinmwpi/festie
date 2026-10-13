@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Festie candidate review</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --line: #e2e5ea; --text: #1f2328; --muted: #6b7280; --accent: #2f6feb;
+    --green-bg: #dcf5e3; --green: #176f32; --amber-bg: #fff1c2; --amber: #7a5000; --red-bg: #ffe1dd; --red: #b4231a;
+    --gray-bg: #eceff3; --gray: #4b5563; --blue-bg: #dbe9fe; --blue: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--text); background: var(--bg); }
+  a { color: var(--accent); }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  h2, h3, h4 { margin: 0; }
+  h2.title { font-size: 20px; }
+  h3 { font-size: 15px; margin-top: 14px; }
+  h3:first-child { margin-top: 0; }
+  h4 { font-size: 14px; margin: 14px 0 6px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .prewrap { white-space: pre-wrap; margin: 4px 0; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .wrap { flex-wrap: wrap; }
+  .spacer { flex: 1; }
+  .chip { white-space: nowrap; }
+
+  .topbar { height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 16px; background: #fff; border-bottom: 1px solid var(--line); }
+  .topbar h1 { font-size: 15px; margin: 0; }
+  .topbar label { display: flex; align-items: center; gap: 8px; }
+  .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); height: calc(100vh - 48px); }
+  .sidebar { border-right: 1px solid var(--line); background: #fff; overflow-y: auto; display: flex; flex-direction: column; }
+  .sidebar-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
+  .candidate-list { list-style: none; margin: 0; padding: 0; }
+  .cand { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 10px 14px; cursor: pointer; }
+  .cand:hover { background: #f8f9fb; }
+  .cand.active { background: #eef3ff; box-shadow: inset 3px 0 0 var(--accent); }
+  .cand-name { font-weight: 600; margin-bottom: 4px; }
+  .cand-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 3px; }
+  .hint { padding: 10px 14px; margin: auto 0 0; font-size: 12px; color: var(--muted); }
+  .main { overflow-y: auto; padding: 16px 20px 48px; }
+  .empty { color: var(--muted); padding: 24px; text-align: center; }
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: 220px minmax(0, 1fr); }
+    .main { padding: 12px; }
+    .topbar { padding: 0 12px; }
+  }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .card.error { border-color: var(--red); background: var(--red-bg); color: var(--red); }
+  .facts { margin: 6px 0; }
+  .chips { margin: 8px 0; }
+  .sources { padding-left: 22px; margin: 6px 0; }
+  .sources li { margin-bottom: 6px; }
+  .sources li:target { background: var(--amber-bg); border-radius: 4px; }
+  .note { font-style: italic; color: var(--gray); }
+  .validation.ok { border-color: #bfe6cb; }
+  .validation.warn { border-color: #f1d98a; }
+  .validation.bad { border-color: #f3b1aa; }
+  .validation ul { margin: 6px 0 0; padding-left: 18px; }
+  .validation li { margin-bottom: 4px; }
+  .review-md { white-space: pre-wrap; word-break: break-word; margin: 0; max-height: 420px; overflow: auto; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #fafbfc; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; }
+  .pill.green { background: var(--green-bg); color: var(--green); }
+  .pill.amber { background: var(--amber-bg); color: var(--amber); }
+  .pill.red { background: var(--red-bg); color: var(--red); }
+  .pill.gray { background: var(--gray-bg); color: var(--gray); }
+  .pill.blue { background: var(--blue-bg); color: var(--blue); }
+
+  button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: #fff; color: inherit; cursor: pointer; }
+  .btn:hover:not(:disabled) { background: #f3f4f6; }
+  .btn.small { padding: 3px 8px; font-size: 12px; }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover:not(:disabled) { background: #2559c4; }
+  .btn.danger { background: var(--red); color: #fff; border-color: var(--red); }
+  .btn.danger:hover:not(:disabled) { background: #951c15; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn[aria-pressed="true"].ok { background: var(--green-bg); color: var(--green); border-color: #9fd6b0; }
+  .btn[aria-pressed="true"].no { background: var(--red-bg); color: var(--red); border-color: #efa9a2; }
+  input[type="text"], textarea { font: inherit; color: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  textarea { width: 100%; resize: vertical; }
+  label.block { display: block; margin: 10px 0; font-weight: 600; }
+  label.block textarea { margin-top: 4px; font-weight: 400; }
+
+  .section-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+  .section-head h3 { margin: 0; }
+  .decision { display: inline-flex; margin-left: auto; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg { font: inherit; padding: 4px 12px; border: 0; background: #fff; color: inherit; cursor: pointer; border-right: 1px solid var(--line); }
+  .seg:last-child { border-right: 0; }
+  .seg:hover { background: #f3f4f6; }
+  .seg.on { font-weight: 600; }
+  .seg.on.pending { background: var(--gray-bg); color: var(--gray); }
+  .seg.on.approved { background: var(--green-bg); color: var(--green); }
+  .seg.on.rejected { background: var(--red-bg); color: var(--red); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; border-top: 0; }
+  tr.cancelled td { color: var(--muted); }
+  tr.cancelled td.artist { text-decoration: line-through; }
+  td.time { white-space: nowrap; }
+  td.num { text-align: right; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-word; }
+  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line); vertical-align: -2px; margin-right: 4px; }
+  .flag { width: 100%; min-width: 110px; padding: 3px 6px; font-size: 12px; }
+  .src { margin-right: 2px; text-decoration: none; }
+
+  .artist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .artist-card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
+  .thumb { aspect-ratio: 1 / 1; background: var(--gray-bg); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .artist-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .artist-name { font-weight: 600; }
+  .artist-body .row { margin-top: 6px; }
+  .attr { font-size: 12px; }
+
+  .review-bar { position: sticky; bottom: 0; box-shadow: 0 -4px 16px rgba(0, 0, 0, .06); }
+  .actions { margin-top: 8px; }
+  .dirty { color: var(--amber); font-weight: 600; }
+  .promote-result { margin-top: 12px; padding: 10px 12px; border-radius: 6px; background: #fafbfc; border: 1px solid var(--line); }
+  .promote-result.bad { background: var(--red-bg); border-color: #f3b1aa; color: var(--red); }
+  .promote-result ul { margin: 6px 0 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <h1>Festie candidate review</h1>
+  <label>Reviewer <input id="reviewer" type="text" placeholder="your name" autocomplete="name" size="18"></label>
+</header>
+<div class="layout">
+  <nav class="sidebar" aria-label="Candidates">
+    <div class="sidebar-head"><span>Candidates</span><button id="refresh" type="button" class="btn small">Refresh</button></div>
+    <ul id="candidate-list" class="candidate-list"></ul>
+    <p class="hint">j / k: previous / next candidate</p>
+  </nav>
+  <main id="main" class="main" aria-live="polite"><p class="empty">Loading…</p></main>
+</div>
+<script>
+(() => {
+  'use strict';
+  const SECTIONS = ['festival', 'stages', 'artists', 'sets'];
+  const SECTION_TITLES = { festival: 'Festival', stages: 'Stages', artists: 'Artists', sets: 'Sets' };
+  const STATUS_TONE = { needs_review: 'amber', approved: 'green', rejected: 'red', promoted: 'blue' };
+  const CONF_TONE = { high: 'green', medium: 'amber', low: 'red' };
+  const DECISION_TONE = { pending: 'gray', approved: 'green', rejected: 'red' };
+  const SET_TONE = { scheduled: 'gray', moved: 'amber', cancelled: 'red' };
+  const NEED_REVIEWER = 'Enter your name in Reviewer to approve';
+
+  const state = {
+    list: [], slug: null, detail: null, decisions: null, notes: '', dirty: false,
+    flags: {}, by: '', promote: null, busy: false, error: null,
+  };
+  // Approvals are signed: the server refuses them without a reviewer name, so the page greys them out.
+  const noReviewer = () => state.by === '';
+
+  const $ = (selector) => document.querySelector(selector);
+  const store = {
+    get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
+    set(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* ignore */ } },
+  };
+
+  function h(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    if (attrs) {
+      for (const [key, value] of Object.entries(attrs)) {
+        if (value === null || value === undefined || value === false) continue;
+        if (key === 'class') node.className = value;
+        else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
+        else node.setAttribute(key, value === true ? '' : String(value));
+      }
+    }
+    for (const child of children.flat(Infinity)) {
+      if (child === null || child === undefined || child === false) continue;
+      node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+    }
+    return node;
+  }
+  const pill = (text, tone) => h('span', { class: `pill ${tone || 'gray'}` }, text);
+  const label = (value) => String(value || '').replace(/_/g, ' ');
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const fmtDate = (iso) => (typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(iso) ? iso.slice(0, 16).replace('T', ' ') + ' UTC' : (iso || '—'));
+  const fmtDay = (iso) => (typeof iso === 'string' ? iso.slice(0, 10) : '—');
+
+  async function api(path, init) {
+    const res = await fetch(path, init);
+    let body = null;
+    try { body = await res.json(); } catch (e) { /* no body */ }
+    if (!res.ok) throw new Error((body && body.error) || `${res.status} ${res.statusText}`);
+    return body;
+  }
+  const post = (path, body) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+  function derivedStatus(decisions) {
+    const values = SECTIONS.map((s) => decisions[s]);
+    if (values.every((v) => v === 'approved')) return 'approved';
+    if (values.some((v) => v === 'rejected')) return 'rejected';
+    return 'needs_review';
+  }
+
+  // --- sidebar ---------------------------------------------------------------------------------
+
+  async function loadList() {
+    try {
+      state.list = await api('/api/candidates');
+      state.error = null;
+    } catch (error) {
+      state.error = `Could not load candidates: ${error.message}`;
+    }
+    renderSidebar();
+  }
+
+  function renderSidebar() {
+    const list = $('#candidate-list');
+    list.replaceChildren();
+    if (state.list.length === 0) {
+      list.append(h('li', { class: 'empty' }, 'No candidates in seed-data/candidates/.'));
+      return;
+    }
+    for (const c of state.list) {
+      const active = c.slug === state.slug;
+      list.append(h('li', null,
+        h('button', { type: 'button', class: `cand${active ? ' active' : ''}`, 'aria-current': active ? 'true' : null, onclick: () => select(c.slug) },
+          h('div', { class: 'cand-name' }, c.name),
+          h('div', { class: 'cand-meta' }, pill(label(c.status), STATUS_TONE[c.status]),
+            h('span', { class: 'muted' }, `${c.counts.stages} st · ${c.counts.artists} art · ${c.counts.sets} sets`)),
+          h('div', { class: 'cand-meta' },
+            c.errors ? pill(plural(c.errors, 'error'), 'red') : null,
+            c.warnings ? pill(plural(c.warnings, 'warning'), 'amber') : null,
+            !c.errors && !c.warnings ? pill('valid', 'green') : null,
+            h('span', { class: 'muted' }, `images ${c.media.approved} ok · ${c.media.pending} pending · ${c.media.rejected} no`)))));
+    }
+  }
+
+  // --- candidate -------------------------------------------------------------------------------
+
+  async function select(slug, { force = false } = {}) {
+    if (!force && state.dirty && slug !== state.slug && !confirm('Discard unsaved decisions?')) return;
+    state.slug = slug;
+    state.dirty = false;
+    state.promote = force ? state.promote : null;
+    if (location.hash !== `#${slug}`) history.replaceState(null, '', `#${slug}`);
+    renderSidebar();
+    try {
+      const detail = await api(`/api/candidates/${encodeURIComponent(slug)}`);
+      state.detail = detail;
+      state.decisions = Object.assign({ festival: 'pending', stages: 'pending', artists: 'pending', sets: 'pending' }, detail.file.review.decisions);
+      state.notes = detail.file.review.notes || '';
+      state.flags = JSON.parse(store.get(`festie-review:flags:${slug}`) || '{}');
+      state.error = null;
+    } catch (error) {
+      state.detail = null;
+      state.error = `Could not load ${slug}: ${error.message}`;
+    }
+    renderMain();
+  }
+
+  function renderMain() {
+    const main = $('#main');
+    const scroll = main.scrollTop;
+    main.replaceChildren();
+    if (state.error) main.append(h('div', { class: 'card error', role: 'alert' }, state.error));
+    if (!state.detail) {
+      if (!state.error) main.append(h('p', { class: 'empty' }, state.list.length ? 'Select a candidate on the left.' : 'Nothing to review yet.'));
+      return;
+    }
+    const d = state.detail;
+    const v = d.view;
+    main.append(
+      renderHeader(v),
+      renderValidation(v),
+      renderReviewMd(v),
+      renderSection('festival', v, renderFestival(v)),
+      renderSection('stages', v, renderStages(v)),
+      renderSection('artists', v, renderArtists(v)),
+      renderSection('sets', v, renderSets(v)),
+      renderReviewBar(d),
+    );
+    main.scrollTop = scroll;
+  }
+
+  function renderHeader(v) {
+    const f = v.festival;
+    const facts = f
+      ? [`${f.start_date} → ${f.end_date}`, f.timezone, f.venue_name, `festival ${f.status}`, `${plural(v.counts.stages, 'stage')}, ${plural(v.counts.artists, 'artist')}, ${plural(v.counts.sets, 'set')}`,
+         v.counts.unscheduled ? `${plural(v.counts.unscheduled, 'artist')} without set times (shown as "set times to be announced")` : null].filter(Boolean)
+      : ['festival.csv could not be read (see validation)'];
+    return h('section', { class: 'card' },
+      h('div', { class: 'row wrap' }, h('h2', { class: 'title' }, v.name), pill(label(v.status), STATUS_TONE[v.status]), h('code', { class: 'muted' }, v.slug),
+        v.seedSource === 'unvalidated' ? pill('showing CSVs that failed validation', 'amber') : null,
+        v.seedSource === 'none' ? pill('lineup unreadable', 'red') : null),
+      h('div', { class: 'facts' }, facts.join(' · ')),
+      h('div', { class: 'row wrap chips' }, h('span', { class: 'muted' }, 'Confidence:'),
+        ...SECTIONS.map((s) => h('span', { class: 'chip' }, `${s} `, pill(v.confidence && v.confidence[s] || 'unknown', CONF_TONE[v.confidence && v.confidence[s]])))),
+      h('div', { class: 'muted small' },
+        `Scouted by ${v.agent.tool}${v.agent.run_id ? ` (${v.agent.run_id})` : ''}, started ${fmtDate(v.agent.started_at)} · trigger: ${v.trigger.kind}`,
+        v.trigger.suggestion_id ? ` ${v.trigger.suggestion_id}` : '', v.trigger.note ? ` — ${v.trigger.note}` : '', ` · created ${fmtDate(v.created_at)}`),
+      v.promoted ? h('div', { class: 'muted small' }, `Promoted ${fmtDate(v.promoted.at)} → ${v.promoted.seed_file}, ${v.promoted.csv_dir}`) : null,
+      h('h3', null, `Sources (${v.sources.length})`),
+      v.sources.length === 0 ? h('p', { class: 'muted' }, 'The agent cited no sources.') : h('ol', { class: 'sources' },
+        ...v.sources.map((s) => h('li', { id: `source-${s.index}` },
+          h('a', { href: s.url, target: '_blank', rel: 'noopener noreferrer' }, s.title || s.url), ' ', pill(s.kind, 'gray'),
+          h('span', { class: 'muted' }, ` · accessed ${fmtDay(s.accessed_at)} · for ${(s.used_for || []).join(', ') || '—'}`),
+          s.title ? h('div', { class: 'muted small mono' }, s.url) : null,
+          s.note ? h('div', { class: 'note' }, s.note) : null))),
+      v.notes ? [h('h3', null, 'Agent notes'), h('p', { class: 'prewrap' }, v.notes)] : null);
+  }
+
+  function renderValidation(v) {
+    const { errors, warnings } = v.validation;
+    const tone = errors.length ? 'bad' : warnings.length ? 'warn' : 'ok';
+    const item = (issue, kind) => h('li', null, pill(kind, kind === 'error' ? 'red' : 'amber'), ' ', h('code', null, issue.path), ' ', issue.message);
+    return h('section', { class: `card validation ${tone}` },
+      h('h3', null, `Validation: ${plural(errors.length, 'error')}, ${plural(warnings.length, 'warning')}`),
+      errors.length || warnings.length
+        ? h('ul', null, ...errors.map((i) => item(i, 'error')), ...warnings.map((i) => item(i, 'warning')))
+        : h('p', { class: 'muted' }, 'The CSVs build a valid festival file.'));
+  }
+
+  function renderReviewMd(v) {
+    return h('section', { class: 'card' }, h('h3', null, 'REVIEW.md'),
+      v.reviewMarkdown ? h('pre', { class: 'review-md' }, v.reviewMarkdown) : h('p', { class: 'muted' }, 'No REVIEW.md in this bundle.'));
+  }
+
+  function renderSection(key, v, body) {
+    const current = state.decisions[key];
+    const count = key === 'festival' ? '' : ` (${v.counts[key]})`;
+    const group = h('div', { class: 'decision', role: 'group', 'aria-label': `${SECTION_TITLES[key]} decision` },
+      ...[['pending', 'Pending'], ['approved', 'Approve'], ['rejected', 'Reject']].map(([value, text]) =>
+        h('button', { type: 'button', class: `seg ${value}${current === value ? ' on' : ''}`, 'aria-pressed': current === value ? 'true' : 'false', onclick: () => setDecision(key, value) }, text)));
+    return h('section', { class: 'card section', id: `section-${key}` },
+      h('div', { class: 'section-head' }, h('h3', null, `${SECTION_TITLES[key]}${count}${key === 'sets' && v.counts.sets === 0 && v.counts.artists > 0 ? ' — set times to be announced' : ''}`),
+        h('span', { class: 'muted small' }, 'confidence '), pill(v.confidence && v.confidence[key] || 'unknown', CONF_TONE[v.confidence && v.confidence[key]]), group),
+      body);
+  }
+
+  function renderFestival(v) {
+    const f = v.festival;
+    if (!f) return h('p', { class: 'muted' }, 'No festival row could be read.');
+    const coords = f.latitude !== null && f.longitude !== null ? `${f.latitude}, ${f.longitude}` : '—';
+    const bounds = [f.bounds_sw_lat, f.bounds_sw_lng, f.bounds_ne_lat, f.bounds_ne_lng].every((n) => n !== null && n !== undefined)
+      ? `SW ${f.bounds_sw_lat}, ${f.bounds_sw_lng} · NE ${f.bounds_ne_lat}, ${f.bounds_ne_lng}` : '—';
+    const rows = [
+      ['Name', f.name], ['Dates', `${f.start_date} → ${f.end_date}`], ['Time zone', f.timezone], ['Venue', f.venue_name || '—'],
+      ['Status', f.status + (f.is_demo ? ' (demo)' : '')],
+      ['Source URL', f.source_url ? h('a', { href: f.source_url, target: '_blank', rel: 'noopener noreferrer' }, f.source_url) : '—'],
+      ['Accent', f.accent_color ? [h('span', { class: 'swatch', style: `background:${/^#[0-9a-fA-F]{6}$/.test(f.accent_color) ? f.accent_color : 'transparent'}` }), f.accent_color] : '—'],
+      ['Map', `${coords}${f.default_zoom !== null && f.default_zoom !== undefined ? ` · zoom ${f.default_zoom}` : ''}`], ['Bounds', bounds], ['Id', h('code', null, f.id)],
+    ];
+    return h('dl', { class: 'kv' }, ...rows.map(([k, val]) => [h('dt', null, k), h('dd', null, val)]));
+  }
+
+  function renderStages(v) {
+    if (v.stages.length === 0) return h('p', { class: 'muted' }, 'No stages.');
+    return h('table', null,
+      h('thead', null, h('tr', null, h('th', null, 'Stage'), h('th', null, 'Zone'), h('th', null, 'Location'), h('th', { class: 'num' }, 'Sets'))),
+      h('tbody', null, ...v.stages.map((s) => h('tr', null, h('td', null, s.name), h('td', null, s.zone || '—'),
+        h('td', { class: 'mono' }, s.latitude !== null && s.longitude !== null ? `${s.latitude}, ${s.longitude}` : '—'), h('td', { class: 'num' }, s.setCount)))));
+  }
+
+  function renderArtists(v) {
+    if (v.artists.length === 0) return h('p', { class: 'muted' }, 'No artists.');
+    const grid = h('div', { class: 'artist-grid' }, ...v.artists.map((a) => renderArtistCard(a.name, `${a.genre || 'genre unknown'} · ${a.setCount === 0 ? 'set times TBA' : plural(a.setCount, 'set')}`, a.media, a.provenance)));
+    const extra = v.media.unmatched.length
+      ? [h('h4', null, `Other images in the registry (${v.media.unmatched.length})`),
+        h('div', { class: 'artist-grid' }, ...v.media.unmatched.map((m) => renderArtistCard(m.subject_name, `${m.subject_type} · not matched to a row`, m, null)))]
+      : null;
+    return h('div', null, grid, extra);
+  }
+
+  function renderArtistCard(name, subtitle, m, provenance) {
+    const thumb = m
+      ? h('div', { class: 'thumb' }, h('img', { src: m.url, alt: `Image candidate for ${name}`, loading: 'lazy' }))
+      : h('div', { class: 'thumb' }, 'no image candidate');
+    const body = h('div', { class: 'artist-body' }, h('div', { class: 'artist-name' }, name), h('div', { class: 'muted small' }, subtitle));
+    if (provenance) {
+      body.append(h('div', { class: 'small' }, pill(provenance.confidence, CONF_TONE[provenance.confidence]), ' ', ...sourceLinks(provenance.sources), provenance.note ? h('span', { class: 'muted' }, ` ${provenance.note}`) : null));
+    }
+    if (m) {
+      const sourceUrl = m.source.url || m.source.page_url;
+      body.append(
+        h('div', { class: 'row wrap' }, pill(`image ${m.review.status}`, DECISION_TONE[m.review.status]), h('code', null, m.license.id),
+          h('span', { class: 'muted small' }, `${m.width || '?'}×${m.height || '?'} ${m.mime.replace('image/', '')}`)),
+        m.license.attribution ? h('div', { class: 'attr' }, m.license.attribution) : h('div', { class: 'attr muted' }, 'no attribution text'),
+        h('div', { class: 'small' }, sourceUrl ? h('a', { href: sourceUrl, target: '_blank', rel: 'noopener noreferrer' }, 'source') : h('span', { class: 'muted' }, 'no source url'),
+          h('span', { class: 'muted' }, ` · ${m.source.kind} · ${fmtDay(m.source.retrieved_at)}`),
+          m.license.url ? [' · ', h('a', { href: m.license.url, target: '_blank', rel: 'noopener noreferrer' }, 'licence')] : null),
+        m.source.note ? h('div', { class: 'note small' }, m.source.note) : null,
+        h('div', { class: 'row' },
+          h('button', { type: 'button', class: 'btn small ok', 'aria-pressed': m.review.status === 'approved' ? 'true' : 'false', 'aria-label': `Approve image for ${name}`, disabled: (state.busy || noReviewer()) || null, title: noReviewer() ? NEED_REVIEWER : null, onclick: () => reviewImage(m.index, 'approved') }, 'Approve image'),
+          h('button', { type: 'button', class: 'btn small no', 'aria-pressed': m.review.status === 'rejected' ? 'true' : 'false', 'aria-label': `Reject image for ${name}`, disabled: state.busy || null, onclick: () => reviewImage(m.index, 'rejected') }, 'Reject image')),
+        m.review.at ? h('div', { class: 'muted small' }, `${m.review.status} by ${m.review.by || 'unknown'} ${fmtDate(m.review.at)}${m.review.note ? ` — ${m.review.note}` : ''}`) : null);
+    }
+    return h('div', { class: 'artist-card' }, thumb, body);
+  }
+
+  function sourceLinks(indexes) {
+    const v = state.detail.view;
+    return (indexes || []).map((i) => {
+      const s = v.sources[i];
+      return h('a', { class: 'src', href: `#source-${i}`, title: s ? (s.title || s.url) : 'unknown source' }, `[${i + 1}]`);
+    });
+  }
+
+  function renderSets(v) {
+    if (v.days.length === 0) return h('p', { class: 'muted' }, 'No sets.');
+    const timeCell = (set) => h('td', { class: 'time' },
+      set.start && set.end ? [h('div', null, `${set.start.time}–${set.end.time}`), h('div', { class: 'muted small' }, `${set.start.label} – ${set.end.label}`)] : h('span', { class: 'muted' }, set.start ? set.start.time : 'unreadable'));
+    const statusCell = (set) => {
+      if (set.status === 'moved') {
+        return h('td', null, pill('moved', 'amber'), set.original_start ? h('div', { class: 'muted small' }, `from ${set.original_start.date} ${set.original_start.time}`) : null);
+      }
+      return h('td', null, set.status === 'scheduled' ? h('span', { class: 'muted' }, 'scheduled') : pill(set.status, SET_TONE[set.status]));
+    };
+    const provenanceCell = (set) => {
+      const p = set.provenance;
+      return h('td', null, p ? [pill(p.confidence, CONF_TONE[p.confidence]), ' ', ...sourceLinks(p.sources), p.note ? h('div', { class: 'muted small' }, p.note) : null] : h('span', { class: 'muted' }, '—'));
+    };
+    const flagCell = (set) => h('td', null, h('input', {
+      type: 'text', class: 'flag', placeholder: 'flag…', value: state.flags[set.id] || '',
+      'aria-label': `Flag for ${set.artist} at ${set.start ? set.start.time : 'unknown time'}`,
+      oninput: (event) => { state.flags[set.id] = event.target.value; store.set(`festie-review:flags:${state.slug}`, JSON.stringify(state.flags)); },
+    }));
+    return h('div', null, ...v.days.map((day) => [
+      h('h4', null, `${day.label} `, h('span', { class: 'muted' }, day.date), ' ', day.inRange ? null : pill('outside festival dates', 'amber'), h('span', { class: 'muted' }, ` · ${plural(day.sets.length, 'set')}`)),
+      day.sets.length === 0 ? h('p', { class: 'muted small' }, 'No sets on this day.') : h('table', null,
+        h('thead', null, h('tr', null, h('th', null, 'Artist'), h('th', null, 'Stage'), h('th', null, 'Time'), h('th', null, 'Status'), h('th', null, 'Note'), h('th', null, 'Provenance'), h('th', null, 'Flag (local)'))),
+        h('tbody', null, ...day.sets.map((set) => h('tr', { class: set.status },
+          h('td', { class: 'artist' }, set.artist, set.set_type && set.set_type !== 'performance' ? h('span', { class: 'muted small' }, ` ${set.set_type}`) : null),
+          h('td', null, set.stage), timeCell(set), statusCell(set),
+          h('td', null, set.change_note || h('span', { class: 'muted' }, '—')), provenanceCell(set), flagCell(set))))),
+    ]));
+  }
+
+  function renderReviewBar(d) {
+    const next = derivedStatus(state.decisions);
+    const canPromote = d.file.status === 'approved' && !state.dirty;
+    const review = d.file.review || {};
+    return h('section', { class: 'card review-bar' },
+      h('div', { class: 'row wrap' },
+        ...SECTIONS.map((s) => h('span', { class: 'chip' }, `${s} `, pill(state.decisions[s], DECISION_TONE[state.decisions[s]]))),
+        h('span', { class: 'muted' }, '→ saving sets status '), pill(label(next), STATUS_TONE[next])),
+      h('label', { class: 'block' }, 'Review notes',
+        h('textarea', { id: 'notes', rows: 3, placeholder: 'What you checked, what to fix…', oninput: (event) => { state.notes = event.target.value; markDirty(); } }, state.notes)),
+      h('div', { class: 'muted small' }, review.at ? `Last saved ${fmtDate(review.at)} by ${review.by || 'unknown'}` : 'Not reviewed yet'),
+      h('div', { class: 'row wrap actions' },
+        h('button', { type: 'button', class: 'btn primary', disabled: (state.busy || noReviewer()) || null, title: noReviewer() ? NEED_REVIEWER : null, onclick: saveReview }, 'Save review'),
+        h('span', { id: 'save-status', class: state.dirty ? 'dirty' : 'muted' }, state.dirty ? 'Unsaved changes' : 'Saved'),
+        noReviewer() ? h('span', { class: 'muted small' }, NEED_REVIEWER) : null,
+        h('span', { class: 'spacer' }),
+        h('button', { type: 'button', class: 'btn', disabled: state.busy || null, onclick: () => promote(true) }, 'Promote (dry run)'),
+        h('button', { type: 'button', class: 'btn danger', disabled: (!canPromote || state.busy || noReviewer()) || null, title: noReviewer() ? NEED_REVIEWER : canPromote ? 'Write seed-data files' : 'Save a review with every section approved first', onclick: () => promote(false) }, 'Promote')),
+      state.promote ? renderPromoteResult(state.promote) : null);
+  }
+
+  function renderPromoteResult(p) {
+    if (p.error) return h('div', { class: 'promote-result bad', role: 'alert' }, `${p.dryRun ? 'Dry run' : 'Promote'} failed: ${p.error}`);
+    const r = p.result;
+    return h('div', { class: 'promote-result' },
+      h('div', null, h('strong', null, p.dryRun ? 'Dry run — nothing written.' : 'Promoted.'), ` ${r.seedFile} · ${r.csvDir} · ${plural(r.mediaMerged, 'approved image')} merged`),
+      h('ul', null, ...(r.actions || []).map((a) => h('li', null, a))));
+  }
+
+  // --- actions ---------------------------------------------------------------------------------
+
+  function setDecision(key, value) {
+    state.decisions[key] = value;
+    state.dirty = true;
+    renderMain();
+  }
+
+  function markDirty() {
+    state.dirty = true;
+    const status = $('#save-status');
+    if (status) { status.textContent = 'Unsaved changes'; status.className = 'dirty'; }
+  }
+
+  async function withBusy(work) {
+    state.busy = true;
+    try { await work(); } catch (error) { state.error = error.message; } finally { state.busy = false; }
+    renderMain();
+    if (state.error) setTimeout(() => { state.error = null; renderMain(); }, 6000);
+  }
+
+  function saveReview() {
+    return withBusy(async () => {
+      const file = await post(`/api/candidates/${encodeURIComponent(state.slug)}/review`, { decisions: state.decisions, by: state.by || null, notes: state.notes || null });
+      state.detail.file = file;
+      state.detail.view.status = file.status;
+      state.detail.view.review = file.review;
+      state.decisions = Object.assign({}, file.review.decisions);
+      state.notes = file.review.notes || '';
+      state.dirty = false;
+      state.error = null;
+      await loadList();
+    });
+  }
+
+  function reviewImage(index, status) {
+    return withBusy(async () => {
+      const entry = await post(`/api/candidates/${encodeURIComponent(state.slug)}/media/${index}`, { status, by: state.by || null, note: null });
+      const view = state.detail.view;
+      if (state.detail.media && state.detail.media.entries[index]) state.detail.media.entries[index] = entry;
+      for (const m of view.media.entries) if (m.index === index) m.review = entry.review;
+      for (const a of view.artists) if (a.media && a.media.index === index) a.media.review = entry.review;
+      for (const m of view.media.unmatched) if (m.index === index) m.review = entry.review;
+      view.media.counts = { pending: 0, approved: 0, rejected: 0 };
+      for (const m of view.media.entries) view.media.counts[m.review.status] += 1;
+      state.error = null;
+      await loadList();
+    });
+  }
+
+  function promote(dryRun) {
+    const name = state.detail.view.name;
+    if (!dryRun && !confirm(`Promote "${name}"?\n\nThis writes seed-data/${state.slug}.json, seed-data/${state.slug}-csv/, approved images into seed-data/media/registry.json and a row in seed-data/golden/index.json.`)) return;
+    return withBusy(async () => {
+      try {
+        const result = await post(`/api/candidates/${encodeURIComponent(state.slug)}/promote`, { dryRun });
+        state.promote = { dryRun, result };
+        if (!dryRun) {
+          await loadList();
+          await select(state.slug, { force: true });
+        }
+      } catch (error) {
+        state.promote = { dryRun, error: error.message };
+      }
+    });
+  }
+
+  // --- boot ------------------------------------------------------------------------------------
+
+  const reviewer = $('#reviewer');
+  state.by = store.get('festie-review:by') || '';
+  reviewer.value = state.by;
+  reviewer.addEventListener('input', () => {
+    const wasEmpty = noReviewer();
+    state.by = reviewer.value.trim();
+    store.set('festie-review:by', state.by);
+    if (wasEmpty !== noReviewer()) renderMain(); // the approve buttons follow the field
+  });
+  $('#refresh').addEventListener('click', () => loadList());
+
+  document.addEventListener('keydown', (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey || event.target.matches('input, textarea, select')) return;
+    if (event.key !== 'j' && event.key !== 'k') return;
+    const index = state.list.findIndex((c) => c.slug === state.slug);
+    const next = event.key === 'j' ? Math.min(index + 1, state.list.length - 1) : Math.max(index - 1, 0);
+    if (next !== index && state.list[next]) { event.preventDefault(); select(state.list[next].slug); }
+  });
+  window.addEventListener('hashchange', () => {
+    const slug = decodeURIComponent(location.hash.slice(1));
+    if (slug && slug !== state.slug && state.list.some((c) => c.slug === slug)) select(slug);
+  });
+
+  loadList().then(() => {
+    const wanted = decodeURIComponent(location.hash.slice(1));
+    const first = state.list.find((c) => c.slug === wanted) || state.list[0];
+    if (first) select(first.slug); else renderMain();
+  });
+})();
+</script>
+</body>
+</html>

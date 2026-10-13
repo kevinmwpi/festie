@@ -1,4 +1,4 @@
-import { festivalDayKey, listFestivalDays } from '@festival/domain';
+import { describeLineupAvailability, describeSetChange, festivalDayKey, listFestivalDays } from '@festival/domain';
 import {
   Badge,
   Chip,
@@ -12,6 +12,7 @@ import {
   motion,
   PressableScale,
   radii,
+  SecondaryButton,
   spacing,
   tabularNums,
   textStyles,
@@ -24,7 +25,9 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View }
 
 import { FestivalDisclaimer, TimeZoneHint } from '@/src/components/FestivalNotes';
 import { SubScreenHeader } from '@/src/components/ScreenHeader';
+import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/components/SetChange';
 import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } from '@/src/components/StateViews';
+import { UnscheduledFootnote } from '@/src/components/UnscheduledLineup';
 import { useFestivalClock } from '@/src/hooks/use-festival';
 import { useLineup, type LineupRow } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
@@ -58,7 +61,7 @@ export default function BrowseScheduleScreen() {
   useSafeAreaEdgeTint(screenBg);
   const isOffline = useOfflineStatus();
 
-  const { bundle, lineup, festival } = useLineup(festivalId);
+  const { bundle, lineup, unscheduled, festival } = useLineup(festivalId);
   const clock = useFestivalClock(festival);
   const { toggle, busyIds } = useSetSelection(festival);
   const [dayFilter, setDayFilter] = React.useState<string>(ALL);
@@ -66,6 +69,8 @@ export default function BrowseScheduleScreen() {
   const deferredSearch = React.useDeferredValue(search.trim().toLowerCase());
 
   const rows = lineup.data ?? NO_ROWS;
+  const unscheduledCount = unscheduled.data?.length ?? 0;
+  const availability = describeLineupAvailability({ setCount: rows.length, unscheduledCount });
   const timeZone = festival?.timezone ?? '';
   const days = React.useMemo(() => (festival ? listFestivalDays(festival, rows) : []), [festival, rows]);
 
@@ -132,42 +137,54 @@ export default function BrowseScheduleScreen() {
 
         {festival ? (
           <>
-            <View style={styles.searchField}>
-              <FieldInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Search artists or stages"
-                autoCorrect={false}
-                returnKeyType="search"
-                accessibilityLabel="Search artists or stages"
-                style={styles.searchInput}
-              />
-              {/* Drawn over the field's leading padding; decorative, and taps pass through to the field. */}
-              <View
-                style={styles.searchIcon}
-                pointerEvents="none"
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-              >
-                <Ionicons name="search" size={SEARCH_ICON_SIZE} color={colors.textSecondary} />
-              </View>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.filterRow}>
-              {[ALL, ...days].map((day) => (
-                <Chip
-                  key={day}
-                  variant="ink"
-                  active={dayFilter === day}
-                  onPress={() => setDayFilter(day)}
-                  label={day === ALL ? 'All days' : clock.date(day)}
-                  accessibilityLabel={day === ALL ? 'All days' : clock.date(day, LONG_DATE)}
-                />
-              ))}
-            </ScrollView>
-            <TimeZoneHint hint={clock.hint} />
+            {/* Announcement mode: while no set has a time there is nothing to search or filter, so the
+                field, the day picker and the time-zone hint wait for the first set times. */}
+            {rows.length > 0 ? (
+              <>
+                <View style={styles.searchField}>
+                  <FieldInput
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder="Search artists or stages"
+                    autoCorrect={false}
+                    returnKeyType="search"
+                    accessibilityLabel="Search artists or stages"
+                    style={styles.searchInput}
+                  />
+                  {/* Drawn over the field's leading padding; decorative, and taps pass through to the field. */}
+                  <View
+                    style={styles.searchIcon}
+                    pointerEvents="none"
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                  >
+                    <Ionicons name="search" size={SEARCH_ICON_SIZE} color={colors.textSecondary} />
+                  </View>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.filterRow}>
+                  {[ALL, ...days].map((day) => (
+                    <Chip
+                      key={day}
+                      variant="ink"
+                      active={dayFilter === day}
+                      onPress={() => setDayFilter(day)}
+                      label={day === ALL ? 'All days' : clock.date(day)}
+                      accessibilityLabel={day === ALL ? 'All days' : clock.date(day, LONG_DATE)}
+                    />
+                  ))}
+                </ScrollView>
+                <TimeZoneHint hint={clock.hint} />
+              </>
+            ) : null}
 
-            {lineup.isLoading ? (
+            {lineup.isLoading || unscheduled.isLoading ? (
               <LoadingState label="Loading the lineup…" />
+            ) : availability === 'tba' ? (
+              <EmptyState
+                title="Set times coming soon"
+                description="The lineup is out, but the festival hasn’t published set times yet. You can add sets here once it does."
+                action={<SecondaryButton label="See the lineup" onPress={() => router.navigate('/(tabs)/lineup')} />}
+              />
             ) : rows.length === 0 ? (
               <EmptyState title="Lineup coming soon" description="Sets will appear here once the festival publishes its schedule." />
             ) : filteredRows.length === 0 ? (
@@ -177,38 +194,51 @@ export default function BrowseScheduleScreen() {
                 {filteredRows.map((row) => {
                   const selected = Boolean(row.selection_id);
                   const busy = busyIds.has(row.id);
+                  const change = describeSetChange(row, clock.timeZone);
+                  const cancelled = change?.status === 'cancelled';
+                  const changeSuffix = change ? `. ${change.accessibilityLabel}` : '';
                   return (
                     <View key={row.id} style={styles.row}>
                       <View style={styles.rowText}>
-                        <Text style={styles.artist}>{row.artist_name}</Text>
-                        <Text style={styles.meta}>
+                        <Text style={[styles.artist, cancelled && cancelledTextStyle]}>{row.artist_name}</Text>
+                        <Text style={[styles.meta, cancelled && cancelledTextStyle]}>
                           {row.stage_name} · {keepTimesTogether(`${clock.day(row.start_time)} ${clock.range(row.start_time, row.end_time)}`)}
                         </Text>
-                        {row.is_conflicting ? <Badge label="Conflict" tone="warning" /> : null}
+                        <SetChangeDetail change={change} />
+                        {change?.label || row.is_conflicting ? (
+                          <View style={styles.badgeRow}>
+                            <SetChangeBadge change={change} />
+                            {row.is_conflicting ? <Badge label="Conflict" tone="warning" /> : null}
+                          </View>
+                        ) : null}
                       </View>
-                      <PressableScale
-                        onPress={() => void toggle(row)}
-                        disabled={busy}
-                        accessibilityRole="button"
-                        accessibilityLabel={selected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}
-                        accessibilityState={{ selected, busy }}
-                        pressedScale={motion.pressedScaleSmall}
-                        style={[styles.toggle, selected ? styles.toggleOn : styles.toggleOff]}
-                      >
-                        {busy ? (
-                          <ActivityIndicator size="small" color={colors.textPrimary} />
-                        ) : (
-                          <>
-                            <Ionicons name={selected ? 'checkmark' : 'add'} size={17} color={colors.textPrimary} />
-                            <Text style={styles.toggleLabel}>{selected ? 'Added' : 'Add'}</Text>
-                          </>
-                        )}
-                      </PressableScale>
+                      {/* A cancelled set cannot be added; one already picked keeps its button so it can be removed. */}
+                      {cancelled && !selected ? null : (
+                        <PressableScale
+                          onPress={() => void toggle(row)}
+                          disabled={busy}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${selected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}${changeSuffix}`}
+                          accessibilityState={{ selected, busy }}
+                          pressedScale={motion.pressedScaleSmall}
+                          style={[styles.toggle, selected ? styles.toggleOn : styles.toggleOff]}
+                        >
+                          {busy ? (
+                            <ActivityIndicator size="small" color={colors.textPrimary} />
+                          ) : (
+                            <>
+                              <Ionicons name={selected ? 'checkmark' : 'add'} size={17} color={colors.textPrimary} />
+                              <Text style={styles.toggleLabel}>{selected ? 'Added' : 'Add'}</Text>
+                            </>
+                          )}
+                        </PressableScale>
+                      )}
                     </View>
                   );
                 })}
               </ListSection>
             )}
+            {availability === 'partial' ? <UnscheduledFootnote count={unscheduledCount} where="lineup" /> : null}
             <StaleDataNote error={bundle.refreshError ?? lineup.refreshError} />
           </>
         ) : null}
@@ -241,6 +271,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.ms,
   },
   rowText: { flex: 1, gap: spacing.xxs },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   artist: { ...textStyles.headline, color: colors.textPrimary },
   meta: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary },
   toggle: {

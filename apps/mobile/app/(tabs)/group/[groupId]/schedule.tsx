@@ -1,5 +1,5 @@
 import type { CombinedSelectionRow } from '@festival/data-access';
-import { festivalDayKey, listFestivalDays } from '@festival/domain';
+import { describeSetChange, festivalDayKey, listFestivalDays, type SetChange } from '@festival/domain';
 import {
   Badge,
   Chip,
@@ -23,9 +23,13 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 
 import { TimeZoneHint } from '@/src/components/FestivalNotes';
 import { SubScreenHeader } from '@/src/components/ScreenHeader';
+import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/components/SetChange';
 import { ErrorState, FestivalBundleState, LoadingState, StaleDataNote } from '@/src/components/StateViews';
+import { queryKeys } from '@/src/hooks/query-keys';
 import { useFestivalBundle, useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useCombinedSelections, useGroupDetail } from '@/src/hooks/use-groups';
+import { useReReadOnBundleChange, useUnscheduledArtists } from '@/src/hooks/use-lineup';
+import { useUserKey } from '@/src/hooks/use-session';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
@@ -62,7 +66,10 @@ function NamePills({ names }: { names: string[] }) {
 
 /**
  * One set in a crew card: a single screen-reader element that reads artist, stage and time, then
- * `accessibilityDetail` (who is going, the next meetup). `accent` adds a coloured bar on the left.
+ * `accessibilityDetail` (who is going, the next meetup) and the set's schedule change, if any.
+ * `accent` adds a coloured bar on the left. A moved or cancelled set (`change`) shows its badge beside
+ * the name and the change detail under the time; a cancelled set's name and time are struck through and
+ * its bar turns red.
  */
 function SetRow({
   artistName,
@@ -70,6 +77,7 @@ function SetRow({
   startTime,
   endTime,
   clock,
+  change,
   footer,
   accent,
   accessibilityDetail,
@@ -79,21 +87,28 @@ function SetRow({
   startTime: string;
   endTime: string;
   clock: FestivalClock;
+  change?: SetChange | null;
   footer?: React.ReactNode;
   accent?: string;
   accessibilityDetail?: string;
 }) {
+  const cancelled = change?.status === 'cancelled';
   const when = `${clock.day(startTime)} ${clock.range(startTime, endTime)}`;
+  const label = [artistName, stageName, when, accessibilityDetail].filter(Boolean).join(', ');
   return (
     <View
       style={styles.setRow}
       accessible
-      accessibilityLabel={[artistName, stageName, when, accessibilityDetail].filter(Boolean).join(', ')}
+      accessibilityLabel={change?.accessibilityLabel ? `${label}. ${change.accessibilityLabel}` : label}
     >
-      {accent ? <View style={[styles.setAccent, { backgroundColor: accent }]} /> : null}
+      {accent ? <View style={[styles.setAccent, { backgroundColor: cancelled ? colors.destructive : accent }]} /> : null}
       <View style={styles.setBody}>
-        <Text style={styles.artistName}>{artistName}</Text>
-        <Text style={styles.setMeta}>{`${stageName} · ${keepTimesTogether(when)}`}</Text>
+        <View style={styles.artistLine}>
+          <Text style={[styles.artistName, cancelled && cancelledTextStyle]}>{artistName}</Text>
+          <SetChangeBadge change={change ?? null} />
+        </View>
+        <Text style={[styles.setMeta, cancelled && cancelledTextStyle]}>{`${stageName} · ${keepTimesTogether(when)}`}</Text>
+        <SetChangeDetail change={change ?? null} />
         {footer}
       </View>
     </View>
@@ -117,8 +132,14 @@ export default function CombinedScheduleScreen() {
   const activeFestivalAccent = useAppStore((state) => state.activeFestivalAccent);
   const screenBg = deriveAccentColors(festival?.accent_color || activeFestivalAccent).bgTint;
   useSafeAreaEdgeTint(screenBg);
+  // Announcement mode: the lineup is out (announced acts exist) but no set has a time yet.
+  const unscheduled = useUnscheduledArtists(festivalId);
+  const setTimesPending = bundle.data?.sets.length === 0 && (unscheduled.data?.length ?? 0) > 0;
   const clock = useFestivalClock(festival);
   const selections = useCombinedSelections(groupId, festivalId);
+  // A moved or cancelled set arrives with a new festival bundle; re-read the crew's picks with it.
+  const userKey = useUserKey();
+  useReReadOnBundleChange(bundle.data, [queryKeys.groupSchedule(userKey, groupId, festivalId ?? 'none')]);
   const rows = selections.data ?? NO_ROWS;
   const timeZone = festival?.timezone ?? '';
 
@@ -201,7 +222,14 @@ export default function CombinedScheduleScreen() {
     content = detail.refreshError && !detail.hasRefreshed ? (
       <ErrorState error={detail.refreshError} onRetry={() => void detail.refetch()} />
     ) : (
-      <EmptyState title="No picks yet" description="When crew members add sets to their schedules, they show up here." />
+      <EmptyState
+        title="No picks yet"
+        description={
+          setTimesPending
+            ? 'The festival hasn’t published set times yet. Once it does, crew members can add sets and they show up here.'
+            : 'When crew members add sets to their schedules, they show up here.'
+        }
+      />
     );
   } else if (view === 'overlap') {
     content =
@@ -212,24 +240,31 @@ export default function CombinedScheduleScreen() {
           <Text style={styles.sectionLabel} accessibilityRole="header">
             Shared sets · {overlapRows.length}
           </Text>
-          {overlapRows.map((entry) => (
-            <SetRow
-              key={entry.row.set_id}
-              artistName={entry.row.artist_name}
-              stageName={entry.row.stage_name}
-              startTime={entry.row.start_time}
-              endTime={entry.row.end_time}
-              clock={clock}
-              accent={colors.success}
-              accessibilityDetail={`${entry.userIds.size} going: ${entry.names.join(', ')}`}
-              footer={
-                <>
-                  <Badge label={`${entry.userIds.size} going`} tone="success" />
-                  <NamePills names={entry.names} />
-                </>
-              }
-            />
-          ))}
+          {overlapRows.map((entry) => {
+            const change = describeSetChange(entry.row, clock.timeZone);
+            const cancelled = change?.status === 'cancelled';
+            // A cancelled set stays listed so the crew can see what happened, but nobody is going to it.
+            const count = `${entry.userIds.size} ${cancelled ? 'had picked it' : 'going'}`;
+            return (
+              <SetRow
+                key={entry.row.set_id}
+                artistName={entry.row.artist_name}
+                stageName={entry.row.stage_name}
+                startTime={entry.row.start_time}
+                endTime={entry.row.end_time}
+                clock={clock}
+                change={change}
+                accent={colors.success}
+                accessibilityDetail={`${count}: ${entry.names.join(', ')}`}
+                footer={
+                  <>
+                    <Badge label={count} tone={cancelled ? 'neutral' : 'success'} />
+                    <NamePills names={entry.names} />
+                  </>
+                }
+              />
+            );
+          })}
         </SectionCard>
       );
   } else if (view === 'per-person') {
@@ -246,6 +281,7 @@ export default function CombinedScheduleScreen() {
             startTime={row.start_time}
             endTime={row.end_time}
             clock={clock}
+            change={describeSetChange(row, clock.timeZone)}
             accent={colors.primary}
           />
         ))}
@@ -258,7 +294,9 @@ export default function CombinedScheduleScreen() {
           All picks · {bySet.length}
         </Text>
         {bySet.map((entry) => {
-          const meetup = nextMeetupAfter(entry.row.start_time);
+          const change = describeSetChange(entry.row, clock.timeZone);
+          // No "next meetup" hint for a set that is not happening.
+          const meetup = change?.status === 'cancelled' ? null : nextMeetupAfter(entry.row.start_time);
           const meetupText = meetup
             ? `Next meetup: ${meetup.title} at ${clock.timeFrom(meetup.starts_at, entry.row.start_time)}`
             : null;
@@ -270,6 +308,7 @@ export default function CombinedScheduleScreen() {
               startTime={entry.row.start_time}
               endTime={entry.row.end_time}
               clock={clock}
+              change={change}
               accessibilityDetail={[entry.names.join(', '), meetupText].filter(Boolean).join(', ')}
               footer={
                 <>
@@ -386,7 +425,9 @@ const styles = StyleSheet.create({
   },
   setAccent: { borderRadius: radii.xs, width: spacing.xs },
   setBody: { alignItems: 'flex-start', flex: 1, gap: spacing.xs },
-  artistName: { ...textStyles.headline, color: colors.textPrimary },
+  // The name and its `Moved` / `Cancelled` badge share a line; a long name shrinks and the badge wraps under it.
+  artistLine: { alignItems: 'center', alignSelf: 'stretch', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  artistName: { ...textStyles.headline, color: colors.textPrimary, flexShrink: 1 },
   setMeta: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary },
   namesPills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   namePill: { backgroundColor: colors.inputBg, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xxs },

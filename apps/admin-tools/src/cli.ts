@@ -2,6 +2,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 
+import { formatCandidateTable, listCandidates, promoteCandidate, evaluateCandidate, formatEvalReport } from './candidates/store';
+import { scaffoldCandidate } from './candidates/scaffold';
 import { buildDemoPlan } from './demo/plan';
 import { describeDemoPlan, runDemoSeed } from './demo/seed';
 import {
@@ -19,10 +21,39 @@ import { applyFestivalSeed, describeSeedPlan, planFestivalSeed } from './festiva
 import { shiftFestivalDates } from './festival/shift-dates';
 import type { FestivalSeed } from './festival/types';
 import { formatIssues, validateFestivalSeed } from './festival/validate';
+import { MEDIA_COMMANDS, MEDIA_HELP } from './media/command';
 import { banUser, describeBan, resolveBanTarget } from './moderation/ban';
 import { formatReportTable, listReports, planContentRemoval, REPORT_STATUSES, type ReportStatus } from './moderation/reports';
 import { addTerms, listTerms, normalizeTerms, removeTerms } from './moderation/terms';
+import { REVIEW_SERVE_USAGE, reviewServeCommand } from './review/server';
 import { storageSweepOrphans } from './storage/command';
+import {
+  formatSuggestionTable,
+  isSuggestionStatus,
+  listSuggestions,
+  setSuggestionStatus,
+  SUGGESTION_STATUSES,
+  suggestionToCandidate,
+  type SuggestionStatus,
+} from './suggestions/list';
+import {
+  addWatchlistEntry,
+  formatSuggestionRanking,
+  formatWatchlistTable,
+  goldenNameMap,
+  groupSuggestions,
+  loadSignals,
+  noSignals,
+  rankWatchlist,
+  readWatchlist,
+  removeWatchlistEntry,
+  linkWatchlistFestival,
+  setWatchlistStatus,
+  TIERS,
+  WATCH_STATUSES,
+  type Tier,
+  type WatchStatus,
+} from './watchlist/watchlist';
 
 const HELP = `Festie admin tools (service role). Usage:
 
@@ -46,6 +77,31 @@ Moderation
 
 Storage
   storage:sweep-orphans [--dry-run]                Delete totem photos no meetup references (older than 24 h)
+
+Watchlist (which festivals the scout may work on: flagship tier, user demand, or an admin request)
+  watchlist:list [--json]                          Priority order; "scout = yes" is what a scheduled run may take
+  watchlist:add --name <name> --tier A|B|C [--slug <slug>] [--year <n>] [--url <official>] [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--note <text>]
+  watchlist:set-status <slug> watching|candidate|awaiting_times|published|passed|dropped
+                                                   (awaiting_times: published with the lineup only; scouted again for set times)
+  watchlist:remove <slug>
+  suggestions:ranking [--json]                     What users ask for most, with watchlist/golden matches
+
+Candidates (seed-data/candidates, reviewed before anything is seeded; docs/agents/festival-pipeline.md)
+  candidate:list [--json]                          Candidate bundles with counts, images and validation issues
+  candidate:new <slug> --name <name> [--source <url>]
+                                                   Empty bundle (headed CSVs, candidate.json, REVIEW.md)
+  ${REVIEW_SERVE_USAGE}
+                                                   Local review page for the candidates (127.0.0.1 only)
+  candidate:promote <slug> [--dry-run]             Approved candidate -> seed-data/<slug>.json + CSV dir, media, golden index
+  scout:eval <slug> --golden <seed.json> [--tolerance <min>] [--json]
+                                                   Score a candidate against a golden festival file
+
+Suggestions (festival_suggestions from the app's "Suggest a festival" form)
+  suggestions:list [--status new|accepted|rejected|duplicate|all] [--limit <n>] [--json]
+  suggestions:to-candidate <id> [--slug <slug>]    Scaffold a candidate from a suggestion and mark it accepted
+  suggestions:set-status <id> <new|accepted|rejected|duplicate>
+
+${MEDIA_HELP}
 
 Environment: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY).
 See docs/festival-data.md.`;
@@ -87,8 +143,11 @@ function loadValidSeed(fileArgument: string): { seed: FestivalSeed; filePath: st
 
 function summarizeSeed(seed: FestivalSeed): string {
   const f = seed.festival;
+  const scheduled = new Set(seed.sets.map((set) => set.artist_id));
+  const unscheduled = seed.artists.filter((artist) => !scheduled.has(artist.id)).length;
   return `${f.name} (${f.id}) ${f.start_date}..${f.end_date} ${f.timezone}, ${f.status}${f.is_demo ? ', demo' : ''}: ` +
-    `${seed.stages.length} stages, ${seed.artists.length} artists, ${seed.sets.length} sets`;
+    `${seed.stages.length} stages, ${seed.artists.length} artists, ${seed.sets.length} sets` +
+    (unscheduled > 0 ? ` (${unscheduled} artists without set times)` : '');
 }
 
 function writeSeedFile(filePath: string, seed: unknown): void {
@@ -294,6 +353,197 @@ async function moderationChangeTerms(args: string[], mode: 'add' | 'remove'): Pr
   }
 }
 
+async function candidateList(args: string[]): Promise<void> {
+  const { values } = parse(args, { json: { type: 'boolean' } }, { min: 0, max: 0, usage: 'candidate:list [--json]' });
+  const candidates = await listCandidates();
+  log(values.json ? JSON.stringify(candidates, null, 2) : formatCandidateTable(candidates));
+}
+
+async function candidateNew(args: string[]): Promise<void> {
+  const usage = 'candidate:new <slug> --name <name> [--source <url>]';
+  const { positionals, values } = parse(args, { name: { type: 'string' }, source: { type: 'string' } }, { min: 1, max: 1, usage });
+  if (typeof values.name !== 'string' || values.name.trim() === '') {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  let result;
+  try {
+    result = scaffoldCandidate({
+      slug: positionals[0],
+      name: values.name.trim(),
+      trigger: { kind: 'manual' },
+      sources:
+        typeof values.source === 'string'
+          ? [{ url: values.source, title: null, kind: 'other', accessed_at: new Date().toISOString(), used_for: [] }]
+          : [],
+    });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(`Created ${result.dir}\n${result.files.map((file) => `  - ${file}`).join('\n')}`);
+  log('Fill the CSVs (or run the festival-scout agent), then: npm run admin -- review:serve');
+}
+
+async function candidatePromote(args: string[]): Promise<void> {
+  const { positionals, values } = parse(args, DRY_RUN, { min: 1, max: 1, usage: 'candidate:promote <slug> [--dry-run]' });
+  let result;
+  try {
+    result = await promoteCandidate(positionals[0], { dryRun: Boolean(values['dry-run']) });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(result.actions.map((action) => `  - ${action}`).join('\n'));
+  if (values['dry-run']) {
+    log('Dry run: nothing written.');
+    return;
+  }
+  const linked = linkWatchlistFestival([result.goldenSlug, result.slug], result.festivalId);
+  if (linked) {
+    log(`Watchlist entry ${linked} now carries festival id ${result.festivalId} (follows count towards its score).`);
+  }
+  log(`Promoted ${result.slug} (${result.mediaMerged} image(s) merged). Next: npm run admin -- media:upload --dry-run, then festival:seed ${result.seedFile} --dry-run.`);
+}
+
+async function scoutEval(args: string[]): Promise<void> {
+  const usage = 'scout:eval <slug> --golden <seed.json> [--tolerance <min>] [--json]';
+  const { positionals, values } = parse(
+    args,
+    { golden: { type: 'string' }, tolerance: { type: 'string' }, json: { type: 'boolean' } },
+    { min: 1, max: 1, usage },
+  );
+  if (typeof values.golden !== 'string') {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  const tolerance = typeof values.tolerance === 'string' ? Number(values.tolerance) : 10;
+  if (!Number.isInteger(tolerance) || tolerance < 0 || tolerance > 240) {
+    throw new UsageError('--tolerance must be a whole number of minutes between 0 and 240');
+  }
+  let report;
+  try {
+    report = await evaluateCandidate(positionals[0], resolveInputPath(values.golden), { toleranceMinutes: tolerance });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(values.json ? JSON.stringify(report, null, 2) : formatEvalReport(report));
+}
+
+async function suggestionsList(args: string[]): Promise<void> {
+  const usage = 'suggestions:list [--status new|accepted|rejected|duplicate|all] [--limit <n>] [--json]';
+  const { values } = parse(args, { status: { type: 'string' }, limit: { type: 'string' }, json: { type: 'boolean' } }, { min: 0, max: 0, usage });
+  const status = typeof values.status === 'string' ? values.status : 'new';
+  if (status !== 'all' && !isSuggestionStatus(status)) {
+    throw new UsageError(`--status must be one of ${[...SUGGESTION_STATUSES, 'all'].join(', ')}`);
+  }
+  const limit = typeof values.limit === 'string' ? Number(values.limit) : 50;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+    throw new UsageError('--limit must be an integer between 1 and 1000');
+  }
+  const rows = await listSuggestions(createAdminClient(requireSupabaseConfig()), { status: status as SuggestionStatus | 'all', limit });
+  log(values.json ? JSON.stringify(rows, null, 2) : formatSuggestionTable(rows));
+}
+
+async function suggestionsToCandidate(args: string[]): Promise<void> {
+  const { positionals, values } = parse(args, { slug: { type: 'string' } }, { min: 1, max: 1, usage: 'suggestions:to-candidate <id> [--slug <slug>]' });
+  let result;
+  try {
+    result = await suggestionToCandidate(createAdminClient(requireSupabaseConfig()), {
+      id: positionals[0],
+      slug: typeof values.slug === 'string' ? values.slug : undefined,
+    });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(`Created ${result.dir} and marked the suggestion accepted. Next: run the festival-scout agent for it, then review:serve.`);
+}
+
+async function suggestionsSetStatus(args: string[]): Promise<void> {
+  const usage = 'suggestions:set-status <id> <new|accepted|rejected|duplicate>';
+  const { positionals } = parse(args, {}, { min: 2, max: 2, usage });
+  if (!isSuggestionStatus(positionals[1])) {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  try {
+    await setSuggestionStatus(createAdminClient(requireSupabaseConfig()), positionals[0], positionals[1]);
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(`Suggestion ${positionals[0]} is now ${positionals[1]}.`);
+}
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function watchlistList(args: string[]): Promise<void> {
+  const { values } = parse(args, { json: { type: 'boolean' } }, { min: 0, max: 0, usage: 'watchlist:list [--json]' });
+  const config = readSupabaseConfig();
+  const signals = config ? await loadSignals(createAdminClient(config)) : noSignals();
+  const ranked = rankWatchlist(readWatchlist(), signals, todayKey());
+  log(values.json ? JSON.stringify(ranked, null, 2) : formatWatchlistTable(ranked, { signalsLoaded: Boolean(config) }));
+}
+
+async function watchlistAdd(args: string[]): Promise<void> {
+  const usage =
+    'watchlist:add --name <name> --tier A|B|C [--slug <slug>] [--year <n>] [--url <official>] [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--note <text>]';
+  const { values } = parse(
+    args,
+    {
+      name: { type: 'string' }, tier: { type: 'string' }, slug: { type: 'string' }, year: { type: 'string' },
+      url: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, note: { type: 'string' },
+    },
+    { min: 0, max: 0, usage },
+  );
+  if (typeof values.name !== 'string' || values.name.trim() === '' || !TIERS.includes(values.tier as Tier)) {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  const year = typeof values.year === 'string' ? Number(values.year) : null;
+  if (year !== null && !Number.isInteger(year)) {
+    throw new UsageError('--year must be a whole number');
+  }
+  let result;
+  try {
+    result = addWatchlistEntry({
+      slug: typeof values.slug === 'string' ? values.slug : undefined,
+      name: values.name,
+      tier: values.tier as Tier,
+      year,
+      officialUrl: typeof values.url === 'string' ? values.url : null,
+      startDate: typeof values.start === 'string' ? values.start : null,
+      endDate: typeof values.end === 'string' ? values.end : null,
+      note: typeof values.note === 'string' ? values.note : null,
+      addedBy: process.env.USER ?? process.env.USERNAME ?? null,
+    });
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  log(`${result.replaced ? 'Updated' : 'Added'} ${result.entry.slug} (tier ${result.entry.tier}).`);
+}
+
+async function watchlistSetStatus(args: string[]): Promise<void> {
+  const usage = `watchlist:set-status <slug> ${WATCH_STATUSES.join('|')}`;
+  const { positionals } = parse(args, {}, { min: 2, max: 2, usage });
+  if (!(WATCH_STATUSES as readonly string[]).includes(positionals[1])) {
+    throw new UsageError(`Usage: ${usage}`);
+  }
+  try {
+    const entry = setWatchlistStatus(positionals[0], positionals[1] as WatchStatus);
+    log(`${entry.slug} is now ${entry.status}.`);
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+}
+
+async function watchlistRemove(args: string[]): Promise<void> {
+  const { positionals } = parse(args, {}, { min: 1, max: 1, usage: 'watchlist:remove <slug>' });
+  log(removeWatchlistEntry(positionals[0]) ? `Removed ${positionals[0]}.` : `${positionals[0]} was not on the watchlist.`);
+}
+
+async function suggestionsRanking(args: string[]): Promise<void> {
+  const { values } = parse(args, { json: { type: 'boolean' } }, { min: 0, max: 0, usage: 'suggestions:ranking [--json]' });
+  const rows = await listSuggestions(createAdminClient(requireSupabaseConfig()), { status: 'all', limit: 1000 });
+  const groups = groupSuggestions(rows, readWatchlist(), goldenNameMap());
+  log(values.json ? JSON.stringify(groups, null, 2) : formatSuggestionRanking(groups));
+}
+
 const COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'festival:validate': festivalValidate,
   'festival:seed': festivalSeed,
@@ -307,6 +557,22 @@ const COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'moderation:add-terms': (args) => moderationChangeTerms(args, 'add'),
   'moderation:remove-terms': (args) => moderationChangeTerms(args, 'remove'),
   'storage:sweep-orphans': (args) => storageSweepOrphans(args, log),
+  'candidate:list': candidateList,
+  'candidate:new': candidateNew,
+  'candidate:promote': candidatePromote,
+  'review:serve': (args) => reviewServeCommand(args, log),
+  'scout:eval': scoutEval,
+  'suggestions:list': suggestionsList,
+  'suggestions:to-candidate': suggestionsToCandidate,
+  'suggestions:set-status': suggestionsSetStatus,
+  'suggestions:ranking': suggestionsRanking,
+  'watchlist:list': watchlistList,
+  'watchlist:add': watchlistAdd,
+  'watchlist:set-status': watchlistSetStatus,
+  'watchlist:remove': watchlistRemove,
+  ...Object.fromEntries(
+    Object.entries(MEDIA_COMMANDS).map(([name, run]) => [name, (args: string[]) => run(args, log)]),
+  ),
 };
 
 export async function main(argv: string[]): Promise<number> {

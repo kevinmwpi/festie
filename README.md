@@ -26,19 +26,21 @@ apps/
 packages/
   data-access/         Supabase client, offline-safe session, auth, RPC wrappers, cache-first reads, photos
   sync-engine/         SQLite schema, offline write queue, flush/retry and error classification
-  domain/              Festival-time formatting, day bucketing (days start 06:00), conflicts (vitest)
+  domain/              Festival-time formatting, day bucketing (days start 06:00), conflicts, set status (vitest)
   map-utils/           Camera/bounds and stage/meetup coordinates
   notification-utils/  Local set and meetup reminders
   ui/                  Design tokens and primitives (pastel palette, accessible link colour)
 supabase/
-  migrations/          001–009 (006–009 are the v1 overhaul; 007 is idempotent)
+  migrations/          001–014 (006–009 are the v1 overhaul; 007 is idempotent; 011 set status; 012–013 image credits, festival suggestions, artwork bucket; 014 announced lineup)
   functions/           delete-account, demo-login, _shared (Deno)
   tests/               rls.sql (pgTAP-style) and local stubs, fixtures and race scripts
   templates/           Code-only sign-in email templates
   config.toml          Local config; pushed to hosted after review (runbook §2.8)
-seed-data/             Fictional demo festival (JSON + CSV) and its totem photo
+seed-data/             Golden festival files (demo + Head Trip 2026), media registry (licensed photos), candidates awaiting review
 scripts/db-test.sh     Throwaway Postgres 16 harness for the database tests
 docs/                  Contract, runbook, QA, festival data, App Store and legal documents, static site
+docs/agents/           How festival data and artwork get in: scout agent -> human review -> publish (the flywheel)
+.claude/               /festival-scout skill and the festival-scout workflow for Claude Code sessions
 ```
 
 ## Setup
@@ -74,6 +76,15 @@ Admin commands run locally with the service-role key from a git-ignored root `.e
 (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`); see [`docs/festival-data.md`](docs/festival-data.md) and
 [`docs/release-runbook.md`](docs/release-runbook.md) §1.2.
 
+## Running the app after a pull
+
+Metro bundles the shared packages (`@festival/domain`, `sync-engine`, `data-access`, `ui`, `map-utils`,
+`notification-utils`) straight from their `src/` (the `react-native` field of each `package.json`), so
+the phone always runs the code you pulled; a bare `npx expo start --clear` is enough after a pull.
+Their compiled `dist/` (not committed) serves only `tsc` and the Node test runners. `npm install`
+(`postinstall`), `npm run start`, `npm run start:dev-client` and `npm run build` rebuild it; if `tsc`
+or a test reports a missing export after a pull, run `npm run build:mobile-workspace-deps`.
+
 ## Verification gates
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all of these on every push and pull
@@ -83,7 +94,7 @@ request; run them locally before pushing:
 npm run build                       # turbo: package builds + mobile tsc
 npm run lint                        # turbo: tsc --noEmit everywhere
 npm run test                        # vitest: domain, sync-engine, data-access, map-utils, admin-tools
-npm run db:test                     # migrations 001–009 on a throwaway Postgres 16 + rls.sql + races
+npm run db:test                     # migrations 001–014 on a throwaway Postgres 16 + rls.sql + races
 (cd supabase/functions && deno check */index.ts && deno test && deno lint)
 node docs/legal/generate.mjs --check    # in-app legal screens and docs/site match docs/legal/*.md
 (cd apps/mobile && EXPO_PUBLIC_SUPABASE_URL=https://example.supabase.co EXPO_PUBLIC_SUPABASE_ANON_KEY=dummy \

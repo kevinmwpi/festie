@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "festivals": [
+    {
+      "slug": "demo-festival",
+      "festival_id": "23201458-2b66-526f-943e-27ba5f93b817",
+      "name": "Festie Demo Fest",
+      "seed_file": "seed-data/demo-festival.json",
+      "csv_dir": "seed-data/demo-festival-csv",
+      "candidate": null,
+      "promoted_at": "2026-10-12T00:00:00Z",
+      "verified": null,
+      "notes": "fictional (is_demo): sample data for App Review, no official source to verify against"
+    },
+    {
+      "slug": "head-trip-2026",
+      "festival_id": "132e6610-7242-5b9e-b8f8-2fb0c8fe58a6",
+      "name": "Head Trip",
+      "seed_file": "seed-data/head-trip-2026.json",
+      "csv_dir": "seed-data/head-trip-2026-csv",
+      "candidate": null,
+      "promoted_at": "2026-10-12T00:00:00Z",
+      "verified": null,
+      "notes": "published as pre-launch test data; verify against https://headtripindio.com/set-times/ or set back to draft (see seed-data/head-trip-2026-changes.md)"
+    }
+  ]
+}

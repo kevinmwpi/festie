@@ -14,7 +14,7 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Two iPhones, **A** and **B**, each signed in to TestFlight; ideally one on the oldest iOS you support.
       One physical Android phone for the festival-time spot-check in §7 (release gate 7 asks for iOS and
       Android even though v1 is submitted to the App Store only).
-- [ ] The build points at the project you are testing (staging or production); migrations 006–009 are
+- [ ] The build points at the project you are testing (staging or production); migrations 006–014 are
       applied there ([`release-runbook.md`](./release-runbook.md) §2).
 - [ ] Two real mailboxes you can read on the devices (custom SMTP is configured, runbook §2.7).
 - [ ] `npm run admin -- demo:seed` has run on that project; at least one real festival is published
@@ -97,6 +97,21 @@ Admin commands: [`festival-data.md`](./festival-data.md).
       sources."
 - [ ] Pull to refresh while online picks up a festival edit made with `festival:seed` (e.g. a renamed
       stage) without reinstalling.
+- [ ] **Festival photo:** a festival with an approved photo (`media:upload`, [`festival-data.md`](./festival-data.md))
+      shows it inside the card's rounded icon box, cropped to fill; festivals without one keep the flag
+      icon. On a fresh install in airplane mode (the photo never downloaded), or after removing the object
+      from the `artwork` bucket on staging and relaunching, the card shows the flag — never a blank or
+      broken box. Once a photo has loaded, it still shows after relaunching in airplane mode.
+- [ ] **Suggest a festival:** "Don't see your festival? Suggest it" under the list (and "Suggest a
+      festival" in the "No festivals yet" state) opens the form. Send a name with the website and note
+      empty: "Thanks — we'll check it out." appears and the list is back; a `festival_suggestions` row
+      exists with your user id. Send again with `fest.example` as the website: the row's `url` is
+      `https://fest.example`; `http://…` is rejected inline; a name with a disallowed word is rejected
+      with the "not allowed" message; the same name twice creates no second row.
+- [ ] Suggest a festival in airplane mode: the Send button is disabled and the form says "Connect to
+      send a suggestion."; nothing is queued (no "Waiting to sync", nothing sent after reconnecting).
+- [ ] Rate limit: after 5 suggestions with different names within a day, the 6th shows "You've sent a
+      lot of suggestions today. Try again tomorrow." and no row is added.
 
 ## 6. Lineup, picks and conflicts
 
@@ -105,6 +120,43 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Overlapping picks show a conflict; back-to-back sets (end = next start) do not.
 - [ ] Crew schedule shows the picks of crew members for the same festival, and not those of a blocked
       member.
+- [ ] **Artist photos:** an artist with an approved photo shows it on the Lineup card's rounded tile
+      (cropped to fill, the Add/✓ button still on its corner); artists without one keep the initials
+      monogram. Add sets, My Schedule and the crew schedule stay text-only.
+- [ ] Photo fallback: on a fresh install in airplane mode (photos never downloaded), and after removing
+      an artist's object from the `artwork` bucket on staging and relaunching, the card shows the
+      monogram — never a blank tile or a broken image. A photo that has loaded once still shows after
+      relaunching in airplane mode. Scrolling a long lineup never shows another artist's photo on a card.
+- [ ] VoiceOver reads each Lineup card's artist name once; the photo or monogram is not a separate element.
+- [ ] **Lineup announced, set times TBA** (`festival-data.md` §4.2): copy `seed-data/demo-festival-csv/`,
+      and in its `festival.csv` give the copy a new name, `is_demo` false, any `https://` `source_url` and
+      `status` published (the demo festival itself must keep its sets); reduce `sets.csv` to its header,
+      convert with `festival:import-csv` and seed it (on staging). Lineup shows "Set times
+      aren't out yet", no day or stage chips, and one card per artist ("Set time TBA", photo or monogram,
+      no Add button; VoiceOver reads name and "set time to be announced" as one element). Add sets shows
+      "Set times coming soon" with a working "See the lineup" button; My Schedule says set times are coming.
+      Crews, chat, meetups and the map work for the festival. Then seed the full CSV again and pull to
+      refresh: the timed cards appear and the TBA notice is gone, without reinstalling.
+- [ ] Partly timed lineup: seed the same copy with the sets of one artist removed from `sets.csv`
+      (keep the artist in `artists.csv`). Under "All", that artist is listed in a "Set times to be
+      announced" section after the timed cards; with a day or stage chip active, a one-line footnote
+      counts the acts without a time instead. Add sets lists only timed sets and the same footnote.
+- [ ] With `billing` set in `artists.csv` (1 = top), the TBA acts list in that order, then alphabetically.
+- [ ] Every artist and festival photo visible in the app is listed under Settings → Photo credits with
+      its credit line (§13).
+- [ ] **Schedule changes**, on future data so picks can be made before the change: shift the demo
+      festival into the future (`festival:shift-dates`, §7) and seed it unchanged; pick two sets on
+      device A. Then, in a copy of its CSV, mark one picked set `moved` to another day (new `start`/`end`,
+      `original_start` = its old start, a `note`) and the other `cancelled` (with a `note`), convert, seed
+      it again and pull to refresh. (`seed-data/head-trip-2026.json` is in the past: use it only to look
+      at the chips and notes.)
+  - [ ] The moved set shows a blue "Moved" chip and "Was Sat 11:00 PM" (or "Sat night 1:00 AM") with
+        its note, sits under its new day in Lineup, Add sets, My Schedule and the crew schedule, and stays
+        picked.
+  - [ ] The cancelled set stays listed, struck through, with a red "Cancelled" chip and its note; it can
+        be removed but has no Add button; it causes no conflict and never shows as "Next" on the map.
+  - [ ] My Schedule shows "N of your picks changed" at the top; tapping an entry jumps to its day.
+  - [ ] VoiceOver / TalkBack reads "Moved, was …" or "Cancelled" on the set and on its add/remove button.
 
 ## 7. Time zones, late-night sets and DST
 
@@ -123,6 +175,9 @@ Admin commands: [`festival-data.md`](./festival-data.md).
 - [ ] Reminders: picking a set asks for notification permission the first time; denying it keeps the
       pick and shows "Added. Turn on notifications in Settings to get set reminders."; the reminder fires
       15 minutes before the set's start.
+- [ ] Reminders after a schedule change: pick two future sets, then re-seed with one moved later and one
+      cancelled. Without opening My Schedule (stay on Lineup or Map and pull to refresh), the moved set's
+      reminder fires 15 minutes before its **new** start and the cancelled set's reminder never fires.
 - [ ] Spot-check at least five sets of each published real festival against its `source_url` on a
       physical iPhone **and** a physical Android phone. This is release gate 7 (`v1-architecture.md` §7).
       For Android, install a development build (`npx eas-cli@latest build -p android --profile
@@ -238,6 +293,12 @@ Admin commands: [`festival-data.md`](./festival-data.md).
       support page; Version shows "1.0.0 (build)".
 - [ ] The legal screens' back button and links are readable (blue link colour, not pastel) and every
       `__PLACEHOLDER__` has been replaced in the release build.
+- [ ] About → "Photo credits" lists every artist and festival photo this device shows, grouped
+      Festivals / Artists and sorted by name, each with its attribution (the credit text, or the licence
+      such as "CC BY-SA 4.0" when there is no credit text) and a thumbnail; tapping a row that has a
+      source opens the source page in the browser, a row without one is not tappable. Works in airplane
+      mode. With no photos cached (fresh install offline) it reads "No photos yet — Festie shows licensed
+      photos only, with credit."
 - [ ] Delete account offline: "You're offline…" shown and nothing is deleted.
 - [ ] Delete account online (A is the only admin of a crew with B): type DELETE, tap "Delete my
       account": A returns to sign-in with "Your account has been deleted."; on B, A is gone from the crew,

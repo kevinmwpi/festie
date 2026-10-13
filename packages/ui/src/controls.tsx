@@ -259,14 +259,18 @@ export function ScreenHeader({ title, subtitle, onBack, backIcon, backAccessibil
 
 /* ─── Badge ─────────────────────────────────────────────── */
 
-export type BadgeTone = 'neutral' | 'sample' | 'warning' | 'success';
+export type BadgeTone = 'neutral' | 'sample' | 'info' | 'warning' | 'success' | 'danger';
 
 /** Text/background pairs; every pair is ≥ 4.5:1. */
 const BADGE_TONES: Record<BadgeTone, { backgroundColor: string; color: string }> = {
   neutral: { backgroundColor: '#ECEDEA', color: colors.textPrimary }, // 11.1:1
   sample: { backgroundColor: colors.tintedFill, color: colors.link }, // 5.7:1
+  /** A schedule change that is not bad news on its own (a moved set). */
+  info: { backgroundColor: colors.tintedFill, color: colors.link }, // 5.7:1
   warning: { backgroundColor: colors.warningBg, color: colors.warningText }, // 6.8:1
   success: { backgroundColor: colors.successBg, color: colors.successText }, // 7.1:1
+  /** A cancelled set. */
+  danger: { backgroundColor: colors.destructiveBg, color: colors.destructive }, // 5.76:1
 };
 
 export interface BadgeProps {

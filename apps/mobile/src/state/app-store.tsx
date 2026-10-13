@@ -13,6 +13,8 @@ import { createMMKV, type MMKV } from 'react-native-mmkv';
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
+import { localTodayKey, pickDefaultFestival } from './default-festival';
+
 /** Accent used until a festival is chosen (matches the default soft-pink screen background). */
 export const DEFAULT_ACCENT = '#FFB3D9';
 
@@ -188,39 +190,16 @@ export function resetAppStore(): void {
 
 /* ─── Default festival rule ─────────────────────────────── */
 
-function todayKey(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
-}
-
-function preferNotEnded(festivals: Festival[]): Festival | null {
-  const today = todayKey();
-  return festivals.find((festival) => festival.end_date >= today) ?? festivals[0] ?? null;
-}
-
 /**
- * Default festival from the local cache (never the network): the first followed festival, else the
- * first published non-demo festival, else the demo festival. Within each tier a festival that has
- * not ended yet wins over a past one. `null` when the festival cache is empty.
+ * Default festival from the local cache (never the network), by `pickDefaultFestival`. `null` when the
+ * festival cache is empty.
  */
 export async function resolveDefaultFestival(): Promise<Festival | null> {
   const [catalog, followed] = await Promise.all([getLocalFestivals(), getLocalUserFestivals()]);
-  const published = catalog.filter((festival) => festival.status === 'published');
-  if (published.length === 0) {
-    return null;
-  }
-
-  const byId = new Map(published.map((festival) => [festival.id, festival]));
-  const followedFestivals = followed
-    .map((row) => byId.get(row.festival_id))
-    .filter((festival): festival is Festival => festival !== undefined);
-
-  return (
-    preferNotEnded(followedFestivals) ??
-    preferNotEnded(published.filter((festival) => !festival.is_demo)) ??
-    preferNotEnded(published.filter((festival) => festival.is_demo))
+  return pickDefaultFestival(
+    catalog,
+    followed.map((row) => row.festival_id),
+    localTodayKey(),
   );
 }
 

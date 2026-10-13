@@ -1,9 +1,14 @@
 /**
  * Local SQLite schema.
  *
- * Cache tables mirror the server rows the app renders offline. Bumping `LOCAL_SCHEMA_VERSION`
- * drops and recreates every cache table on the next launch (the app then refetches); the
- * persistent tables (`sync_queue`, `sync_failures`, `app_meta`) survive and are migrated in place.
+ * Cache tables mirror the server rows the app renders offline. A column appended to a cache table
+ * is added in place on the next launch, so an app update never empties the offline cache (a new
+ * catalog column or table also marks every cached festival bundle stale, so it is refetched once
+ * online).
+ * Append new columns with a default or as nullable. Bump `LOCAL_SCHEMA_VERSION` only for changes
+ * that cannot be made in place (a removed, renamed or retyped column, or a new primary key): that
+ * drops and recreates every cache table on the next launch and the app refetches. The persistent
+ * tables (`sync_queue`, `sync_failures`, `app_meta`) always survive and are migrated in place.
  */
 
 export const LOCAL_SCHEMA_VERSION = 2;
@@ -36,6 +41,10 @@ export const CACHE_TABLES = {
       ['venue_name', 'TEXT'],
       ['accent_color', 'TEXT'],
       ['image_url', 'TEXT'],
+      // Attribution of `image_url` (server migration 012); shown on the Photo credits screen.
+      ['image_credit', 'TEXT'],
+      ['image_license', 'TEXT'],
+      ['image_source_url', 'TEXT'],
       ['map_asset_url', 'TEXT'],
       ['version', 'INTEGER NOT NULL DEFAULT 1'],
       ['status', "TEXT NOT NULL DEFAULT 'published'"],
@@ -71,6 +80,10 @@ export const CACHE_TABLES = {
       ['id', 'TEXT NOT NULL'],
       ['name', 'TEXT NOT NULL'],
       ['image_url', 'TEXT'],
+      // Attribution of `image_url` (server migration 012); shown on the Photo credits screen.
+      ['image_credit', 'TEXT'],
+      ['image_license', 'TEXT'],
+      ['image_source_url', 'TEXT'],
       ['genre', 'TEXT'],
     ],
     primaryKey: ['id'],
@@ -84,9 +97,24 @@ export const CACHE_TABLES = {
       ['start_time', 'TEXT NOT NULL'],
       ['end_time', 'TEXT NOT NULL'],
       ['set_type', "TEXT NOT NULL DEFAULT 'performance'"],
+      // 'scheduled' | 'moved' | 'cancelled' (server migration 011).
+      ['status', "TEXT NOT NULL DEFAULT 'scheduled'"],
+      ['original_start_time', 'TEXT'],
+      ['change_note', 'TEXT'],
     ],
     primaryKey: ['id'],
     indexes: ['CREATE INDEX IF NOT EXISTS sets_festival_idx ON sets (festival_id, start_time);'],
+  },
+  // The festival's announced lineup (server migration 014): every billed act, with or without a set.
+  festival_artists: {
+    columns: [
+      ['festival_id', 'TEXT NOT NULL'],
+      ['artist_id', 'TEXT NOT NULL'],
+      // 1 = top billing; null = alphabetical.
+      ['billing_order', 'INTEGER'],
+    ],
+    // The primary key's index serves every per-festival read.
+    primaryKey: ['festival_id', 'artist_id'],
   },
   user_festivals: {
     columns: [
@@ -166,6 +194,9 @@ export const CACHE_TABLES = {
     primaryKey: ['blocked_id'],
   },
 } as const satisfies Record<string, TableDefinition>;
+
+/** Festival catalog tables, refreshed per festival bundle (`festivals.bundle_version`). */
+export const CATALOG_TABLES: ReadonlySet<string> = new Set(['festivals', 'stages', 'sets', 'artists', 'festival_artists']);
 
 export const PERSISTENT_TABLES = {
   sync_queue: {

@@ -89,11 +89,13 @@ Warn before a voluntary sign-out when `getPendingCount() > 0` (sync-engine).
 |---|---|---|
 | `getLocalFestivals()` | `() => Promise<Festival[]>` | Cached published festivals; demo festivals sort last. `is_demo` is a boolean. |
 | `getLocalFestival(id)` | `(string) => Promise<Festival \| null>` | |
-| `refreshFestivalCatalog()` | `() => Promise<Festival[]>` | Online. Upserts published festivals and deletes cached festivals/stages/sets that are no longer published. Call on launch and pull-to-refresh. |
-| `fetchAndCacheFestival(id)` | `(string) => Promise<FestivalBundle \| null>` | Online. Light `select id, version` first; downloads stages/sets/artists only when the version changed. `null` (and removed locally) when no longer published. |
-| `getLocalFestivalBundle(id)` | `(string) => Promise<FestivalBundle \| null>` | `{ festival, stages, artists, sets }`. Stages carry `latitude/longitude` (no `map_x/map_y`). |
+| `refreshFestivalCatalog()` | `() => Promise<Festival[]>` | Online. Upserts published festivals and deletes cached festivals/stages/sets/lineup rows that are no longer published. Call on launch and pull-to-refresh. |
+| `fetchAndCacheFestival(id)` | `(string) => Promise<FestivalBundle \| null>` | Online. Light `select id, version` first; downloads stages/sets/lineup (`festival_artists`)/artists only when the version changed. `null` (and removed locally) when no longer published. A server without migration 014 (`PGRST205` on `festival_artists`) fails the fetch, like a server without the 011 columns, and leaves the cached bundle as it was. |
+| `getLocalUnscheduledArtists(id)` | `(string) => Promise<UnscheduledArtist[]>` | Cache only. Announced artists (`festival_artists`) with no set of any status in the festival, with `billing_order`; billing first, then name. Pair with `describeLineupAvailability` from `@festival/domain` for the `empty \| tba \| partial \| scheduled` state. |
+| `getLocalFestivalBundle(id)` | `(string) => Promise<FestivalBundle \| null>` | `{ festival, stages, artists, sets }`; `artists` is the announced lineup plus every set's artist. Stages carry `latitude/longitude` (no `map_x/map_y`). Sets carry `status` (`scheduled`, `moved`, `cancelled`), `original_start_time` and `change_note`; cancelled sets stay in the bundle (render them with `describeSetChange` from `@festival/domain`). A changed status reaches the cache only after `festivals.version` changes. |
 | `hasCachedFestivalBundle(id)` | `(string) => Promise<boolean>` | |
-| `getLocalFestivalLineup(id)` | `(string) => Promise<FestivalLineupRow[]>` | Sets joined with artist/stage names. |
+| `getLocalFestivalLineup(id)` | `(string) => Promise<FestivalLineupRow[]>` | Sets joined with artist/stage names and `artist_image_url`. |
+| `getLocalImageCredits()` | `() => Promise<ImageCredit[]>` | Cache only. Every cached artist and festival photo (`image_url` set) as `{ subject_type: 'artist' \| 'festival', subject_id, name, image_url, image_credit, image_license, image_source_url }`, ordered by name. Backs Settings → Photo credits. |
 | `getLocalUserFestivals()` | `() => Promise<LocalUserFestival[]>` | Followed festivals (cache). |
 | `refreshUserFestivals()` | `() => Promise<LocalUserFestival[]>` | Online; replaces the cache, except festivals followed or unfollowed while it was in flight (they keep their local state). |
 | `followFestival(id)` / `unfollowFestival(id)` | `(string) => Promise<void>` | Online writes (not queued); already-following is not an error. |
@@ -101,16 +103,29 @@ Warn before a voluntary sign-out when `getPendingCount() > 0` (sync-engine).
 
 Format every time with `@festival/domain` helpers and `festival.timezone`.
 
+Festivals and artists carry `image_url` (a public https URL in the `artwork` bucket when an approved,
+licensed photo exists, else `null`) with `image_credit`, `image_license` and `image_source_url`
+(migration 012). The app shows a photo only when `image_url` is set and falls back to the monogram /
+flag icon otherwise or when it fails to load.
+
+## Festival suggestions
+
+| Export | Signature | Behaviour |
+|---|---|---|
+| `suggestFestival(input)` | `({ name, url?, note? }) => Promise<string>` | Online RPC `suggest_festival` (never queued). Trims; name 1–120, website an `https://` address ≤ 500 (`https://` is added to a bare "fest.example"), note ≤ 300 → `ValidationError` with `field` before anything is sent. P0001 `rate_limited` (5 a day), `content_not_allowed`, `invalid_input`. The same name again resolves the same id. |
+| `validateFestivalSuggestion(input)`, `normaliseSuggestionUrl(value)`, `FESTIVAL_SUGGESTION_{NAME,URL,NOTE}_MAX_LENGTH` | pure | Form validation. |
+| `toSuggestionErrorMessage(error)` | `(unknown) => string` | `toUserMessage`, except `rate_limited` → `SUGGESTION_RATE_LIMITED_MESSAGE` ("You've sent a lot of suggestions today. Try again tomorrow."). |
+
 ## Schedule (selections — offline queue)
 
 | Export | Signature | Behaviour |
 |---|---|---|
 | `toggleSetSelection(festivalId, setId)` | `(string, string) => Promise<boolean>` | Queued. Upsert on `(user_id, set_id)` ignoring duplicates; delete by `user_id + set_id`. Works offline. `true` when now selected. |
 | `getLocalSelections(festivalId)` | `(string) => Promise<LocalSelection[]>` | `pending_sync = 1` until the server accepted it. |
-| `getBrowseSchedule(festivalId)` | `(string) => Promise<ScheduleRow[]>` | Full lineup with `selection_id`/`selection_pending`. |
-| `getSelectedSchedule(festivalId)` | `(string) => Promise<ScheduleRow[]>` | |
-| `getLineupWithConflicts(festivalId)` | `(string) => Promise<Array<ScheduleRow & { is_conflicting }>>` | Back-to-back sets do not conflict. |
-| `getConflictSetIds(rows)` | `(rows) => Set<string>` | Pure. |
+| `getBrowseSchedule(festivalId)` | `(string) => Promise<ScheduleRow[]>` | Full lineup with `selection_id`/`selection_pending`, including moved and cancelled sets. |
+| `getSelectedSchedule(festivalId)` | `(string) => Promise<ScheduleRow[]>` | Includes picks of cancelled sets (so the app can flag them). |
+| `getLineupWithConflicts(festivalId)` | `(string) => Promise<Array<ScheduleRow & { is_conflicting }>>` | Back-to-back sets do not conflict; cancelled sets never do. |
+| `getConflictSetIds(rows)` | `(rows) => Set<string>` | Pure. Ignores cancelled sets. |
 | `refreshUserSelections(festivalId)` | `(string) => Promise<LocalSelection[]>` | Online merge: never drops `pending_sync = 1` rows, never resurrects rows with a queued delete — including operations a concurrent flush completes while the fetch is in flight (the queue is snapshotted before the fetch and tracked during it). Writes nothing if local data was wiped (sign-out) meanwhile. |
 | `refreshSchedule(festivalId)` | `(string) => Promise<LocalSelection[]>` | `flush()` then `refreshUserSelections`. |
 

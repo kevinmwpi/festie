@@ -1,4 +1,4 @@
-import type { Set } from '@festival/domain';
+import { isCancelledSet, type Set } from '@festival/domain';
 
 /** Mapbox order: `[longitude, latitude]`. */
 export type LngLat = [number, number];
@@ -167,11 +167,12 @@ export function indexStagesById<T extends StageGeo>(stages: readonly T[]): Map<s
   return new Map(stages.map((stage) => [stage.id, stage]));
 }
 
-export function getNextStageSet<T extends Pick<Set, 'stage_id' | 'start_time'>>(stageId: string, sets: readonly T[], now: Date): T | null {
+/** The next set on a stage that has not started yet; cancelled sets are skipped. */
+export function getNextStageSet<T extends Pick<Set, 'stage_id' | 'start_time' | 'status'>>(stageId: string, sets: readonly T[], now: Date): T | null {
   const nowMs = now.getTime();
   return (
     [...sets]
-      .filter((set) => set.stage_id === stageId && new Date(set.start_time).getTime() >= nowMs)
+      .filter((set) => set.stage_id === stageId && !isCancelledSet(set) && new Date(set.start_time).getTime() >= nowMs)
       .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime())[0] ?? null
   );
 }

@@ -36,9 +36,9 @@ project). Re-scan before each release:
 | Immutable meetup ownership and crew; picks must match their set's festival | Column-scoped triggers | rls.sql F, G |
 | Disallowed-word filter on names, crew names, meetup title/notes (insert and change only, never on cascades) | Triggers + `private.contains_disallowed_text`, list in `public.moderation_terms` (009) | rls.sql D, G; `apps/admin-tools/test/terms.test.ts` |
 | Rate limits: crew creation 10/day, reports 20/day, meetups 30/h per user and 100 per user per crew (`meetups_insert_limits`, profile-JWT inserts only), invite guessing: 11th wrong code per account in an hour refused, and once 200 wrong codes land project-wide in the last hour (`join_group:global`, counted without a lock) profiles younger than 7 days cannot guess and older ones get 3 failures an hour; demo login 20/h per IP and 30/h global. Residual risk: 6-character codes (32^6) never expire; 8 characters or a TTL on `invite_code_rotated_at` is a v1.1 option (needs mobile input and contract changes) | `private.check_rate_limit` (advisory lock per key) | rls.sql I (I37–I41), G21–G24, K, M; `supabase/functions/demo-login/handler_test.ts` |
-| Only published festivals visible; catalog read-only | RLS on festivals/stages/sets; draft-by-default; `festivals_published_requires_source` | rls.sql B |
-| Migrations safe on a dirty hosted database and idempotent | 006–009 | `npm run db:test` (dirty fixture, re-apply of 007–009, partial-history scenarios) |
-| No `storage.*` DDL/DML in migrations except the isolated 008 | `scripts/db-test.sh` guard | `npm run db:test` |
+| Only published festivals visible; catalog read-only | RLS on festivals/stages/sets/festival_artists (014); draft-by-default; `festivals_published_requires_source` | rls.sql B, T |
+| Migrations safe on a dirty hosted database and idempotent | 006–014 | `npm run db:test` (dirty fixture, re-apply of 007–014, partial-history scenarios) |
+| No `storage.*` DDL/DML in migrations except the isolated 008 and 013 | `scripts/db-test.sh` guard | `npm run db:test` |
 
 ## 3. Storage
 

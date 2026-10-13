@@ -1,4 +1,5 @@
-import { detectConflict, festivalDayKey, listFestivalDays } from '@festival/domain';
+import { describeLineupAvailability, describeSetChange, detectConflict, festivalDayKey, listFestivalDays } from '@festival/domain';
+import type { UnscheduledArtist } from '@festival/data-access';
 import {
   Badge,
   Chip,
@@ -7,6 +8,7 @@ import {
   deriveAccentColors,
   elevation,
   EmptyState,
+  iconRadius,
   layout,
   motion,
   PressableScale,
@@ -21,12 +23,20 @@ import { router } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { ArtistMonogram } from '@/src/components/ArtistMonogram';
+import { ArtistAvatar } from '@/src/components/ArtistAvatar';
 import { FestivalDisclaimer, TimeZoneHint } from '@/src/components/FestivalNotes';
 import { ScreenHeader } from '@/src/components/ScreenHeader';
+import { cancelledTextStyle, SetChangeBadge, SetChangeDetail } from '@/src/components/SetChange';
 import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } from '@/src/components/StateViews';
+import {
+  LineupTbaNotice,
+  UnscheduledArtistCard,
+  UnscheduledFootnote,
+  UnscheduledSectionHeader,
+} from '@/src/components/UnscheduledLineup';
 import { formatWeekdayDayLabel } from '@/src/hooks/festival-time-labels';
 import { useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
+import { useFollowFestivals } from '@/src/hooks/use-follow-festival';
 import { useLineup, type LineupRow } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
@@ -35,16 +45,17 @@ import { useAppStore } from '@/src/state/app-store';
 
 const ALL = 'all';
 const NO_ROWS: LineupRow[] = [];
+const NO_ARTISTS: UnscheduledArtist[] = [];
 
-/** Edge of the artist monogram beside the text, and above it when the text is large. */
+/** Edge of the artist tile (photo or monogram) beside the text, and above it when the text is large. */
 const MONOGRAM_SIZE = 112;
 const MONOGRAM_SIZE_STACKED = 80;
-/** The add button: a 44pt target with a white cut-out ring, overhanging the monogram's corner. */
+/** The add button: a 44pt target with a white cut-out ring, overhanging the tile's corner. */
 const ADD_BUTTON_SIZE = layout.minTouchTarget;
 const ADD_BUTTON_RING = 4;
 const ADD_BUTTON_OVERHANG = spacing.sm;
 /**
- * From the xxxLarge text size up (iOS `fontScale` 1.35 and the accessibility sizes) the monogram moves
+ * From the xxxLarge text size up (iOS `fontScale` 1.35 and the accessibility sizes) the tile moves
  * above the text: beside the 112pt tile the artist name would get only a few characters per line.
  */
 const STACK_FONT_SCALE = 1.3;
@@ -72,12 +83,20 @@ function ArtistCard({
   const showConflict = Boolean(row.is_conflicting);
   const showOverlap = !isSelected && overlapsPick;
   const showPending = isSelected && row.selection_pending === 1;
+  // Schedule changes (moved / cancelled sets): a chip, a detail line, and a struck-through name and time.
+  const change = describeSetChange(row, clock.timeZone);
+  const cancelled = change?.status === 'cancelled';
+  // A cancelled set can still be removed from the schedule, but not added.
+  const canToggle = isSelected || !cancelled;
+  const changeSuffix = change ? `. ${change.accessibilityLabel}` : '';
 
-  // VoiceOver reads the set as one element (who, where, when, status) and then reaches its add button.
+  // VoiceOver reads the set as one element (who, where, when, any schedule change, status) and then
+  // reaches its add button.
   const summary = [
     row.artist_name,
     row.stage_name,
     `${day}, ${timeRange}`,
+    change?.accessibilityLabel ?? null,
     showConflict ? 'Conflict' : null,
     showOverlap ? 'Overlaps a pick' : null,
     showPending ? 'Waiting to sync' : null,
@@ -87,21 +106,28 @@ function ArtistCard({
     .join(', ');
 
   const monogramSize = stacked ? MONOGRAM_SIZE_STACKED : MONOGRAM_SIZE;
-  // The monogram is the first child, at the card content's origin in both layouts: this puts the add
+  // The tile is the first child, at the card content's origin in both layouts: this puts the add
   // button on its bottom-right corner, overhanging it.
   const addButtonOffset = monogramSize - ADD_BUTTON_SIZE + ADD_BUTTON_OVERHANG;
 
-  // Screen reader order: the set, then its add button. The summary element wraps the (hidden) monogram as
+  // Screen reader order: the set, then its add button. The summary element wraps the (hidden) tile as
   // well as the text, so its frame starts at the content's top-left corner, above and before the button.
   // VoiceOver orders elements by position, so a summary that started below the button (the stacked
   // layout) would be read after it. The button is rendered after the summary for TalkBack, which follows
   // the view order. The button stays a sibling: inside an accessible View it could not be focused.
   return (
     <View style={styles.artistCard}>
-      {/* Positioning box for the add button: its origin is the summary's, so the monogram's. */}
+      {/* Positioning box for the add button: its origin is the summary's, so the tile's. */}
       <View>
         <View style={stacked ? styles.summaryStacked : styles.summaryRow} accessible accessibilityLabel={summary}>
-          <ArtistMonogram name={row.artist_name} colorKey={row.artist_id} size={monogramSize} />
+          {/* The licensed photo when there is one, else the monogram; both with the app-icon corner. */}
+          <ArtistAvatar
+            name={row.artist_name}
+            colorKey={row.artist_id}
+            imageUrl={row.artist_image_url}
+            size={monogramSize}
+            radius={iconRadius(monogramSize)}
+          />
 
           <View style={[styles.artistContent, !stacked && styles.artistContentRow]}>
             <View style={styles.stagePill}>
@@ -111,42 +137,46 @@ function ArtistCard({
             </View>
 
             <View style={styles.nameRow}>
-              <Text style={styles.artistName}>{row.artist_name}</Text>
+              <Text style={[styles.artistName, cancelled && cancelledTextStyle]}>{row.artist_name}</Text>
               {isSelected ? (
                 <Ionicons name="heart" size={20} color={colors.textPrimary} accessibilityLabel="In your schedule" style={styles.heart} />
               ) : null}
             </View>
 
             <View style={styles.badgeRow}>
+              <SetChangeBadge change={change} />
               {showConflict ? <Badge label="Conflict" tone="warning" /> : null}
               {showOverlap ? <Badge label="Overlaps a pick" tone="neutral" /> : null}
               {showPending ? <Badge label="Waiting to sync" tone="neutral" /> : null}
             </View>
 
-            <Text style={styles.artistTime}>{`${day} · ${timeRange}`}</Text>
+            <Text style={[styles.artistTime, cancelled && cancelledTextStyle]}>{`${day} · ${timeRange}`}</Text>
+            <SetChangeDetail change={change} />
           </View>
         </View>
 
-        <PressableScale
-          onPress={onToggle}
-          disabled={busy}
-          accessibilityRole="button"
-          accessibilityLabel={isSelected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}
-          accessibilityState={{ selected: isSelected, busy }}
-          hitSlop={4}
-          pressedScale={motion.pressedScaleSmall}
-          style={[
-            styles.addButton,
-            { left: addButtonOffset, top: addButtonOffset },
-            isSelected ? styles.addButtonSelected : styles.addButtonDefault,
-          ]}
-        >
-          {busy ? (
-            <ActivityIndicator size="small" color={colors.textPrimary} />
-          ) : (
-            <Ionicons name={isSelected ? 'checkmark' : 'add'} size={18} color={colors.textPrimary} />
-          )}
-        </PressableScale>
+        {canToggle ? (
+          <PressableScale
+            onPress={onToggle}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={`${isSelected ? `Remove ${row.artist_name} from my schedule` : `Add ${row.artist_name} to my schedule`}${changeSuffix}`}
+            accessibilityState={{ selected: isSelected, busy }}
+            hitSlop={4}
+            pressedScale={motion.pressedScaleSmall}
+            style={[
+              styles.addButton,
+              { left: addButtonOffset, top: addButtonOffset },
+              isSelected ? styles.addButtonSelected : styles.addButtonDefault,
+            ]}
+          >
+            {busy ? (
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+            ) : (
+              <Ionicons name={isSelected ? 'checkmark' : 'add'} size={18} color={colors.textPrimary} />
+            )}
+          </PressableScale>
+        ) : null}
       </View>
     </View>
   );
@@ -163,9 +193,10 @@ export default function LineupScreen() {
   useSafeAreaEdgeTint(screenBg);
   const isOffline = useOfflineStatus();
 
-  const { bundle, lineup, festival } = useLineup(festivalId);
+  const { bundle, lineup, unscheduled, festival } = useLineup(festivalId);
   const clock = useFestivalClock(festival);
   const { toggle, busyIds } = useSetSelection(festival);
+  const follows = useFollowFestivals({ reapplyDefault: false });
 
   const [dayFilter, setDayFilter] = React.useState<string>(ALL);
   const [stageFilter, setStageFilter] = React.useState<string>(ALL);
@@ -176,6 +207,10 @@ export default function LineupScreen() {
   }, [festivalId]);
 
   const rows = React.useDeferredValue(lineup.data ?? NO_ROWS);
+  // Announced acts without a set yet (announcement mode, festival-data.md §4.2).
+  const tbaArtists = unscheduled.data ?? NO_ARTISTS;
+  const availability = describeLineupAvailability({ setCount: rows.length, unscheduledCount: tbaArtists.length });
+  const filtersActive = dayFilter !== ALL || stageFilter !== ALL;
   const timeZone = festival?.timezone ?? '';
 
   const days = React.useMemo(() => (festival ? listFestivalDays(festival, rows) : []), [festival, rows]);
@@ -254,7 +289,8 @@ export default function LineupScreen() {
     <View style={[styles.container, { backgroundColor: screenBg }]}>
       {header}
 
-      {festival ? (
+      {/* Day and stage filters only make sense once at least one set has a time. */}
+      {festival && rows.length > 0 ? (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.filterRow}>
             {[ALL, ...days].map((day) => {
@@ -306,28 +342,55 @@ export default function LineupScreen() {
 
         {festival ? (
           <>
-            <TimeZoneHint hint={clock.hint} />
-            {lineup.isLoading ? (
+            {rows.length > 0 ? <TimeZoneHint hint={clock.hint} /> : null}
+            {lineup.isLoading || unscheduled.isLoading ? (
               <LoadingState label="Loading the lineup…" />
-            ) : rows.length === 0 ? (
+            ) : availability === 'empty' ? (
               <EmptyState
                 title="Lineup coming soon"
-                description="Sets will appear here once the festival publishes its schedule."
+                description="Artists and sets will appear here once the festival announces them."
               />
-            ) : filtered.length === 0 ? (
-              <EmptyState title="No sets match" description="Try another day or stage." />
-            ) : (
-              filtered.map((row) => (
-                <ArtistCard
-                  key={row.id}
-                  row={row}
-                  clock={clock}
-                  overlapsPick={overlapIds.has(row.id)}
-                  busy={busyIds.has(row.id)}
-                  stacked={stackCards}
-                  onToggle={() => void toggle(row)}
+            ) : availability === 'tba' ? (
+              <>
+                <LineupTbaNotice
+                  count={tbaArtists.length}
+                  follow={
+                    follows.following.data && !follows.followingIds.has(festival.id)
+                      ? { festivalName: festival.name, busy: follows.busyId === festival.id, onPress: () => void follows.toggle(festival) }
+                      : undefined
+                  }
                 />
-              ))
+                {tbaArtists.map((artist) => (
+                  <UnscheduledArtistCard key={artist.id} artist={artist} />
+                ))}
+              </>
+            ) : (
+              <>
+                {filtered.length === 0 ? (
+                  <EmptyState title="No sets match" description="Try another day or stage." />
+                ) : (
+                  filtered.map((row) => (
+                    <ArtistCard
+                      key={row.id}
+                      row={row}
+                      clock={clock}
+                      overlapsPick={overlapIds.has(row.id)}
+                      busy={busyIds.has(row.id)}
+                      stacked={stackCards}
+                      onToggle={() => void toggle(row)}
+                    />
+                  ))
+                )}
+                {availability === 'partial' && !filtersActive ? (
+                  <>
+                    <UnscheduledSectionHeader count={tbaArtists.length} />
+                    {tbaArtists.map((artist) => (
+                      <UnscheduledArtistCard key={artist.id} artist={artist} />
+                    ))}
+                  </>
+                ) : null}
+                {availability === 'partial' && filtersActive ? <UnscheduledFootnote count={tbaArtists.length} where="filters" /> : null}
+              </>
             )}
             <StaleDataNote error={bundle.refreshError ?? lineup.refreshError} />
           </>
@@ -362,7 +425,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { gap: spacing.md, paddingHorizontal: layout.screenGutter, paddingTop: spacing.lg },
 
-  /* Artist card: white, `card` radius, the monogram beside (or above) the set's details. */
+  /* Artist card: white, `card` radius, the tile beside (or above) the set's details. */
   artistCard: {
     ...continuous,
     ...elevation.card,
@@ -375,7 +438,7 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', gap: spacing.xl },
   summaryStacked: { gap: spacing.md },
 
-  /* Add button: a 44pt soft square with a white cut-out ring, on the monogram's corner. */
+  /* Add button: a 44pt soft square with a white cut-out ring, on the tile's corner. */
   addButton: {
     ...continuous,
     ...elevation.raised,

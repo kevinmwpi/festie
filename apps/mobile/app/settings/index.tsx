@@ -219,6 +219,11 @@ export default function SettingsScreen() {
         {/* Hosted documents open in a browser sheet; without a URL they are in-app screens. */}
         <ListRow title="Privacy Policy" accessory={PRIVACY_POLICY_URL ? 'external' : 'chevron'} onPress={openPrivacyPolicy} />
         <ListRow title="Terms of Use" accessory={TERMS_URL ? 'external' : 'chevron'} onPress={openTermsOfUse} />
+        <ListRow
+          title="Photo credits"
+          subtitle="Who took the artist and festival photos"
+          onPress={() => router.push('/settings/credits')}
+        />
         {SUPPORT_EMAIL ? (
           <ListRow
             title="Contact support"
