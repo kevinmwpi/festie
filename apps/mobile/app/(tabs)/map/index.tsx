@@ -19,14 +19,23 @@ import {
 import {
   Chip,
   colors,
+  continuous,
   deriveAccentColors,
+  elevation,
   EmptyState,
   IconButton,
+  iconRadius,
   layout,
+  ListRow,
+  ListSection,
+  PressableScale,
   radii,
   showToast,
   spacing,
+  tabularNums,
+  textStyles,
   useOfflineStatus,
+  useReduceMotion,
 } from '@festival/ui';
 import { Ionicons } from '@expo/vector-icons';
 import Mapbox from '@rnmapbox/maps';
@@ -34,7 +43,7 @@ import { onlineManager, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, AppState, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Avatar } from '@/src/components/Avatar';
 import { ActionSheet, type SheetAction } from '@/src/components/BottomSheet';
@@ -62,6 +71,38 @@ import { useAppStore } from '@/src/state/app-store';
 const FRIEND_POLL_MS = 30_000;
 const NO_MEETUPS: LocalMeetup[] = [];
 const NO_FRIENDS: Array<DeviceTimed<FriendLocation>> = [];
+
+/** Camera move of the recenter button; 0 (a cut) with Reduce Motion on. */
+const RECENTER_DURATION_MS = 600;
+/**
+ * Top-overlay height (title card and control pills, default text size) assumed until the overlay has been
+ * measured. The map reads its first framing before any onLayout lands, so that framing always uses this
+ * estimate; `CREW_CHIPS_HEIGHT` is added when the crew chips row is shown.
+ */
+const INITIAL_TOP_OVERLAY_HEIGHT = 140;
+/** The crew chips row in the top overlay: chip, its scroller's vertical padding, and the overlay gap. */
+const CREW_CHIPS_HEIGHT = layout.chipHeight + 2 * spacing.xs + spacing.sm;
+/**
+ * Most of the map's height the camera padding may take. Mapbox cannot frame bounds whose vertical padding
+ * exceeds the map (it keeps the current camera), which wrapped overlays at the largest text sizes can reach
+ * on a small phone; the padding is scaled down to leave the festival at least a quarter of the map.
+ */
+const MAX_CAMERA_PADDING_SHARE = 0.75;
+
+/**
+ * Pins float over the map with `allowOverlap`, so past this text size they would cover each other and the
+ * festival. Each marker's accessibility label carries its full text.
+ */
+const PIN_MAX_FONT_SCALE = 1.4;
+
+/** Friend pin: the avatar inside a white inset and the festival-accent ring (a stroke, so off the 4pt grid). */
+const FRIEND_AVATAR_SIZE = 34;
+const FRIEND_RING_INSET = spacing.xxs;
+const FRIEND_RING_BORDER = 3;
+const FRIEND_RING_SIZE = FRIEND_AVATAR_SIZE + 2 * (FRIEND_RING_INSET + FRIEND_RING_BORDER);
+
+/** Icon tiles and avatars leading the rows of the no-map lists. */
+const LIST_TILE_SIZE = 36;
 
 /* ─── Data ──────────────────────────────────────────────── */
 
@@ -174,15 +215,15 @@ function useMeetups(groupId: string | null) {
 
 function StagePin({ name, nextLabel, accent }: { name: string; nextLabel: string | null; accent: string }) {
   return (
-    <View style={[styles.stagePin, { borderColor: accent }]} accessible accessibilityLabel={`Stage ${name}${nextLabel ? `, next: ${nextLabel}` : ''}`}>
+    <View style={[styles.pin, styles.stagePin, { borderColor: accent }]} accessible accessibilityLabel={`Stage ${name}${nextLabel ? `, next: ${nextLabel}` : ''}`}>
       <View style={styles.stagePinRow}>
         <View style={[styles.stageDot, { backgroundColor: accent }]} />
-        <Text style={styles.stagePinText} numberOfLines={1}>
+        <Text style={styles.pinTitle} numberOfLines={2} maxFontSizeMultiplier={PIN_MAX_FONT_SCALE}>
           {name}
         </Text>
       </View>
       {nextLabel ? (
-        <Text style={styles.stagePinTime} numberOfLines={1}>
+        <Text style={styles.stagePinTime} numberOfLines={2} maxFontSizeMultiplier={PIN_MAX_FONT_SCALE}>
           {nextLabel}
         </Text>
       ) : null}
@@ -192,27 +233,40 @@ function StagePin({ name, nextLabel, accent }: { name: string; nextLabel: string
 
 function MeetupPin({ title, time }: { title: string; time: string }) {
   return (
-    <View style={styles.meetupPin} accessible accessibilityLabel={`Meetup ${title} at ${time}`}>
+    <View style={[styles.pin, styles.meetupPin]} accessible accessibilityLabel={`Meetup ${title} at ${time}`}>
       <Ionicons name="location" size={14} color={colors.textPrimary} />
-      <Text style={styles.meetupPinText} numberOfLines={1}>
+      <Text style={[styles.pinTitle, styles.pinTextCentered]} numberOfLines={2} maxFontSizeMultiplier={PIN_MAX_FONT_SCALE}>
         {title}
       </Text>
-      <Text style={styles.meetupPinTime}>{time}</Text>
+      <Text style={styles.meetupPinTime} maxFontSizeMultiplier={PIN_MAX_FONT_SCALE}>
+        {time}
+      </Text>
     </View>
   );
 }
 
 function FriendPin({ friend, ago, accent }: { friend: FriendLocation; ago: string; accent: string }) {
+  const nameLabel = (
+    <Text style={styles.friendLabelText} numberOfLines={1} maxFontSizeMultiplier={PIN_MAX_FONT_SCALE}>
+      {friend.display_name.split(' ')[0]} · {ago}
+    </Text>
+  );
   return (
     <View style={styles.friendPin} accessible accessibilityLabel={`${friend.display_name}, last seen ${ago}`}>
+      {/* An invisible copy of the name label above the avatar balances the real one below it, so the avatar
+          is the pin's vertical centre: the marker is anchored at y 0.5, which keeps the avatar (not the gap
+          above the name) on the friend's position at any text size. */}
+      <View
+        style={[styles.friendLabel, styles.friendLabelSpacer]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {nameLabel}
+      </View>
       <View style={[styles.friendRing, { borderColor: accent }]}>
-        <Avatar name={friend.display_name} avatarType={friend.avatar_type} avatarValue={friend.avatar_value} size={34} />
+        <Avatar name={friend.display_name} avatarType={friend.avatar_type} avatarValue={friend.avatar_value} size={FRIEND_AVATAR_SIZE} />
       </View>
-      <View style={styles.friendLabel}>
-        <Text style={styles.friendLabelText} numberOfLines={1}>
-          {friend.display_name.split(' ')[0]} · {ago}
-        </Text>
-      </View>
+      <View style={styles.friendLabel}>{nameLabel}</View>
     </View>
   );
 }
@@ -254,24 +308,25 @@ function ControlPill({
   accessibilityHint?: string;
 }) {
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
-      style={({ pressed }) => [styles.pill, active && styles.pillActive, pressed && { opacity: 0.85 }]}
+      accessibilityState={{ busy: Boolean(busy) }}
+      style={[styles.overlaySurface, styles.pill, active && styles.pillActive]}
     >
-      {busy ? <ActivityIndicator size="small" color={colors.textPrimary} /> : <Ionicons name={icon} size={14} color={colors.textPrimary} />}
+      {busy ? <ActivityIndicator size="small" color={colors.textPrimary} /> : <Ionicons name={icon} size={16} color={colors.textPrimary} />}
       <Text style={styles.pillLabel}>{label}</Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
 function GroupChips({ groups, selectedId, onSelect, accent }: { groups: GroupSummary[]; selectedId: string | null; onSelect: (id: string) => void; accent: string }) {
   if (groups.length < 2) return null;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.groupChips}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.chipRow}>
       {groups.map((group) => (
         <Chip key={group.id} label={group.name} active={group.id === selectedId} accentColor={accent} onPress={() => onSelect(group.id)} />
       ))}
@@ -280,6 +335,20 @@ function GroupChips({ groups, selectedId, onSelect, accent }: { groups: GroupSum
 }
 
 /* ─── Fallback (no map) ─────────────────────────────────── */
+
+/** Icon tile leading a no-map list row (decorative: `ListRow` hides `leading` from screen readers). */
+function ListTile({ icon, backgroundColor }: { icon: React.ComponentProps<typeof Ionicons>['name']; backgroundColor: string }) {
+  return (
+    <View style={[styles.listTile, { backgroundColor }]}>
+      <Ionicons name={icon} size={20} color={colors.textPrimary} />
+    </View>
+  );
+}
+
+/** A section's empty-state line, inside its card. */
+function SectionNote({ children }: { children: React.ReactNode }) {
+  return <Text style={styles.sectionNote}>{children}</Text>;
+}
 
 function FallbackLists({
   bundle,
@@ -304,79 +373,64 @@ function FallbackLists({
   const artistsById = new Map(bundle.artists.map((artist) => [artist.id, artist.name]));
   const upcomingMeetups = meetups.filter((meetup) => Date.parse(meetup.starts_at) >= now - 60 * 60_000);
 
+  // Inset-grouped sections (sentence-case header above a card of rows), like Settings.
   return (
     <>
-      <View style={styles.card}>
-        <Text style={styles.sectionLabel} accessibilityRole="header">
-          STAGES · NEXT UP
-        </Text>
-        {stages.length === 0 ? <Text style={styles.muted}>Stages appear once the festival publishes them.</Text> : null}
+      <ListSection title="Stages · next up">
+        {stages.length === 0 ? <SectionNote>Stages appear once the festival publishes them.</SectionNote> : null}
         {stages.map((stage) => {
           const next = getNextStageSet(stage.id, bundle.sets, new Date(now));
           return (
-            <View key={stage.id} style={styles.listRow}>
-              <View style={[styles.listIcon, { backgroundColor: '#F0F4FF' }]}>
-                <Ionicons name="flag-outline" size={18} color={colors.textPrimary} />
-              </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>{stage.name}</Text>
-                <Text style={styles.listSub}>
-                  {next
-                    ? `Next: ${artistsById.get(next.artist_id) ?? 'TBA'} · ${clock.day(next.start_time)} ${clock.time(next.start_time)}`
-                    : 'No more sets'}
-                </Text>
-              </View>
-            </View>
+            <ListRow
+              key={stage.id}
+              leading={<ListTile icon="flag-outline" backgroundColor={colors.inputBg} />}
+              title={stage.name}
+              subtitle={
+                next
+                  ? `Next: ${artistsById.get(next.artist_id) ?? 'TBA'} · ${clock.day(next.start_time)} ${clock.time(next.start_time)}`
+                  : 'No more sets'
+              }
+            />
           );
         })}
-      </View>
+      </ListSection>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionLabel} accessibilityRole="header">
-          {group ? `MEETUPS · ${group.name.toUpperCase()}` : 'MEETUPS'}
-        </Text>
+      <ListSection title={group ? `Meetups · ${group.name}` : 'Meetups'}>
         {!hasGroups ? (
-          <Text style={styles.muted}>Join or create a crew to plan meetups.</Text>
+          <SectionNote>Join or create a crew to plan meetups.</SectionNote>
         ) : upcomingMeetups.length === 0 ? (
-          <Text style={styles.muted}>No upcoming meetups.</Text>
+          <SectionNote>No upcoming meetups.</SectionNote>
         ) : (
           upcomingMeetups.map((meetup) => (
-            <View key={meetup.id} style={styles.listRow}>
-              <View style={[styles.listIcon, { backgroundColor: colors.successBg }]}>
-                <Ionicons name="location-outline" size={18} color={colors.textPrimary} />
-              </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>{meetup.title}</Text>
-                <Text style={styles.listSub}>
-                  {[`${clock.date(meetup.starts_at, { weekday: 'short' })} ${clock.time(meetup.starts_at)}`, stageLabel(meetup.stage_id)]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
-              </View>
-            </View>
+            <ListRow
+              key={meetup.id}
+              leading={<ListTile icon="location-outline" backgroundColor={colors.successBg} />}
+              title={meetup.title}
+              subtitle={[`${clock.date(meetup.starts_at, { weekday: 'short' })} ${clock.time(meetup.starts_at)}`, stageLabel(meetup.stage_id)]
+                .filter(Boolean)
+                .join(' · ')}
+            />
           ))
         )}
-      </View>
+      </ListSection>
 
       {group ? (
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel} accessibilityRole="header">
-            FRIENDS SHARING
-          </Text>
+        <ListSection title="Friends sharing">
           {friends.length === 0 ? (
-            <Text style={styles.muted}>No one in {group.name} is sharing their location right now.</Text>
+            <SectionNote>No one in {group.name} is sharing their location right now.</SectionNote>
           ) : (
             friends.map((friend) => (
-              <View key={friend.user_id} style={styles.listRow}>
-                <Avatar name={friend.display_name} avatarType={friend.avatar_type} avatarValue={friend.avatar_value} />
-                <View style={styles.listText}>
-                  <Text style={styles.listTitle}>{friend.display_name}</Text>
-                  <Text style={styles.listSub}>Last seen {formatAgo(friend.seen_at, now)}</Text>
-                </View>
-              </View>
+              <ListRow
+                key={friend.user_id}
+                leading={
+                  <Avatar name={friend.display_name} avatarType={friend.avatar_type} avatarValue={friend.avatar_value} size={LIST_TILE_SIZE} />
+                }
+                title={friend.display_name}
+                subtitle={`Last seen ${formatAgo(friend.seen_at, now)}`}
+              />
             ))
           )}
-        </View>
+        </ListSection>
       ) : null}
     </>
   );
@@ -408,6 +462,15 @@ export default function MapScreen() {
   const showMap = isMapboxConfigured() && camera !== null;
   const offlinePack = useOfflinePack(festival, showMap);
   const cameraRef = React.useRef<Mapbox.Camera>(null);
+  const reduceMotion = useReduceMotion();
+  // Measured overlay sizes: they grow with the text size, and the camera framing, the Mapbox logo and the
+  // recenter button are placed around them. `null` until measured.
+  const [topOverlayHeight, setTopOverlayHeight] = React.useState<number | null>(null);
+  const [legendHeight, setLegendHeight] = React.useState<number>(layout.minTouchTarget);
+  // The live map's height (the map fills its container). Until measured, the window height stands in: the
+  // padding cap is a share of it, so it still leaves the map room on the first framing.
+  const [mapHeight, setMapHeight] = React.useState<number | null>(null);
+  const { height: windowHeight } = useWindowDimensions();
 
   const [sheetVisible, setSheetVisible] = React.useState(false);
   const [controlsSheet, setControlsSheet] = React.useState<'sharing' | 'offline' | null>(null);
@@ -474,7 +537,7 @@ export default function MapScreen() {
             <RefreshControl
               refreshing={meetupsQuery.isRefreshing}
               onRefresh={() => void Promise.all([bundle.refetch(), meetupsQuery.refetch(), friendsQuery.refetch()])}
-              tintColor={colors.textPrimary}
+              tintColor={colors.textSecondary}
             />
           }
         >
@@ -525,11 +588,39 @@ export default function MapScreen() {
     })
     .filter((pin): pin is { meetup: LocalMeetup; coordinate: LngLat } => pin !== null);
 
+  const stagesLegend = `${stagePins.length} stages`;
+  const meetupsLegend = `${meetupPins.length} meetups`;
+  const friendsLegend = group ? (friendsQuery.isError && friends.length === 0 ? 'Friends offline' : `${friends.length} friends`) : 'No crew';
+
+  // Bottom stack, from the tab bar up: the legend with the recenter button beside it, then the Mapbox logo
+  // and attribution (i) above the legend, so no control ever covers them.
+  const overlayBottom = tabBarClearance + spacing.sm;
+  const ornamentBottom = overlayBottom + legendHeight + spacing.sm;
+  // The festival fits between the top overlay and the legend. The first view is framed before the overlays
+  // are measured, so it uses their estimates (the crew chips row is known from the crew count); the recenter
+  // button uses the measured heights.
+  const topPadding = (topOverlayHeight ?? INITIAL_TOP_OVERLAY_HEIGHT + (groups.length >= 2 ? CREW_CHIPS_HEIGHT : 0)) + spacing.sm;
+  const bottomPadding = ornamentBottom;
+  const maxVerticalPadding = (mapHeight ?? windowHeight) * MAX_CAMERA_PADDING_SHARE;
+  const paddingScale = Math.min(1, maxVerticalPadding / (topPadding + bottomPadding));
+  const cameraPadding = {
+    paddingTop: Math.floor(topPadding * paddingScale),
+    paddingRight: layout.screenGutter,
+    paddingBottom: Math.floor(bottomPadding * paddingScale),
+    paddingLeft: layout.screenGutter,
+  };
+
   const recenter = () => {
+    const animationDuration = reduceMotion ? 0 : RECENTER_DURATION_MS;
     if (camera.bounds) {
-      cameraRef.current?.fitBounds(camera.bounds.ne, camera.bounds.sw, 40, 600);
+      cameraRef.current?.fitBounds(
+        camera.bounds.ne,
+        camera.bounds.sw,
+        [cameraPadding.paddingTop, cameraPadding.paddingRight, cameraPadding.paddingBottom, cameraPadding.paddingLeft],
+        animationDuration,
+      );
     } else {
-      cameraRef.current?.setCamera({ centerCoordinate: camera.center, zoomLevel: camera.zoom, animationDuration: 600 });
+      cameraRef.current?.setCamera({ centerCoordinate: camera.center, zoomLevel: camera.zoom, animationDuration });
     }
   };
 
@@ -607,21 +698,24 @@ export default function MapScreen() {
         : [];
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={(event) => setMapHeight(Math.floor(event.nativeEvent.layout.height))}>
       {/* Screens run to the bottom edge of the display, so the map fills it, under the floating tab bar
-          and the home indicator. */}
+          and the home indicator. The logo and attribution sit above the legend (Mapbox's terms keep the
+          wordmark visible); on iOS Mapbox may measure these margins from the safe area, which only lifts
+          them further clear of it. */}
       <Mapbox.MapView
         style={styles.map}
         styleURL={OFFLINE_MAP_STYLE}
         scaleBarEnabled={false}
-        logoPosition={{ bottom: tabBarClearance + 4, left: 12 }}
-        attributionPosition={{ bottom: tabBarClearance + 4, right: 12 }}
+        logoPosition={{ bottom: ornamentBottom, left: layout.screenGutter }}
+        attributionPosition={{ bottom: ornamentBottom, right: layout.screenGutter }}
       >
+        {/* `defaultSettings` is read once, when the map first lays out; later changes never move the camera. */}
         <Mapbox.Camera
           ref={cameraRef}
           defaultSettings={
             camera.bounds
-              ? { bounds: { ne: camera.bounds.ne, sw: camera.bounds.sw, paddingTop: 140, paddingBottom: 160, paddingLeft: 24, paddingRight: 24 } }
+              ? { bounds: { ne: camera.bounds.ne, sw: camera.bounds.sw, ...cameraPadding } }
               : { centerCoordinate: camera.center, zoomLevel: camera.zoom }
           }
         />
@@ -647,17 +741,26 @@ export default function MapScreen() {
       </Mapbox.MapView>
 
       {/* Top overlay */}
-      <View style={styles.topOverlay} pointerEvents="box-none">
-        <View style={styles.titleCard}>
-          <Text style={styles.titleCardName} numberOfLines={1} accessibilityRole="header">
+      <View
+        style={styles.topOverlay}
+        pointerEvents="box-none"
+        onLayout={(event) => setTopOverlayHeight(Math.ceil(event.nativeEvent.layout.height))}
+      >
+        <View style={[styles.overlaySurface, styles.titleCard]}>
+          <Text style={styles.titleCardName} numberOfLines={2} accessibilityRole="header">
             {festival.name}
           </Text>
-          <Text style={styles.titleCardSub} numberOfLines={1}>
+          <Text style={styles.titleCardSub} numberOfLines={2}>
             {group ? group.name : groups.length === 0 ? 'Join a crew to see friends here' : ''}
           </Text>
         </View>
         <GroupChips groups={groups} selectedId={group?.id ?? null} onSelect={select} accent={accent} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.controlRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={[styles.chipScroller, styles.controlScroller]}
+          contentContainerStyle={styles.chipRow}
+        >
           {group ? (
             <ControlPill
               label={sharingLabel}
@@ -686,25 +789,30 @@ export default function MapScreen() {
         </ScrollView>
       </View>
 
-      <View style={[styles.recenter, { bottom: tabBarClearance + 64 }]}>
-        <IconButton icon={<Ionicons name="locate-outline" size={20} color={colors.textPrimary} />} accessibilityLabel="Show the whole festival" onPress={recenter} />
+      {/* The recenter button frames the festival area (not the user's own position). */}
+      <View style={[styles.recenter, { bottom: overlayBottom }]}>
+        <IconButton icon={<Ionicons name="expand-outline" size={20} color={colors.textPrimary} />} accessibilityLabel="Show the whole festival" onPress={recenter} />
       </View>
 
-      {/* Bottom summary */}
-      <View style={[styles.legend, { bottom: tabBarClearance + 8 }]} accessibilityLiveRegion="polite">
+      {/* Bottom summary: one VoiceOver element. Not a live region, since the friend count changes with
+          every 30 s poll. */}
+      <View
+        style={[styles.overlaySurface, styles.legend, { bottom: overlayBottom }]}
+        onLayout={(event) => setLegendHeight(Math.ceil(event.nativeEvent.layout.height))}
+        accessible
+        accessibilityLabel={[stagesLegend, meetupsLegend, friendsLegend].join(', ')}
+      >
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: solidAccent }]} />
-          <Text style={styles.legendText}>{stagePins.length} stages</Text>
+          <Text style={styles.legendText}>{stagesLegend}</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
-          <Text style={styles.legendText}>{meetupPins.length} meetups</Text>
+          <Text style={styles.legendText}>{meetupsLegend}</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-          <Text style={styles.legendText}>
-            {group ? (friendsQuery.isError && friends.length === 0 ? 'Friends offline' : `${friends.length} friends`) : 'No crew'}
-          </Text>
+          <Text style={styles.legendText}>{friendsLegend}</Text>
         </View>
       </View>
 
@@ -738,148 +846,133 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   // React Native gives horizontal ScrollViews flexGrow/flexShrink 1; in a flex column they would take
-  // a share of the free height away from the list below.
-  chipScroller: { flexGrow: 0 },
+  // a share of the free height away from the list below. The negative margin runs the scroller to the
+  // screen edges (chips scroll out under the edge instead of stopping at the gutter); `chipRow` puts the
+  // gutter back inside it.
+  chipScroller: { flexGrow: 0, marginHorizontal: -layout.screenGutter },
+  // Chips are 36pt tall with a 4pt hitSlop above and below: the vertical padding keeps that slop inside
+  // the scroller, which would otherwise clip the 44pt target.
+  chipRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: layout.screenGutter, paddingVertical: spacing.xs },
   container: { flex: 1 },
-  map: { left: 0, position: 'absolute', right: 0, top: 0 },
-  statePad: { padding: spacing.lg },
+  // Fills the whole screen: rnmapbox sizes the native map to this wrapper, so it needs every edge (a wrapper
+  // with only top/left/right has no height and the map collapses to nothing).
+  map: StyleSheet.absoluteFillObject,
+  statePad: { padding: layout.screenGutter },
   scroll: { flex: 1 },
-  scrollContent: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  scrollContent: { gap: spacing.md, paddingHorizontal: layout.screenGutter, paddingTop: spacing.sm },
 
   /* Fallback lists */
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.borderCard,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    gap: spacing.sm,
-    padding: spacing.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+  listTile: {
+    ...continuous,
+    alignItems: 'center',
+    borderRadius: iconRadius(LIST_TILE_SIZE),
+    height: LIST_TILE_SIZE,
+    justifyContent: 'center',
+    width: LIST_TILE_SIZE,
   },
-  sectionLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
-  muted: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  listRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, minHeight: 56 },
-  listIcon: { alignItems: 'center', borderRadius: 16, height: 44, justifyContent: 'center', width: 44 },
-  listText: { flex: 1, gap: 2 },
-  listTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
-  listSub: { color: colors.textSecondary, fontSize: 13 },
-  groupChips: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
+  sectionNote: {
+    ...textStyles.subheadline,
+    color: colors.textSecondary,
+    paddingHorizontal: layout.cardPadding,
+    paddingVertical: spacing.ms,
+  },
 
   /* Live map overlay */
-  topOverlay: { gap: spacing.sm, left: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.md, position: 'absolute', right: 0, top: 0 },
+  // One surface for everything floating over the map (title card, control pills, legend). Opaque white, not
+  // the 95% `overlay`, because it carries the floating shadow and translucent fills get none (iOS cannot
+  // path them and redraws the shadow offscreen while the map pans; Android shows it through as a grey cast).
+  // The hairline edge separates it from the Street style's pale land, which is almost white.
+  overlaySurface: {
+    ...continuous,
+    ...elevation.floating,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  topOverlay: { gap: spacing.sm, left: 0, paddingHorizontal: layout.screenGutter, paddingTop: spacing.md, position: 'absolute', right: 0, top: 0 },
   titleCard: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: radii.xl,
     maxWidth: '100%',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  titleCardName: { color: colors.textPrimary, fontFamily: 'Georgia', fontSize: 20, fontStyle: 'italic', fontWeight: '700' },
-  titleCardSub: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
-  controlRow: { flexDirection: 'row', gap: spacing.sm },
+  titleCardName: { ...textStyles.title3, color: colors.textPrimary },
+  titleCardSub: { ...textStyles.footnote, color: colors.textSecondary },
+  // Lets the pills' floating shadow draw below the scroller instead of being cut off at its bottom edge.
+  controlScroller: { overflow: 'visible' },
   pill: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: radii.pill,
     flexDirection: 'row',
-    gap: 6,
+    gap: spacing.sm,
     minHeight: layout.minTouchTarget,
     paddingHorizontal: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingVertical: spacing.sm,
   },
   pillActive: { backgroundColor: colors.success },
-  pillLabel: { color: colors.textPrimary, fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
-  recenter: { position: 'absolute', right: spacing.lg },
+  pillLabel: { ...textStyles.footnote, color: colors.textPrimary, fontWeight: '600' },
+  recenter: { position: 'absolute', right: layout.screenGutter },
 
   /* Pins */
-  stagePin: {
+  pin: {
+    ...continuous,
+    ...elevation.raised,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: radii.md,
     borderWidth: 2,
-    gap: 2,
+    gap: spacing.xxs,
+    // A label, not a card: wide enough for short names, never wider than a third of the map.
     maxWidth: 180,
     minWidth: 80,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
+    paddingHorizontal: spacing.ms,
+    paddingVertical: spacing.xs,
   },
-  stagePinRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  stageDot: { borderRadius: 4, height: 8, width: 8 },
-  stagePinText: { color: colors.textPrimary, fontSize: 11, fontWeight: '800' },
-  stagePinTime: { color: colors.textSecondary, fontSize: 10, fontWeight: '600' },
-  meetupPin: {
-    alignItems: 'center',
-    backgroundColor: colors.success,
-    borderColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 2,
-    gap: 1,
-    maxWidth: 180,
-    minWidth: 80,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  meetupPinText: { color: colors.textPrimary, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  meetupPinTime: { color: colors.textPrimary, fontSize: 10, fontWeight: '600' },
-  friendPin: { alignItems: 'center', gap: 2 },
+  pinTitle: { ...textStyles.caption1, color: colors.textPrimary, flexShrink: 1, fontWeight: '600' },
+  pinTextCentered: { textAlign: 'center' },
+  stagePin: { backgroundColor: colors.surface },
+  stagePinRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.xs },
+  stageDot: { borderRadius: radii.xs, height: 8, width: 8 },
+  stagePinTime: { ...textStyles.caption2, ...tabularNums, color: colors.textSecondary, fontWeight: '500', textAlign: 'center' },
+  meetupPin: { backgroundColor: colors.success, borderColor: colors.surface },
+  meetupPinTime: { ...textStyles.caption2, ...tabularNums, color: colors.textPrimary, fontWeight: '500' },
+  friendPin: { alignItems: 'center', gap: spacing.xxs },
   friendRing: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    borderWidth: 3,
-    padding: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 5,
+    ...elevation.raised,
+    backgroundColor: colors.surface,
+    borderRadius: FRIEND_RING_SIZE / 2,
+    borderWidth: FRIEND_RING_BORDER,
+    padding: FRIEND_RING_INSET,
   },
-  friendLabel: { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: radii.pill, paddingHorizontal: 8, paddingVertical: 2 },
-  friendLabelText: { color: colors.textPrimary, fontSize: 10, fontWeight: '700' },
+  friendLabel: {
+    backgroundColor: colors.overlay,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
+  friendLabelSpacer: { opacity: 0 },
+  friendLabelText: { ...textStyles.caption1, ...tabularNums, color: colors.textPrimary, fontWeight: '600' },
 
   /* Legend */
   legend: {
+    alignContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: radii.pill,
+    columnGap: spacing.md,
     flexDirection: 'row',
-    gap: spacing.md,
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    left: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 10,
+    left: layout.screenGutter,
+    // Matches the recenter button beside it; wraps onto more lines (growing upward) at large text sizes.
+    minHeight: layout.minTouchTarget,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     position: 'absolute',
-    right: spacing.lg + 56,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
+    // Leaves the recenter button its own column at the end of the row.
+    right: layout.screenGutter + layout.minTouchTarget + spacing.sm,
+    rowGap: spacing.xs,
   },
-  legendItem: { alignItems: 'center', flexDirection: 'row', gap: 5 },
-  legendDot: { borderRadius: 4, height: 8, width: 8 },
-  legendText: { color: colors.textPrimary, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  legendItem: { alignItems: 'center', flexDirection: 'row', flexShrink: 1, gap: spacing.xs },
+  legendDot: { borderRadius: radii.xs, height: 8, width: 8 },
+  legendText: { ...textStyles.footnote, ...tabularNums, color: colors.textPrimary, flexShrink: 1, fontWeight: '500' },
 });

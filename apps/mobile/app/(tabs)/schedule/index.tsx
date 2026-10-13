@@ -10,17 +10,24 @@ import {
   Badge,
   Chip,
   colors,
+  continuous,
   deriveAccentColors,
+  elevation,
   EmptyState,
   IconButton,
+  layout,
+  PressableScale,
   radii,
   SecondaryButton,
   spacing,
+  tabularNums,
+  textStyles,
   useOfflineStatus,
 } from '@festival/ui';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ActionSheet } from '@/src/components/BottomSheet';
 import { TimeZoneHint } from '@/src/components/FestivalNotes';
@@ -37,15 +44,38 @@ import { useAppStore } from '@/src/state/app-store';
 /* ─── Timeline geometry ─────────────────────────────────── */
 
 const HOUR_HEIGHT = 96;
-const MIN_BLOCK_HEIGHT = 52;
 /**
- * Block heights follow the clock, not the text, so block text stops growing at 1.25× (the artist and
- * stage lines then still fit the 36pt a minimum-height block has inside its padding). The block's
- * accessibility label carries the full text at any size.
+ * Block heights follow the clock, not the text, so block text stops growing at 1.25×. The block
+ * geometry below is derived from the text's line heights at that cap, so nothing is clipped at any
+ * text size. The block's accessibility label carries the full text at any size.
  */
 const BLOCK_MAX_FONT_SCALE = 1.25;
+const BLOCK_ARTIST_TEXT = { ...textStyles.footnote, fontWeight: '600' } as const;
+const BLOCK_DETAIL_TEXT = textStyles.caption2;
+/** Height (pt) of one line of `style` at the capped text size (React Native scales line heights too). */
+function cappedLineHeight(style: { lineHeight: number }): number {
+  return Math.ceil(style.lineHeight * BLOCK_MAX_FONT_SCALE);
+}
+const BLOCK_PADDING_VERTICAL = spacing.sm;
+/** Width of the warning ring on a conflicting block (it takes layout space, so it is in the budget). */
+const BLOCK_CONFLICT_BORDER = 2;
+const BLOCK_CHROME_HEIGHT = BLOCK_PADDING_VERTICAL * 2 + BLOCK_CONFLICT_BORDER * 2;
+/** Artist and stage lines at the capped size, plus padding and the conflict ring (60pt). */
+const MIN_BLOCK_HEIGHT = BLOCK_CHROME_HEIGHT + cappedLineHeight(BLOCK_ARTIST_TEXT) + cappedLineHeight(BLOCK_DETAIL_TEXT);
+/** Tall enough to add the time line under the artist and stage (77pt, about 48 minutes). */
+const TIME_LINE_MIN_HEIGHT = MIN_BLOCK_HEIGHT + cappedLineHeight(BLOCK_DETAIL_TEXT);
+/** Tall enough for a second artist line as well (100pt, about an hour), so long names are not cut. */
+const ARTIST_TWO_LINE_MIN_HEIGHT = TIME_LINE_MIN_HEIGHT + cappedLineHeight(BLOCK_ARTIST_TEXT);
 const MIN_WINDOW_MINUTES = 4 * 60;
-const TIME_GUTTER_WIDTH = 48;
+const TIME_GUTTER_WIDTH = 56;
+/**
+ * Hour labels are decorative (hidden from screen readers: every block's label has its full time), so
+ * they stop growing at 1.3×, where "12 PM" still fits the gutter beside the grid.
+ */
+const HOUR_LABEL_MAX_FONT_SCALE = 1.3;
+/** Box each hour label is centred in, on its grid line; taller than the label at its capped size. */
+const HOUR_LABEL_BOX_HEIGHT = spacing.xl;
+const LONG_DATE: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' };
 const NO_ROWS: ScheduleRow[] = [];
 
 interface PositionedBlock {
@@ -143,36 +173,56 @@ function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; cloc
   const widthPercent = 100 / block.totalColumns;
   const time = clock.range(block.row.start_time, block.row.end_time);
   return (
-    <Pressable
+    // The slot fills the block's column; its horizontal padding leaves a 4pt gap between side-by-side
+    // blocks (2pt at the grid edges) without pushing the block past its column.
+    <PressableScale
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${block.row.artist_name}, ${block.row.stage_name}, ${time}${block.isConflict ? ', conflicts with another pick' : ''}`}
       accessibilityHint="Shows options for this set"
-      style={({ pressed }) => [
-        styles.block,
+      style={[
+        styles.blockSlot,
         {
           top: block.top,
           height: block.height,
           left: `${block.column * widthPercent}%`,
           width: `${widthPercent}%`,
-          borderLeftColor: pastelFor(block.row.stage_id),
         },
-        block.isConflict && styles.blockConflict,
-        pressed && { opacity: 0.8 },
       ]}
     >
-      <Text style={styles.blockArtist} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
-        {block.row.artist_name}
-      </Text>
-      <Text style={styles.blockStage} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
-        {block.row.stage_name}
-      </Text>
-      {block.height >= 80 ? (
-        <Text style={styles.blockTime} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
-          {time}
-        </Text>
-      ) : null}
-    </Pressable>
+      {/* The shadow sits on this view; the one inside clips the text to the rounded corners. */}
+      <View style={styles.block}>
+        <View
+          style={[
+            styles.blockClip,
+            { borderLeftColor: pastelFor(block.row.stage_id) },
+            block.isConflict && styles.blockConflict,
+          ]}
+        >
+          <Text
+            style={styles.blockArtist}
+            numberOfLines={block.height >= ARTIST_TWO_LINE_MIN_HEIGHT ? 2 : 1}
+            maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}
+          >
+            {/* Inline, so it scales with the name; the block's label already says it conflicts. */}
+            {block.isConflict ? (
+              <>
+                <Ionicons name="warning" size={BLOCK_ARTIST_TEXT.fontSize} color={colors.warningText} />{' '}
+              </>
+            ) : null}
+            {block.row.artist_name}
+          </Text>
+          <Text style={styles.blockStage} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
+            {block.row.stage_name}
+          </Text>
+          {block.height >= TIME_LINE_MIN_HEIGHT ? (
+            <Text style={styles.blockTime} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
+              {time}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+    </PressableScale>
   );
 }
 
@@ -259,10 +309,14 @@ export default function PersonalScheduleScreen() {
 
   const header = (
     <ScreenHeader
-      crumbs={['My Schedule', festival?.name]}
+      crumbs={['My schedule', festival?.name]}
       right={
         festival ? (
-          <IconButton icon="+" accessibilityLabel="Add sets from the lineup" onPress={() => router.push('/(tabs)/schedule/browse')} />
+          <IconButton
+            icon={<Ionicons name="add" size={24} color={colors.textPrimary} />}
+            accessibilityLabel="Add sets from the lineup"
+            onPress={() => router.push('/(tabs)/schedule/browse')}
+          />
         ) : undefined
       }
     />
@@ -292,10 +346,11 @@ export default function PersonalScheduleScreen() {
             return (
               <Chip
                 key={day}
+                variant="ink"
                 active={activeDay === day}
-                accentColor={activeFestivalAccent}
                 onPress={() => setSelectedDay(day)}
                 label={`${clock.date(day)}${count > 0 ? ` · ${count}` : ''}`}
+                accessibilityLabel={`${clock.date(day, LONG_DATE)}${count > 0 ? `, ${count} ${count === 1 ? 'set' : 'sets'}` : ''}`}
               />
             );
           })}
@@ -346,15 +401,24 @@ export default function PersonalScheduleScreen() {
                 <EmptyState title="Nothing picked this day" description="Pick another day, or add sets from the lineup." />
               ) : (
                 <View style={styles.timeline}>
-                  <View style={[styles.timeGutter, { height: timeline.hours * HOUR_HEIGHT }]}>
+                  {/* Decorative on both platforms: every block's label already carries its full time. */}
+                  <View
+                    style={[styles.timeGutter, { height: timeline.hours * HOUR_HEIGHT }]}
+                    pointerEvents="none"
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     {Array.from({ length: timeline.hours + 1 }, (_, index) => (
-                      <Text
-                        key={index}
-                        style={[styles.hourLabel, { top: index * HOUR_HEIGHT - 6 }]}
-                        importantForAccessibility="no"
-                      >
-                        {hourLabel(timeline.windowStart + index * 60)}
-                      </Text>
+                      <View key={index} style={[styles.hourLabelBox, { top: index * HOUR_HEIGHT - HOUR_LABEL_BOX_HEIGHT / 2 }]}>
+                        <Text
+                          style={styles.hourLabel}
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={HOUR_LABEL_MAX_FONT_SCALE}
+                          importantForAccessibility="no"
+                        >
+                          {hourLabel(timeline.windowStart + index * 60)}
+                        </Text>
+                      </View>
                     ))}
                   </View>
                   <View style={[styles.gridArea, { height: timeline.hours * HOUR_HEIGHT }]}>
@@ -395,45 +459,45 @@ const styles = StyleSheet.create({
   // a share of the free height away from the list below.
   chipScroller: { flexGrow: 0 },
   container: { flex: 1 },
-  statePad: { padding: spacing.lg },
-  dayRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  statePad: { padding: layout.screenGutter },
+  // Vertical padding keeps the chips' 44pt hitSlop inside the horizontal ScrollView.
+  dayRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: layout.screenGutter, paddingVertical: spacing.sm },
 
   scroll: { flex: 1 },
-  scrollContent: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  scrollContent: { gap: spacing.md, paddingHorizontal: layout.screenGutter, paddingTop: spacing.sm },
   infoRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
 
   timeline: { flexDirection: 'row', paddingTop: spacing.sm },
   timeGutter: { position: 'relative', width: TIME_GUTTER_WIDTH },
-  hourLabel: {
-    color: colors.textSecondary,
-    fontSize: 10,
-    fontWeight: '800',
+  hourLabelBox: {
+    justifyContent: 'center',
+    left: 0,
+    minHeight: HOUR_LABEL_BOX_HEIGHT,
+    paddingRight: spacing.sm,
     position: 'absolute',
-    right: 6,
-    textAlign: 'right',
+    right: 0,
   },
-  gridArea: { borderLeftColor: 'rgba(0,0,0,0.05)', borderLeftWidth: 1, flex: 1, position: 'relative' },
-  gridLine: { backgroundColor: 'rgba(0,0,0,0.05)', height: 1, left: 0, position: 'absolute', right: 0 },
+  hourLabel: { ...textStyles.caption2, ...tabularNums, color: colors.textSecondary, fontWeight: '600', textAlign: 'right' },
+  gridArea: { borderLeftColor: colors.separator, borderLeftWidth: StyleSheet.hairlineWidth, flex: 1, position: 'relative' },
+  gridLine: { backgroundColor: colors.separator, height: StyleSheet.hairlineWidth, left: 0, position: 'absolute', right: 0 },
 
-  /* Block — white, rounded-2xl, stage-coloured left edge */
-  block: {
+  /* Block: a white tile with the stage colour as a 4pt left edge (`md` corners, so the edge still reads as
+     a bar on a short block). */
+  blockSlot: { paddingHorizontal: spacing.xxs, position: 'absolute' },
+  block: { ...continuous, ...elevation.card, backgroundColor: colors.surface, borderRadius: radii.md, flex: 1 },
+  blockClip: {
+    ...continuous,
     backgroundColor: colors.surface,
-    borderLeftWidth: 4,
+    borderLeftWidth: spacing.xs,
     borderRadius: radii.md,
-    elevation: 2,
-    gap: 2,
-    marginHorizontal: 2,
+    flex: 1,
     overflow: 'hidden',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: BLOCK_PADDING_VERTICAL,
   },
-  blockConflict: { borderColor: colors.destructive, borderWidth: 1.5, borderLeftWidth: 4 },
-  blockArtist: { color: colors.textPrimary, fontFamily: 'Georgia', fontSize: 13, fontStyle: 'italic', fontWeight: '700' },
-  blockStage: { color: colors.textSecondary, fontSize: 9, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  blockTime: { color: colors.textSecondary, fontSize: 10, fontWeight: '700', marginTop: 'auto' },
+  blockConflict: { borderColor: colors.warningText, borderLeftWidth: spacing.xs, borderWidth: BLOCK_CONFLICT_BORDER },
+  blockArtist: { ...BLOCK_ARTIST_TEXT, color: colors.textPrimary },
+  blockStage: { ...BLOCK_DETAIL_TEXT, color: colors.textSecondary },
+  // `marginTop: 'auto'` pins the time to the bottom of the block.
+  blockTime: { ...BLOCK_DETAIL_TEXT, ...tabularNums, color: colors.textSecondary, marginTop: 'auto' },
 });

@@ -1,5 +1,5 @@
 import { toUserMessage } from '@festival/data-access';
-import { colors, EmptyState, radii, SecondaryButton, spacing } from '@festival/ui';
+import { colors, continuous, EmptyState, radii, SecondaryButton, spacing, textStyles } from '@festival/ui';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
@@ -55,6 +55,7 @@ export function StaleDataNote({ error }: { error: unknown }) {
 
 const styles = StyleSheet.create({
   card: {
+    ...continuous,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.borderCard,
@@ -63,8 +64,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.xxl,
   },
-  muted: { color: colors.textSecondary, fontSize: 14 },
-  note: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, paddingHorizontal: spacing.sm, textAlign: 'center' },
+  muted: { ...textStyles.subheadline, color: colors.textSecondary, textAlign: 'center' },
+  note: { ...textStyles.footnote, color: colors.textSecondary, paddingHorizontal: spacing.sm, textAlign: 'center' },
 });
 
 /** Shown on festival-scoped tabs before any festival is chosen. */

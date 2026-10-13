@@ -1,4 +1,5 @@
-import { colors, spacing } from '@festival/ui';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing, textStyles } from '@festival/ui';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -10,9 +11,9 @@ export const FESTIVAL_DISCLAIMER =
 export function TimeZoneHint({ hint }: { hint: string }) {
   return (
     <View style={styles.hintRow} accessible accessibilityLabel={hint}>
-      <Text style={styles.hintIcon} importantForAccessibility="no">
-        ◷
-      </Text>
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Ionicons name="time-outline" size={15} color={colors.textSecondary} />
+      </View>
       <Text style={styles.hint}>{hint}</Text>
     </View>
   );
@@ -23,13 +24,11 @@ export function FestivalDisclaimer() {
 }
 
 const styles = StyleSheet.create({
-  hintRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  hintIcon: { color: colors.textSecondary, fontSize: 12 },
-  hint: { color: colors.textSecondary, flexShrink: 1, fontSize: 12, fontWeight: '600' },
+  hintRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.xs },
+  hint: { ...textStyles.footnote, color: colors.textSecondary, flexShrink: 1, fontWeight: '600' },
   disclaimer: {
+    ...textStyles.footnote,
     color: colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 17,
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.sm,
     textAlign: 'center',

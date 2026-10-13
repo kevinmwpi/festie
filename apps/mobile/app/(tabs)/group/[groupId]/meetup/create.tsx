@@ -10,17 +10,23 @@ import { scheduleMeetupReminder } from '@festival/notification-utils';
 import {
   Chip,
   colors,
+  continuous,
+  deriveAccentColors,
+  elevation,
   EmptyState,
   FieldInput,
   FieldLabel,
   InlineMessage,
   layout,
+  PressableScale,
   PrimaryButton,
   radii,
   SecondaryButton,
   SectionCard,
   showToast,
   spacing,
+  tabularNums,
+  textStyles,
   TextLink,
 } from '@festival/ui';
 import DateTimePicker, { DateTimePickerAndroid, type DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -28,8 +34,9 @@ import Mapbox from '@rnmapbox/maps';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { KeyboardAvoidingScreen } from '@/src/components/KeyboardAvoidingScreen';
 import { SubScreenHeader } from '@/src/components/ScreenHeader';
 import { ErrorState, LoadingState } from '@/src/components/StateViews';
 import { isMapboxConfigured } from '@/src/config/app-info';
@@ -44,6 +51,8 @@ import {
   uploadPickedTotem,
   type PickedTotemPhoto,
 } from '@/src/hooks/use-totem-photo';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
+import { useAppStore } from '@/src/state/app-store';
 
 /** Next quarter hour, one hour from now. */
 function defaultStart(): Date {
@@ -63,6 +72,9 @@ export default function CreateMeetupScreen() {
   const group = detail.data?.group ?? null;
   const bundle = useFestivalBundle(group?.festival_id ?? null);
   const festival = bundle.data?.festival ?? null;
+  const activeFestivalAccent = useAppStore((state) => state.activeFestivalAccent);
+  const screenBg = deriveAccentColors(festival?.accent_color || activeFestivalAccent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
   const stages = React.useMemo(
     () => [...(bundle.data?.stages ?? [])].sort((left, right) => left.name.localeCompare(right.name)),
     [bundle.data],
@@ -182,11 +194,11 @@ export default function CreateMeetupScreen() {
     }
   }, [festival, finishPhoto, group, notes, photo, pin, queryClient, stageId, stages, startsAt, title]);
 
-  const header = <SubScreenHeader title="Create Meetup" label={group ? `${group.name} · plan your regroup spot`.toUpperCase() : 'PLAN YOUR REGROUP SPOT'} />;
+  const header = <SubScreenHeader title="Create meetup" label={group ? `${group.name} · plan your regroup spot` : 'Plan your regroup spot'} />;
 
   if (!group) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: screenBg }]}>
         {header}
         <View style={styles.content}>
           {detail.isLoading || detail.isRefreshing ? (
@@ -206,7 +218,7 @@ export default function CreateMeetupScreen() {
   const festivalTimeLabel = `${clock.date(startsAt.toISOString())} · ${clock.time(startsAt.toISOString())}`;
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingScreen style={[styles.container, { backgroundColor: screenBg }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: tabBarClearance }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {header}
         <View style={styles.content}>
@@ -237,22 +249,22 @@ export default function CreateMeetupScreen() {
               </View>
             ) : (
               <View style={styles.androidPickerRow}>
-                <Pressable
+                <PressableScale
                   onPress={() => openAndroidPicker('date')}
                   accessibilityRole="button"
                   accessibilityLabel={`Date, ${clock.date(startsAt.toISOString(), { weekday: 'long', month: 'long', day: 'numeric' })}`}
-                  style={({ pressed }) => [styles.dateButton, pressed && styles.pressed]}
+                  style={styles.dateButton}
                 >
                   <Text style={styles.dateButtonText}>{clock.date(startsAt.toISOString())}</Text>
-                </Pressable>
-                <Pressable
+                </PressableScale>
+                <PressableScale
                   onPress={() => openAndroidPicker('time')}
                   accessibilityRole="button"
                   accessibilityLabel={`Time, ${clock.time(startsAt.toISOString())}`}
-                  style={({ pressed }) => [styles.dateButton, pressed && styles.pressed]}
+                  style={styles.dateButton}
                 >
                   <Text style={styles.dateButtonText}>{clock.time(startsAt.toISOString())}</Text>
-                </Pressable>
+                </PressableScale>
               </View>
             )}
             {festival ? (
@@ -307,7 +319,7 @@ export default function CreateMeetupScreen() {
                   </Mapbox.MapView>
                 </View>
                 {pin ? (
-                  <TextLink label="Clear pin" onPress={() => setPin(null)} />
+                  <TextLink label="Clear pin" onPress={() => setPin(null)} role="button" />
                 ) : (
                   <Text style={styles.hint}>Tap the map to drop a pin where you'll meet.</Text>
                 )}
@@ -329,10 +341,18 @@ export default function CreateMeetupScreen() {
             <FieldLabel>Totem photo (optional)</FieldLabel>
             {photo ? (
               <>
-                <Image source={{ uri: photo.uri }} style={styles.preview} accessibilityLabel="Selected totem photo" />
+                <View style={styles.previewFrame}>
+                  <Image
+                    source={{ uri: photo.uri }}
+                    style={styles.preview}
+                    accessible
+                    accessibilityRole="image"
+                    accessibilityLabel="Selected totem photo"
+                  />
+                </View>
                 <View style={styles.photoActions}>
-                  <TextLink label="Replace photo" onPress={() => void handleAddPhoto()} />
-                  <TextLink label="Remove photo" onPress={() => setPhoto(null)} />
+                  <TextLink label="Replace photo" onPress={() => void handleAddPhoto()} role="button" />
+                  <TextLink label="Remove photo" onPress={() => setPhoto(null)} role="button" />
                 </View>
               </>
             ) : (
@@ -349,44 +369,51 @@ export default function CreateMeetupScreen() {
           </SectionCard>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingScreen>
   );
 }
 
+/** Diameter of the dropped map pin. */
+const PIN_SIZE = 24;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { gap: spacing.md, paddingHorizontal: spacing.lg },
-  pressed: { opacity: 0.8 },
+  /* The festival wash (`screenBg`) is applied inline; it is translucent over the Stack's `colors.background`. */
+  container: { flex: 1 },
+  content: { gap: spacing.md, paddingHorizontal: layout.screenGutter },
   iosPickerRow: { alignItems: 'flex-start' },
   androidPickerRow: { flexDirection: 'row', gap: spacing.sm },
+  /* Android date and time buttons look like the text fields around them. */
   dateButton: {
+    ...continuous,
     alignItems: 'center',
-    backgroundColor: colors.inputBg,
+    backgroundColor: colors.surface,
+    borderColor: colors.inputBorder,
     borderRadius: radii.md,
+    borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
-    minHeight: layout.minTouchTarget + 4,
+    minHeight: layout.buttonHeight,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.ms,
   },
-  dateButtonText: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
-  hint: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
+  dateButtonText: { ...textStyles.body, ...tabularNums, color: colors.textPrimary, textAlign: 'center' },
+  hint: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary },
   stageList: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   notesInput: { minHeight: 88, paddingTop: spacing.md, textAlignVertical: 'top' },
-  mapFrame: { borderRadius: radii.xl, height: 220, overflow: 'hidden' },
+  mapFrame: { ...continuous, borderRadius: radii.lg, height: 220, overflow: 'hidden' },
   map: { flex: 1 },
   pin: {
+    ...elevation.raised,
     backgroundColor: colors.link,
-    borderColor: '#FFFFFF',
-    borderRadius: 12,
+    borderColor: colors.surface,
+    borderRadius: radii.pill,
+    // A 3pt white ring keeps the pin visible on any map colour.
     borderWidth: 3,
-    height: 24,
-    width: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    height: PIN_SIZE,
+    width: PIN_SIZE,
   },
-  preview: { borderRadius: radii.xl, height: 180, resizeMode: 'cover', width: '100%' },
-  photoActions: { flexDirection: 'row', gap: spacing.lg },
+  // The frame clips the photo to continuous corners (`borderCurve` is not an Image style).
+  previewFrame: { ...continuous, borderRadius: radii.lg, overflow: 'hidden' },
+  preview: { height: 180, resizeMode: 'cover', width: '100%' },
+  photoActions: { columnGap: spacing.lg, flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.sm },
 });

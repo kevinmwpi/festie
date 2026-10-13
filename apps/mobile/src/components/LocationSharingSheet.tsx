@@ -1,5 +1,16 @@
 import { toUserMessage } from '@festival/data-access';
-import { colors, InlineMessage, PrimaryButton, radii, showToast, spacing } from '@festival/ui';
+import {
+  colors,
+  continuous,
+  FieldLabel,
+  InlineMessage,
+  layout,
+  PrimaryButton,
+  radii,
+  showToast,
+  spacing,
+  textStyles,
+} from '@festival/ui';
 import React from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -83,8 +94,8 @@ export function LocationSharingSheet({
         <Text style={styles.note}>This stops sharing with {otherGroupName}.</Text>
       ) : null}
 
-      <Text style={styles.label}>Share for</Text>
-      <View style={styles.options} accessibilityRole="radiogroup">
+      <FieldLabel>Share for</FieldLabel>
+      <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel="Share for">
         {SHARING_DURATION_OPTIONS.map((option) => {
           const selected = option.durationMs === durationMs;
           return (
@@ -94,7 +105,7 @@ export function LocationSharingSheet({
               accessibilityRole="radio"
               accessibilityState={{ checked: selected }}
               accessibilityLabel={option.key === 'until_stop' ? 'Until I stop, at most 24 hours' : option.label}
-              style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && styles.optionPressed]}
             >
               <View style={[styles.radio, selected && styles.radioSelected]} />
               <View style={styles.optionText}>
@@ -112,27 +123,32 @@ export function LocationSharingSheet({
   );
 }
 
+/** Diameter of the radio ring. */
+const RADIO_SIZE = 20;
+
 const styles = StyleSheet.create({
-  explainer: { backgroundColor: '#F0F4FF', borderRadius: radii.xl, padding: spacing.lg },
-  explainerText: { color: colors.textPrimary, fontSize: 15, lineHeight: 22 },
-  note: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
-  label: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
+  explainer: { ...continuous, backgroundColor: colors.inputBg, borderRadius: radii.lg, padding: spacing.lg },
+  explainerText: { ...textStyles.subheadline, color: colors.textPrimary },
+  note: { ...textStyles.footnote, color: colors.textSecondary },
   options: { gap: spacing.xs },
   option: {
+    ...continuous,
     alignItems: 'center',
     borderColor: colors.borderCard,
     borderRadius: radii.md,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: spacing.sm + 4,
-    minHeight: 52,
+    gap: spacing.ms,
+    minHeight: layout.buttonHeight,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  optionSelected: { backgroundColor: '#F0F4FF', borderColor: colors.primary },
-  pressed: { opacity: 0.7 },
-  radio: { borderColor: 'rgba(44, 51, 39, 0.35)', borderRadius: 10, borderWidth: 2, height: 20, width: 20 },
+  optionSelected: { backgroundColor: colors.inputBg, borderColor: colors.primary },
+  optionPressed: { backgroundColor: colors.fill },
+  // The ring is the control's outline: `inputBorder` keeps it at 3:1 or more (WCAG 1.4.11).
+  radio: { borderColor: colors.inputBorder, borderRadius: radii.pill, borderWidth: 2, height: RADIO_SIZE, width: RADIO_SIZE },
   radioSelected: { backgroundColor: colors.link, borderColor: colors.link },
-  optionText: { flex: 1, gap: 2 },
-  optionLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
-  optionSub: { color: colors.textSecondary, fontSize: 12 },
+  optionText: { flex: 1, gap: spacing.xxs },
+  optionLabel: { ...textStyles.body, color: colors.textPrimary },
+  optionSub: { ...textStyles.footnote, color: colors.textSecondary },
 });

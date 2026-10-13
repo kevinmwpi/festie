@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { configureReminderNotifications } from '@festival/notification-utils';
-import { colors } from '@festival/ui';
+import { colors, elevation, layout, radii, spacing, textStyles } from '@festival/ui';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -13,7 +13,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /**
  * Unfocused tab ink. `colors.textSecondary` (70 %) is tuned for white and tinted surfaces; on the solid
- * accent fill its 9 px labels drop to ~3.6:1. At 85 % the labels stay ≥ 4.9:1 on every accent
+ * accent fill its small labels drop to ~3.6:1. At 85 % the labels stay ≥ 4.9:1 on every accent
  * `accessibleAccent` can produce (§5.8) while still reading lighter than the focused tab.
  */
 const UNFOCUSED_TAB_INK = 'rgba(44, 51, 39, 0.85)';
@@ -22,7 +22,7 @@ const UNFOCUSED_TAB_INK = 'rgba(44, 51, 39, 0.85)';
 const TAB_BAR_HEIGHT = 80;
 /**
  * Box React Navigation gives each tab icon. Its default (31×28) is sized for a bare glyph; ours stacks a
- * 26 pt glyph, a gap and a label (≈ 41 pt, 1.1× when focused), which would overflow it and the pill.
+ * 26 pt glyph, a gap and an 11 pt label (≈ 43 pt), which would overflow it and the pill.
  */
 const TAB_ICON_BOX_HEIGHT = 52;
 /** Space between the floating pill and the home indicator area below it. */
@@ -45,10 +45,13 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const cfg = TAB_CONFIG[name];
   if (!cfg) return null;
   // Dark ink on the pastel accent keeps ≥ 4.5:1; unfocused tabs read as lighter ink, not lower opacity.
+  // The focused tab is marked by its filled icon and heavier label, not by a size jump.
   const tint = focused ? colors.textPrimary : UNFOCUSED_TAB_INK;
   return (
-    <View style={[styles.iconContainer, focused && styles.iconContainerFocused]}>
+    <View style={styles.iconContainer}>
       <Ionicons name={focused ? cfg.iconFocused : cfg.icon} size={26} color={tint} />
+      {/* Fixed size like iOS tab bars: the pill has a fixed height (labels are short and the Large Content
+          Viewer is the system's answer for tab bars). */}
       <Text style={[styles.iconLabel, { color: tint }, focused && styles.iconLabelFocused]} allowFontScaling={false}>
         {cfg.label}
       </Text>
@@ -78,21 +81,18 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: accent,
           borderTopWidth: 0,
-          borderRadius: 32,
+          borderRadius: radii.pill,
           height: TAB_BAR_HEIGHT,
           paddingTop: 0,
           paddingBottom: 0,
-          marginHorizontal: 20,
+          marginHorizontal: layout.screenGutter,
           marginBottom: TAB_BAR_GAP + insets.bottom,
           position: 'absolute',
-          shadowColor: '#000000',
-          shadowOpacity: 0.25,
-          shadowRadius: 24,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 12,
-          // subtle white border as in reference: border border-white/20
+          borderCurve: 'continuous',
+          ...elevation.floating,
+          // Subtle white edge, as in the reference (border-white/20).
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.2)',
+          borderColor: 'rgba(255, 255, 255, 0.2)',
         },
       }}
     >
@@ -109,19 +109,14 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   iconContainer: {
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
     justifyContent: 'center',
   },
-  iconContainerFocused: {
-    transform: [{ scale: 1.1 }],
-  },
   iconLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    ...textStyles.caption2,
+    fontWeight: '500',
   },
   iconLabelFocused: {
-    fontWeight: '800',
+    fontWeight: '700',
   },
 });

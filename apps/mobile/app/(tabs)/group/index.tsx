@@ -1,18 +1,25 @@
 import {
   Badge,
   colors,
+  continuous,
   deriveAccentColors,
   EmptyState,
+  elevation,
   layout,
+  PressableScale,
+  PrimaryButton,
   radii,
+  SecondaryButton,
   spacing,
+  textStyles,
   useOfflineStatus,
 } from '@festival/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PASTELS } from '@/src/components/palette';
 import { ScreenHeader } from '@/src/components/ScreenHeader';
 import { ErrorState, LoadingState, StaleDataNote } from '@/src/components/StateViews';
 import { useFestivalsById, useGroups } from '@/src/hooks/use-groups';
@@ -21,27 +28,32 @@ import { useLocationSharing } from '@/src/location/LocationSharingProvider';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
+/** The crew card's signature pastel yellow from the design reference (`#FDFD96`). Fill only. */
+const CREW_CARD_FILL = PASTELS[2];
+/** Edge of the white people puck on a crew card. */
+const CREW_PUCK_SIZE = 40;
+
 function CrewActions() {
   return (
     <View style={styles.actionRow}>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel="Create a crew"
-        style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.primary }, pressed && styles.pressed]}
+        style={[styles.actionBtn, styles.actionBtnPrimary]}
         onPress={() => router.push('/(tabs)/group/create')}
       >
-        <Ionicons name="add-circle-outline" size={18} color={colors.textPrimary} />
+        <Ionicons name="add-circle-outline" size={20} color={colors.textPrimary} />
         <Text style={styles.actionBtnLabel}>Create</Text>
-      </Pressable>
-      <Pressable
+      </PressableScale>
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel="Join a crew with a code"
-        style={({ pressed }) => [styles.actionBtn, styles.actionBtnSecondary, pressed && styles.pressed]}
+        style={[styles.actionBtn, styles.actionBtnSecondary]}
         onPress={() => router.push('/(tabs)/group/join')}
       >
-        <Ionicons name="enter-outline" size={18} color={colors.textPrimary} />
-        <Text style={styles.actionBtnLabel}>Join</Text>
-      </Pressable>
+        <Ionicons name="enter-outline" size={20} color={colors.link} />
+        <Text style={[styles.actionBtnLabel, styles.actionBtnLabelSecondary]}>Join</Text>
+      </PressableScale>
     </View>
   );
 }
@@ -70,7 +82,9 @@ export default function GroupsScreen() {
   } else if (!hasGroups) {
     body = (
       <View style={styles.emptyCard}>
-        <Ionicons name="people" size={48} color={colors.textPrimary} style={{ marginBottom: 4 }} />
+        <View style={styles.emptyIcon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Ionicons name="people" size={48} color={colors.textPrimary} />
+        </View>
         <Text style={styles.emptyTitle} accessibilityRole="header">
           Festival is better with friends
         </Text>
@@ -79,22 +93,18 @@ export default function GroupsScreen() {
             ? "You're offline. Crews you've joined appear here once you connect."
             : 'Create a crew to compare schedules, plan meetups, and find each other on the map.'}
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Create a crew"
-          style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
-          onPress={() => router.push('/(tabs)/group/create')}
-        >
-          <Text style={styles.createBtnLabel}>Create Crew</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Join a crew with a code"
-          style={({ pressed }) => [styles.joinBtn, pressed && styles.pressed]}
-          onPress={() => router.push('/(tabs)/group/join')}
-        >
-          <Text style={styles.joinBtnLabel}>Join with Code</Text>
-        </Pressable>
+        <View style={styles.emptyActions}>
+          <PrimaryButton
+            label="Create crew"
+            accessibilityLabel="Create a crew"
+            onPress={() => router.push('/(tabs)/group/create')}
+          />
+          <SecondaryButton
+            label="Join with code"
+            accessibilityLabel="Join a crew with a code"
+            onPress={() => router.push('/(tabs)/group/join')}
+          />
+        </View>
       </View>
     );
   } else {
@@ -115,7 +125,7 @@ export default function GroupsScreen() {
                   ? { label: 'Sharing paused', tone: 'neutral' as const, a11y: ', location sharing paused' }
                   : null;
           return (
-            <Pressable
+            <PressableScale
               key={group.id}
               accessibilityRole="button"
               accessibilityLabel={`${group.name}, ${festival?.name ?? 'festival'}, ${memberLabel}${group.my_role === 'admin' ? ', you are an admin' : ''}${sharingBadge?.a11y ?? ''}`}
@@ -123,7 +133,7 @@ export default function GroupsScreen() {
                 setSelectedGroupId(group.id);
                 router.push(`/(tabs)/group/${group.id}`);
               }}
-              style={({ pressed }) => [styles.groupCard, pressed && { transform: [{ scale: 0.98 }] }]}
+              style={styles.groupCard}
             >
               <View style={styles.groupIcon}>
                 <Ionicons name="people" size={22} color={colors.textPrimary} />
@@ -132,8 +142,8 @@ export default function GroupsScreen() {
                 <Text style={styles.groupName} numberOfLines={2}>
                   {group.name}
                 </Text>
-                <Text style={styles.groupMeta} numberOfLines={1}>
-                  {[festival?.name, memberLabel].filter(Boolean).join(' · ').toUpperCase()}
+                <Text style={styles.groupMeta} numberOfLines={2}>
+                  {[festival?.name, memberLabel].filter(Boolean).join(' · ')}
                 </Text>
                 <View style={styles.badges}>
                   {group.my_role === 'admin' ? <Badge label="Admin" /> : null}
@@ -141,8 +151,8 @@ export default function GroupsScreen() {
                   {sharingBadge ? <Badge label={sharingBadge.label} tone={sharingBadge.tone} /> : null}
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-            </Pressable>
+              <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
+            </PressableScale>
           );
         })}
         <StaleDataNote error={groups.refreshError} />
@@ -152,7 +162,7 @@ export default function GroupsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: screenBg }]}>
-      <ScreenHeader crumbs={['My Crews']} />
+      <ScreenHeader crumbs={['My crews']} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
@@ -174,112 +184,67 @@ export default function GroupsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
+  scrollContent: { gap: spacing.md, paddingHorizontal: layout.screenGutter, paddingTop: spacing.sm },
 
+  /* Empty state: the brand card with both ways in */
   emptyCard: {
+    ...continuous,
+    ...elevation.card,
+    alignItems: 'center',
     backgroundColor: colors.surface,
+    borderColor: colors.borderCard,
     borderRadius: radii.card,
-    padding: 32,
-    alignItems: 'center',
-    gap: spacing.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    gap: spacing.sm,
+    paddingHorizontal: layout.cardPadding,
+    paddingVertical: spacing.xxl,
   },
-  emptyTitle: {
-    color: colors.textPrimary,
-    fontFamily: 'Georgia',
-    fontStyle: 'italic',
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  emptyDesc: { color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 21, marginBottom: 8 },
-  createBtn: {
-    width: '100%',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    minHeight: layout.minTouchTarget,
-    justifyContent: 'center',
-    paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  createBtnLabel: { color: colors.textPrimary, fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2 },
-  joinBtn: {
-    width: '100%',
-    alignItems: 'center',
-    borderRadius: 16,
-    minHeight: layout.minTouchTarget,
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  joinBtnLabel: { color: colors.link, fontSize: 13, fontWeight: '700' },
+  emptyIcon: { marginBottom: spacing.xs },
+  emptyTitle: { ...textStyles.title2, color: colors.textPrimary, textAlign: 'center' },
+  emptyDesc: { ...textStyles.subheadline, color: colors.textSecondary, textAlign: 'center' },
+  emptyActions: { alignSelf: 'stretch', gap: spacing.ms, marginTop: spacing.sm },
 
+  /* Create / Join tiles above the list: flat, like buttons */
   actionRow: { flexDirection: 'row', gap: spacing.sm },
   actionBtn: {
+    ...continuous,
+    alignItems: 'center',
+    borderRadius: radii.md,
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    gap: spacing.sm,
     justifyContent: 'center',
-    gap: 8,
-    borderRadius: radii.xl,
-    minHeight: layout.minTouchTarget + 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    minHeight: layout.buttonHeight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  actionBtnSecondary: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  actionBtnLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  actionBtnPrimary: { backgroundColor: colors.primary },
+  /* Matches the shared SecondaryButton: tinted fill, `link` label. */
+  actionBtnSecondary: { backgroundColor: colors.tintedFill },
+  actionBtnLabel: { ...textStyles.headline, color: colors.textPrimary, flexShrink: 1, textAlign: 'center' },
+  actionBtnLabelSecondary: { color: colors.link },
 
-  /* Crew card — reference yellow, 40px radius */
+  /* Crew card: the reference yellow, `card` radius */
   groupCard: {
-    backgroundColor: '#FDFD96',
-    borderRadius: radii.card,
-    padding: spacing.xl,
-    flexDirection: 'row',
+    ...continuous,
+    ...elevation.card,
     alignItems: 'center',
+    backgroundColor: CREW_CARD_FILL,
+    borderRadius: radii.card,
+    flexDirection: 'row',
     gap: spacing.md,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    padding: layout.cardPadding,
   },
   groupIcon: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    height: 40,
+    backgroundColor: colors.surface,
+    borderRadius: radii.pill,
+    height: CREW_PUCK_SIZE,
     justifyContent: 'center',
-    width: 40,
+    width: CREW_PUCK_SIZE,
   },
-  groupBody: { flex: 1, gap: 4 },
-  groupName: {
-    color: colors.textPrimary,
-    fontFamily: 'Georgia',
-    fontStyle: 'italic',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  groupMeta: { color: colors.textSecondary, fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  groupBody: { flex: 1, gap: spacing.xs },
+  groupName: { ...textStyles.title2, color: colors.textPrimary },
+  groupMeta: { ...textStyles.footnote, color: colors.textSecondary },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
 });
