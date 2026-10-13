@@ -57,7 +57,7 @@ export default function AcceptTermsScreen() {
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Before you head in</Text>
           <Text style={styles.title} accessibilityRole="header">
-            Our terms
+            Our Terms
           </Text>
           <Text style={styles.subtitle}>
             Festie is where crews share plans, meetups and photos. Please read and agree to our terms to continue.
@@ -110,8 +110,9 @@ const styles = StyleSheet.create({
   content: { gap: spacing.lg },
   brandTile: { alignSelf: 'center' },
   header: { alignItems: 'center', gap: spacing.sm },
-  eyebrow: { ...textStyles.footnote, color: colors.textSecondary, fontWeight: '600', textAlign: 'center' },
-  title: { ...textStyles.title1, color: colors.textPrimary, textAlign: 'center' },
+  eyebrow: { ...textStyles.label, color: colors.textSecondary, textAlign: 'center' },
+  // The gate's hero title, a size above title1 as in the original screen.
+  title: { ...textStyles.title1, color: colors.textPrimary, fontSize: 32, lineHeight: 38, textAlign: 'center' },
   subtitle: { ...textStyles.subheadline, color: colors.textSecondary, textAlign: 'center' },
   // TextLink is 20pt tall with 12pt hitSlop above and below: 24pt apart, the touch areas don't overlap.
   signOutRow: { alignItems: 'center', gap: spacing.xl },
