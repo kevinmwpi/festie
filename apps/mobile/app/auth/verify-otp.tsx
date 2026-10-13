@@ -1,9 +1,22 @@
 import { requestEmailCode, toUserMessage, verifyEmailCode } from '@festival/data-access';
-import { colors, InlineMessage, PrimaryButton, radii, showToast, spacing, TextLink } from '@festival/ui';
+import {
+  colors,
+  continuous,
+  InlineMessage,
+  layout,
+  PrimaryButton,
+  radii,
+  showToast,
+  spacing,
+  tabularNums,
+  TextLink,
+  textStyles,
+} from '@festival/ui';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { KeyboardAvoidingScreen } from '@/src/components/KeyboardAvoidingScreen';
 import { OTP_LENGTH } from '@/src/config/app-info';
 import { resetTo } from '@/src/providers/launch-route';
 import { trackSignIn } from '@/src/providers/owner-check';
@@ -14,8 +27,27 @@ const MIN_CODE_LENGTH = 6;
 const MAX_CODE_LENGTH = 10;
 const RESEND_COOLDOWN_S = 60;
 
+/**
+ * Code cells share the row (`flex: 1`), capped for wide screens. On a 375pt phone (335pt row) the 8 cells
+ * are about 35pt wide with an 8pt gap; a pasted 10-digit code switches to the dense row (4pt gap, tighter
+ * corners), about 30pt per cell.
+ */
+const OTP_CELL_MAX_WIDTH = 48;
+const OTP_CELL_MIN_HEIGHT = 56;
+/**
+ * The digits follow Dynamic Type up to 1.4×: a `title2` digit then draws at about 31pt, roughly 19pt wide
+ * and 39pt tall, which still fits the ~26pt inner width of a dense 10-digit cell and the 56pt cell height.
+ * Past that the digits would overflow the cells. VoiceOver reads the code from the input, not the cells.
+ */
+const OTP_DIGIT_MAX_SCALE = 1.4;
+
 function firstParam(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value) ?? '';
+}
+
+/** "an 8-digit code", "a 6-digit code": the article follows the spoken number (eight, eleven, eighteen). */
+function digitCountArticle(count: number): 'a' | 'an' {
+  return /^8|^1[18]$/.test(String(count)) ? 'an' : 'a';
 }
 
 export default function VerifyOtpScreen() {
@@ -54,6 +86,17 @@ export default function VerifyOtpScreen() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [secondsLeft]);
+
+  // The countdown text ticks every second, so it is not a live region. Screen readers hear one
+  // announcement when the cooldown ends instead (not on arrival, when resending is already allowed).
+  const canResend = secondsLeft <= 0;
+  const couldResendRef = React.useRef(canResend);
+  React.useEffect(() => {
+    if (canResend && !couldResendRef.current) {
+      AccessibilityInfo.announceForAccessibility('You can resend the code now');
+    }
+    couldResendRef.current = canResend;
+  }, [canResend]);
 
   const submit = React.useCallback(
     async (candidate: string) => {
@@ -121,26 +164,35 @@ export default function VerifyOtpScreen() {
 
   if (!email) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Text style={styles.title} accessibilityRole="header">Verify Code</Text>
+      // Scrolls instead of clipping at large text sizes.
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.centered}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title} accessibilityRole="header">Verify code</Text>
         <Text style={styles.subtitle}>Enter your email first so we know where to send the code.</Text>
         <PrimaryButton label="Enter email" onPress={() => router.replace('/auth/enter-email')} />
-      </View>
+      </ScrollView>
     );
   }
 
   const boxCount = Math.max(OTP_LENGTH, code.length);
+  const dense = boxCount > OTP_LENGTH;
   const canVerify = code.length >= MIN_CODE_LENGTH && code.length <= MAX_CODE_LENGTH;
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingScreen style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title} accessibilityRole="header">Verify Code</Text>
+            <Text style={styles.title} accessibilityRole="header">Verify code</Text>
             <Text style={styles.subtitle}>
-              {justSent ? `We sent a ${OTP_LENGTH}-digit code to ${email}` : `Enter the ${OTP_LENGTH}-digit code we emailed to ${email}`}
+              {justSent
+                ? `We sent ${digitCountArticle(OTP_LENGTH)} ${OTP_LENGTH}-digit code to ${email}`
+                : `Enter the ${OTP_LENGTH}-digit code we emailed to ${email}`}
             </Text>
           </View>
 
@@ -148,7 +200,7 @@ export default function VerifyOtpScreen() {
               the keyboard's one-time-code autofill. */}
           <Pressable
             onPress={() => inputRef.current?.focus()}
-            style={styles.otpRow}
+            style={[styles.otpRow, dense && styles.otpRowDense]}
             accessible={false}
             importantForAccessibility="no"
           >
@@ -157,16 +209,18 @@ export default function VerifyOtpScreen() {
               return (
                 <View
                   key={index}
-                  style={[styles.otpCell, code[index] ? styles.otpCellFilled : null, active && styles.otpCellActive, error ? styles.otpCellError : null]}
+                  style={[styles.otpCell, dense && styles.otpCellDense, active && styles.otpCellActive, error ? styles.otpCellError : null]}
                   importantForAccessibility="no-hide-descendants"
                   accessibilityElementsHidden
                 >
-                  <Text style={styles.otpText} allowFontScaling={false}>
+                  <Text style={styles.otpText} maxFontSizeMultiplier={OTP_DIGIT_MAX_SCALE}>
                     {code[index] ?? ''}
                   </Text>
                 </View>
               );
             })}
+            {/* The number pad has no return key on iOS, so `onSubmitEditing` only fires on Android; codes
+                that do not auto-submit use the Verify button, which stays above the keyboard. */}
             <TextInput
               ref={inputRef}
               accessibilityLabel={`Sign-in code, ${OTP_LENGTH} digits`}
@@ -198,13 +252,15 @@ export default function VerifyOtpScreen() {
 
           <View style={styles.links}>
             {secondsLeft > 0 ? (
-              <Text style={styles.helper} accessibilityLiveRegion="polite">
+              <Text style={styles.helper}>
                 Didn&apos;t get it? Check spam, or resend in {secondsLeft}s
               </Text>
             ) : (
               <TextLink
                 align="center"
+                role="button"
                 label={resending ? 'Sending…' : 'Resend code'}
+                busy={resending}
                 accessibilityLabel={`Resend code to ${email}`}
                 onPress={() => void handleResend()}
               />
@@ -213,7 +269,7 @@ export default function VerifyOtpScreen() {
           </View>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingScreen>
   );
 }
 
@@ -223,14 +279,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   centered: {
+    flexGrow: 1,
     gap: spacing.lg,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: layout.screenGutter,
+    paddingVertical: spacing.xxxl,
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: layout.screenGutter,
     paddingVertical: spacing.xxxl,
   },
   content: {
@@ -241,25 +299,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  title: {
-    fontFamily: 'Georgia',
-    fontSize: 32,
-    fontWeight: '700',
-    fontStyle: 'italic',
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  title: { ...textStyles.title1, color: colors.textPrimary, textAlign: 'center' },
+  subtitle: { ...textStyles.subheadline, color: colors.textSecondary, textAlign: 'center' },
   otpRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: spacing.sm,
     justifyContent: 'center',
   },
+  otpRowDense: { gap: spacing.xs },
   // Nearly transparent rather than 0-sized/opacity 0, which some platforms treat as not focusable.
   hiddenInput: {
     ...StyleSheet.absoluteFillObject,
@@ -267,26 +314,21 @@ const styles = StyleSheet.create({
     fontSize: 1,
     opacity: 0.02,
   },
+  // Flat like every text field; the outline (3.90:1 on white) shows where each empty cell is.
   otpCell: {
+    ...continuous,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
-    borderColor: colors.borderCard,
+    borderColor: colors.inputBorder,
     borderRadius: radii.md,
     borderWidth: 1,
     flex: 1,
-    maxWidth: 48,
-    minHeight: 56,
-    shadowColor: colors.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    maxWidth: OTP_CELL_MAX_WIDTH,
+    minHeight: OTP_CELL_MIN_HEIGHT,
   },
-  otpCellFilled: {
-    borderColor: colors.primary,
-    borderWidth: 2,
-  },
+  // ~30pt-wide cells: a tighter radius so the corners do not clamp into pill ends.
+  otpCellDense: { borderRadius: radii.sm },
   otpCellActive: {
     borderColor: colors.link,
     borderWidth: 2,
@@ -294,21 +336,14 @@ const styles = StyleSheet.create({
   otpCellError: {
     borderColor: colors.destructive,
   },
-  otpText: {
-    color: colors.textPrimary,
-    fontSize: 24,
-    fontWeight: '700',
-  },
+  otpText: { ...textStyles.title2, ...tabularNums, color: colors.textPrimary },
   links: {
     alignItems: 'center',
     // TextLink is 20pt tall with 12pt hitSlop above and below: 24pt apart, the touch areas don't overlap.
     gap: spacing.xl,
     marginTop: spacing.xs,
   },
-  helper: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  // Same metrics as the TextLink label (`subheadline`) that replaces it, so nothing jumps when the
+  // countdown ends; tabular digits keep the line from jittering while it ticks.
+  helper: { ...textStyles.subheadline, ...tabularNums, color: colors.textSecondary, textAlign: 'center' },
 });

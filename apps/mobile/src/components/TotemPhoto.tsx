@@ -1,5 +1,6 @@
 import { getTotemSignedUrl } from '@festival/data-access';
-import { colors, IconButton, radii, spacing } from '@festival/ui';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, continuous, IconButton, layout, radii, spacing, textStyles } from '@festival/ui';
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
@@ -32,45 +33,58 @@ export function TotemPhoto({
   const [failed, setFailed] = React.useState(false);
 
   return (
-    <View style={styles.frame}>
-      {urlQuery.data && !failed ? (
-        <Image
-          source={{ uri: urlQuery.data }}
-          style={styles.image}
-          resizeMode="cover"
-          accessible
-          accessibilityRole="image"
-          accessibilityLabel={`Totem photo for ${meetupTitle}`}
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <View style={styles.placeholder}>
-          {urlQuery.isPending && !failed ? (
-            <ActivityIndicator color={colors.textPrimary} />
-          ) : (
-            <Text style={styles.placeholderText}>Photo unavailable right now — check your connection.</Text>
-          )}
-        </View>
-      )}
+    // The report button sits outside the clipped frame so its shadow is not cut off by the rounded corners.
+    <View style={styles.container}>
+      <View style={styles.frame}>
+        {urlQuery.data && !failed ? (
+          <Image
+            source={{ uri: urlQuery.data }}
+            style={styles.image}
+            resizeMode="cover"
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={`Totem photo for ${meetupTitle}`}
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <View style={[styles.placeholder, onReport ? styles.placeholderBesideReport : null]}>
+            {urlQuery.isPending && !failed ? (
+              <ActivityIndicator color={colors.textPrimary} accessibilityLabel="Loading photo" />
+            ) : (
+              <Text style={styles.placeholderText}>Photo unavailable right now — check your connection.</Text>
+            )}
+          </View>
+        )}
+      </View>
       {onReport ? (
         <View style={styles.reportButton}>
-          <IconButton icon="⚑" accessibilityLabel={`Report the photo for ${meetupTitle}`} onPress={onReport} />
+          <IconButton
+            icon={<Ionicons name="flag-outline" size={20} color={colors.textPrimary} />}
+            accessibilityLabel={`Report the photo for ${meetupTitle}`}
+            onPress={onReport}
+          />
         </View>
       ) : null}
     </View>
   );
 }
 
+/** Room the placeholder text leaves on each side for the 44pt report button in the corner. */
+const REPORT_CLEARANCE = layout.minTouchTarget + spacing.md;
+
 const styles = StyleSheet.create({
-  frame: { borderRadius: radii.xl, overflow: 'hidden', position: 'relative' },
+  container: { position: 'relative' },
+  frame: { ...continuous, borderRadius: radii.lg, overflow: 'hidden' },
   image: { height: 200, width: '100%' },
   placeholder: {
     alignItems: 'center',
-    backgroundColor: '#F0F4FF',
-    height: 120,
+    backgroundColor: colors.inputBg,
     justifyContent: 'center',
+    minHeight: 120,
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  placeholderText: { color: colors.textSecondary, fontSize: 13, textAlign: 'center' },
+  placeholderBesideReport: { paddingHorizontal: REPORT_CLEARANCE },
+  placeholderText: { ...textStyles.footnote, color: colors.textSecondary, textAlign: 'center' },
   reportButton: { position: 'absolute', right: spacing.sm, top: spacing.sm },
 });

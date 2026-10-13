@@ -1,19 +1,16 @@
 import { requestEmailCode, toUserMessage } from '@festival/data-access';
-import { colors, FieldInput, InlineMessage, PrimaryButton, spacing, TextLink } from '@festival/ui';
+import { colors, FieldInput, InlineMessage, layout, PrimaryButton, spacing, TextLink, textStyles } from '@festival/ui';
 import { router } from 'expo-router';
 import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { BrandMark } from '@/src/components/BrandMark';
+import { BrandTile } from '@/src/components/BrandMark';
+import { KeyboardAvoidingScreen } from '@/src/components/KeyboardAvoidingScreen';
 import { WORDMARK_FONT } from '@/src/config/fonts';
 import { openPrivacyPolicy, openTermsOfUse } from '@/src/providers/external-links';
 
 const MAX_EMAIL_LENGTH = 254;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** Default auth screen uses Coachella palette before a festival is chosen */
-const AUTH_BG     = '#FFF5F9';
-const AUTH_ACCENT = '#FFB3D9';
 
 export default function EnterEmailScreen() {
   const [email, setEmail] = React.useState('');
@@ -43,47 +40,48 @@ export default function EnterEmailScreen() {
   }, [trimmed]);
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingScreen style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
-          {/* Icon */}
-          <View style={styles.iconWrap} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-            <View style={[styles.iconBox, { backgroundColor: AUTH_ACCENT }]}>
-              <BrandMark />
+          {/* Brand: tile, wordmark and tagline */}
+          <View style={styles.hero}>
+            <BrandTile />
+            <View style={styles.brand}>
+              {/* The logotype. Its growth is capped so "Festie" never breaks across lines at accessibility
+                  sizes; the tagline below carries the readable content. */}
+              <Text style={styles.wordmark} accessibilityRole="header" maxFontSizeMultiplier={1.3}>
+                Festie
+              </Text>
+              <Text style={styles.tagline}>Ready for the show?</Text>
             </View>
-          </View>
-
-          {/* Wordmark */}
-          <View style={styles.brand}>
-            <Text style={styles.wordmark} accessibilityRole="header">Festie</Text>
-            <Text style={styles.tagline}>Ready for the show?</Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
-            <FieldInput
-              accessibilityLabel="Email address"
-              autoCapitalize="none"
-              autoComplete="email"
-              autoCorrect={false}
-              keyboardType="email-address"
-              maxLength={MAX_EMAIL_LENGTH}
-              onChangeText={(value) => {
-                setEmail(value);
-                if (error) setError(null);
-              }}
-              onSubmitEditing={() => void handleSubmit()}
-              placeholder="Email Address"
-              returnKeyType="send"
-              textContentType="emailAddress"
-              value={email}
-              style={styles.emailInput}
-            />
-            <Text style={styles.helper}>We&apos;ll email you a sign-in code. No password needed.</Text>
+            <View style={styles.field}>
+              <FieldInput
+                accessibilityLabel="Email address"
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect={false}
+                keyboardType="email-address"
+                maxLength={MAX_EMAIL_LENGTH}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  if (error) setError(null);
+                }}
+                onSubmitEditing={() => void handleSubmit()}
+                placeholder="Email address"
+                returnKeyType="send"
+                textContentType="emailAddress"
+                value={email}
+              />
+              <Text style={styles.helper}>We&apos;ll email you a sign-in code. No password needed.</Text>
+            </View>
             <InlineMessage message={error} />
             {error && looksValid ? (
               <View style={styles.haveCodeRow}>
@@ -95,7 +93,7 @@ export default function EnterEmailScreen() {
               loading={loading}
               label="Email me a code"
               onPress={() => void handleSubmit()}
-              accentColor={AUTH_ACCENT}
+              accentColor={colors.brand}
             />
 
             <Text style={styles.legalText}>
@@ -112,51 +110,39 @@ export default function EnterEmailScreen() {
           </View>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingScreen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: AUTH_BG,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: layout.screenGutter,
     paddingVertical: spacing.xxxl,
   },
   content: { gap: spacing.xxxl },
-  iconWrap: { alignItems: 'center' },
-  iconBox: {
-    width: 80,
-    height: 80,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  },
-  brand: { alignItems: 'center', gap: spacing.xs, marginTop: -spacing.md },
+  hero: { alignItems: 'center', gap: spacing.xl },
+  brand: { alignItems: 'center', gap: spacing.xs },
+  // The Fredoka logotype is the one custom face and the one size outside `textStyles` (single weight, so
+  // no fontWeight).
   wordmark: {
+    color: colors.textPrimary,
     fontFamily: WORDMARK_FONT,
     fontSize: 52,
-    color: colors.textPrimary,
   },
-  tagline: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    letterSpacing: 0.5,
-  },
+  tagline: { ...textStyles.subheadline, color: colors.textSecondary, fontWeight: '600', textAlign: 'center' },
   form: { gap: spacing.md },
-  emailInput: { paddingVertical: 20, fontSize: 16 },
-  helper: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: -spacing.xs, paddingHorizontal: spacing.xs },
+  field: { gap: spacing.sm },
+  helper: { ...textStyles.footnote, color: colors.textSecondary, paddingHorizontal: spacing.xs },
   haveCodeRow: { alignItems: 'flex-start', paddingHorizontal: spacing.xs },
-  legalText: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: spacing.xs, textAlign: 'center' },
-  legalLink: { color: colors.link, fontWeight: '700' },
+  // `subheadline` (15/20), the same as the terms checkbox label: the nested links cannot take hitSlop, so
+  // their touch target is the 20pt line, and it matches on both screens.
+  legalText: { ...textStyles.subheadline, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' },
+  // Same inline-link style as the terms checkbox: `link`, semibold, underlined.
+  legalLink: { color: colors.link, fontWeight: '600', textDecorationLine: 'underline' },
 });

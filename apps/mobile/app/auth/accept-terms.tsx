@@ -4,19 +4,16 @@
  * version changes. New accounts agree on profile setup instead. The launch route sends signed-in users
  * here until they agree; the app's tabs stay closed until then.
  */
-import { colors, InlineMessage, PrimaryButton, radii, spacing, TextLink, typography } from '@festival/ui';
+import { colors, InlineMessage, layout, PrimaryButton, SectionCard, spacing, TextLink, textStyles } from '@festival/ui';
 import { Redirect, router } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { BrandMark } from '@/src/components/BrandMark';
+import { BrandTile } from '@/src/components/BrandMark';
 import { resetTo } from '@/src/providers/launch-route';
 import { performSignOut, signOutErrorMessage } from '@/src/providers/session-actions';
 import { hasCurrentUserAcceptedTerms, markTermsAccepted } from '@/src/providers/terms-acceptance';
 import { TERMS_REQUIRED_MESSAGE, TermsAgreement } from '@/src/providers/terms-agreement';
-
-/** Same tent badge colour as the launch and sign-in screens, before a festival accent applies. */
-const AUTH_ACCENT = '#FFB3D9';
 
 export default function AcceptTermsScreen() {
   const [alreadyAccepted] = React.useState(hasCurrentUserAcceptedTerms);
@@ -55,21 +52,19 @@ export default function AcceptTermsScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.content}>
-        <View style={styles.iconBox} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-          <BrandMark />
-        </View>
+        <BrandTile style={styles.brandTile} />
 
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Before you head in</Text>
           <Text style={styles.title} accessibilityRole="header">
-            Our Terms
+            Our terms
           </Text>
           <Text style={styles.subtitle}>
             Festie is where crews share plans, meetups and photos. Please read and agree to our terms to continue.
           </Text>
         </View>
 
-        <View style={styles.card}>
+        <SectionCard>
           <TermsAgreement
             agreed={agreed}
             onChange={(next) => {
@@ -77,15 +72,22 @@ export default function AcceptTermsScreen() {
               if (next) setError(null);
             }}
           />
-        </View>
+        </SectionCard>
 
         <InlineMessage message={error} />
         <PrimaryButton label="Continue" disabled={!agreed || signingOut} onPress={handleContinue} />
         <View style={styles.signOutRow}>
-          <TextLink align="center" label={signingOut ? 'Signing out…' : 'Sign out'} onPress={signingOut ? () => undefined : handleSignOut} />
+          <TextLink
+            align="center"
+            role="button"
+            label={signingOut ? 'Signing out…' : 'Sign out'}
+            busy={signingOut}
+            onPress={signingOut ? () => undefined : handleSignOut}
+          />
           <TextLink
             align="center"
             label="Delete my account"
+            tone="destructive"
             onPress={signingOut ? () => undefined : () => router.push('/auth/delete-account')}
           />
         </View>
@@ -102,35 +104,15 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: layout.screenGutter,
     paddingVertical: spacing.xxxl,
   },
   content: { gap: spacing.lg },
-  iconBox: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: AUTH_ACCENT,
-    borderRadius: radii.xxl,
-    height: 80,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    width: 80,
-    elevation: 4,
-  },
+  brandTile: { alignSelf: 'center' },
   header: { alignItems: 'center', gap: spacing.sm },
-  eyebrow: { ...typography.label, color: colors.textSecondary },
-  title: { ...typography.heading, color: colors.textPrimary, fontSize: 32, textAlign: 'center' },
-  subtitle: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.borderCard,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    padding: spacing.xl,
-  },
+  eyebrow: { ...textStyles.footnote, color: colors.textSecondary, fontWeight: '600', textAlign: 'center' },
+  title: { ...textStyles.title1, color: colors.textPrimary, textAlign: 'center' },
+  subtitle: { ...textStyles.subheadline, color: colors.textSecondary, textAlign: 'center' },
   // TextLink is 20pt tall with 12pt hitSlop above and below: 24pt apart, the touch areas don't overlap.
   signOutRow: { alignItems: 'center', gap: spacing.xl },
 });

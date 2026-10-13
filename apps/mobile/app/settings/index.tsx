@@ -1,6 +1,5 @@
 import { getLocalGroups } from '@festival/data-access';
-import { Avatar, colors, DestructiveButton, ListRow, ListSection, ScreenHeader, showToast, spacing } from '@festival/ui';
-import { Ionicons } from '@expo/vector-icons';
+import { Avatar, colors, DestructiveButton, layout, ListRow, ListSection, ScreenHeader, showToast, spacing, textStyles } from '@festival/ui';
 import { useQuery } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
@@ -8,7 +7,7 @@ import { router, useFocusEffect } from 'expo-router';
 import React from 'react';
 import { Alert, AppState, ScrollView, StyleSheet, Text } from 'react-native';
 
-import { APP_VERSION_LABEL, SUPPORT_EMAIL, SUPPORT_URL } from '@/src/config/app-info';
+import { APP_VERSION_LABEL, PRIVACY_POLICY_URL, SUPPORT_EMAIL, SUPPORT_URL, TERMS_URL } from '@/src/config/app-info';
 import { STOP_NOT_CONFIRMED_MESSAGE, useLocationSharing, type LocationSharingStatus } from '@/src/location/LocationSharingProvider';
 import {
   openPrivacyPolicy,
@@ -164,12 +163,7 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={[styles.screen, { backgroundColor: screenTint }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <ScreenHeader
-        title="Settings"
-        subtitle="Account & privacy"
-        onBack={() => goBackOr(HOME_HREF)}
-        backIcon={<Ionicons name="chevron-back" size={22} color={colors.textPrimary} />}
-      />
+      <ScreenHeader title="Settings" subtitle="Account & privacy" onBack={() => goBackOr(HOME_HREF)} />
 
       <ListSection title="Profile">
         {profile ? (
@@ -195,6 +189,8 @@ export default function SettingsScreen() {
           title="Location sharing"
           value={sharingText.value}
           subtitle={sharingText.subtitle}
+          // Asking again shows the iOS prompt in place; otherwise the row opens the Settings app.
+          accessory={sharing.status === 'permission_denied' && !sharing.canAskAgain ? 'external' : 'none'}
           onPress={
             sharing.status === 'permission_denied'
               ? sharing.canAskAgain
@@ -204,7 +200,7 @@ export default function SettingsScreen() {
           }
         />
         {sharing.status !== 'off' ? (
-          <ListRow title="Stop sharing location" destructive loading={stoppingShare} onPress={confirmStopSharing} />
+          <ListRow title="Stop sharing location" destructive accessory="none" loading={stoppingShare} onPress={confirmStopSharing} />
         ) : null}
       </ListSection>
 
@@ -214,22 +210,27 @@ export default function SettingsScreen() {
           value={notificationRow.value}
           subtitle={notificationRow.subtitle}
           onPress={notificationRow.onPress}
+          accessory="external"
           accessibilityHint={notificationRow.onPress ? 'Opens the Settings app' : undefined}
         />
       </ListSection>
 
       <ListSection title="About">
-        <ListRow title="Privacy Policy" onPress={openPrivacyPolicy} />
-        <ListRow title="Terms of Use" onPress={openTermsOfUse} />
+        {/* Hosted documents open in a browser sheet; without a URL they are in-app screens. */}
+        <ListRow title="Privacy Policy" accessory={PRIVACY_POLICY_URL ? 'external' : 'chevron'} onPress={openPrivacyPolicy} />
+        <ListRow title="Terms of Use" accessory={TERMS_URL ? 'external' : 'chevron'} onPress={openTermsOfUse} />
         {SUPPORT_EMAIL ? (
           <ListRow
             title="Contact support"
             subtitle={SUPPORT_EMAIL}
             onPress={() => openSupportEmail(`Festie support (${APP_VERSION_LABEL})`)}
+            accessory="external"
             accessibilityHint="Opens your mail app"
           />
         ) : null}
-        {SUPPORT_URL ? <ListRow title="Help & support" onPress={openSupportUrl} accessibilityHint="Opens in a browser" /> : null}
+        {SUPPORT_URL ? (
+          <ListRow title="Help & support" accessory="external" onPress={openSupportUrl} accessibilityHint="Opens in a browser" />
+        ) : null}
         <ListRow title="Version" value={APP_VERSION_LABEL} />
       </ListSection>
 
@@ -245,6 +246,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: spacing.xl, padding: spacing.lg, paddingBottom: spacing.xxxl + spacing.xl },
-  footer: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  content: { gap: spacing.xl, padding: layout.screenGutter, paddingBottom: spacing.xxxl + spacing.xl },
+  footer: { ...textStyles.caption1, color: colors.textSecondary, textAlign: 'center' },
 });

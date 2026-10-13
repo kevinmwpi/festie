@@ -3,7 +3,7 @@
  * rules (App Review guideline 1.2: zero tolerance for objectionable content and abusive users). Shared
  * by profile setup and the one-time agreement screen for existing accounts (`/auth/accept-terms`).
  */
-import { Checkbox, checkboxLabelStyle, colors, spacing } from '@festival/ui';
+import { Checkbox, checkboxLabelStyle, colors, spacing, textStyles } from '@festival/ui';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -11,6 +11,13 @@ import { openPrivacyPolicy, openTermsOfUse } from './external-links';
 
 /** Shown when the user tries to continue without ticking the box. */
 export const TERMS_REQUIRED_MESSAGE = 'Please agree to the Terms of Use and Privacy Policy to continue.';
+
+/**
+ * The note lines up with the checkbox label: `Checkbox` draws a 24pt box with a `spacing.ms` gap before
+ * its label (packages/ui/src/identity.tsx). Update this if either changes.
+ */
+const CHECKBOX_SIZE = 24;
+const LABEL_INSET = CHECKBOX_SIZE + spacing.ms;
 
 export function TermsAgreement({ agreed, onChange }: { agreed: boolean; onChange: (agreed: boolean) => void }) {
   return (
@@ -50,6 +57,7 @@ export function TermsAgreement({ agreed, onChange }: { agreed: boolean; onChange
 
 const styles = StyleSheet.create({
   terms: { gap: spacing.xs },
-  link: { color: colors.link, fontWeight: '700', textDecorationLine: 'underline' },
-  note: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, paddingLeft: 36 },
+  // Same inline-link style as the sign-in screen's legal line: `link`, semibold, underlined.
+  link: { color: colors.link, fontWeight: '600', textDecorationLine: 'underline' },
+  note: { ...textStyles.footnote, color: colors.textSecondary, paddingLeft: LABEL_INSET },
 });

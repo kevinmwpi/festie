@@ -1,25 +1,30 @@
 import { getStoredSession } from '@festival/data-access';
 import {
   colors,
+  continuous,
   DestructiveButton,
   FieldInput,
   FieldLabel,
   InlineMessage,
+  layout,
   radii,
   ScreenHeader,
   SectionCard,
   showToast,
   spacing,
+  textStyles,
   useOfflineStatus,
 } from '@festival/ui';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { KeyboardAvoidingScreen } from '@/src/components/KeyboardAvoidingScreen';
 import { getPendingCount, performSignOut, signOutErrorMessage } from '@/src/providers/session-actions';
 
 const CONFIRM_WORD = 'DELETE';
+/** Wait for the keyboard to finish opening before scrolling the confirmation into view. */
+const KEYBOARD_SETTLE_MS = 300;
 
 const DELETED = [
   'Your profile: name, avatar and email address',
@@ -36,6 +41,7 @@ const DELETED = [
  */
 export function DeleteAccountView({ onBack, backgroundColor }: { onBack: () => void; backgroundColor: string }) {
   const offline = useOfflineStatus();
+  const scrollRef = React.useRef<ScrollView>(null);
   const [confirmation, setConfirmation] = React.useState('');
   const [deleting, setDeleting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -79,14 +85,14 @@ export function DeleteAccountView({ onBack, backgroundColor }: { onBack: () => v
   }, [confirmed, deleting]);
 
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <ScreenHeader
-          title="Delete account"
-          subtitle="Permanent"
-          onBack={onBack}
-          backIcon={<Ionicons name="chevron-back" size={22} color={colors.textPrimary} />}
-        />
+    <KeyboardAvoidingScreen style={[styles.screen, { backgroundColor }]}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <ScreenHeader title="Delete account" subtitle="Permanent" onBack={onBack} />
 
         <SectionCard title="What gets deleted" subtitle="Deleting your Festie account permanently removes:">
           <View style={styles.list}>
@@ -129,6 +135,8 @@ export function DeleteAccountView({ onBack, backgroundColor }: { onBack: () => v
               setConfirmation(value);
               setError(null);
             }}
+            // The screen shrinks above the keyboard; bring the field and the Delete button into view.
+            onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), KEYBOARD_SETTLE_MS)}
             onSubmitEditing={() => void handleDelete()}
             placeholder={CONFIRM_WORD}
             returnKeyType="done"
@@ -145,25 +153,28 @@ export function DeleteAccountView({ onBack, backgroundColor }: { onBack: () => v
           onPress={() => void handleDelete()}
         />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingScreen>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: spacing.lg, padding: spacing.lg, paddingBottom: spacing.xxxl + spacing.xl },
+  content: { gap: spacing.lg, padding: layout.screenGutter, paddingBottom: spacing.xxxl + spacing.xl },
   list: { gap: spacing.sm, marginTop: spacing.xs },
   listItem: { flexDirection: 'row', gap: spacing.sm },
-  bullet: { color: colors.textPrimary, fontSize: 15, lineHeight: 21 },
-  listText: { color: colors.textPrimary, flex: 1, fontSize: 15, lineHeight: 21 },
-  note: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: spacing.sm },
+  // Decorative: `textTertiary`, and hidden from screen readers.
+  bullet: { ...textStyles.subheadline, color: colors.textTertiary },
+  listText: { ...textStyles.subheadline, color: colors.textPrimary, flex: 1 },
+  note: { ...textStyles.footnote, color: colors.textSecondary, marginTop: spacing.sm },
+  // A flat callout under the "What gets deleted" card, with the same card radius.
   warning: {
+    ...continuous,
     backgroundColor: colors.destructiveBg,
-    borderRadius: radii.xl,
+    borderRadius: radii.card,
     gap: spacing.xs,
-    padding: spacing.lg,
+    padding: layout.cardPadding,
   },
-  warningTitle: { color: colors.destructive, fontSize: 15, fontWeight: '800' },
-  warningText: { color: colors.destructive, fontSize: 13, lineHeight: 19 },
+  warningTitle: { ...textStyles.headline, color: colors.destructive },
+  warningText: { ...textStyles.footnote, color: colors.destructive },
   field: { gap: spacing.sm },
 });

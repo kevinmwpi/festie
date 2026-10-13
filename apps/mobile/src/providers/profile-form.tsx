@@ -11,7 +11,18 @@ import {
   type CachedProfile,
   type ProfileInput,
 } from '@festival/data-access';
-import { Avatar, AVATAR_EMOJIS, AvatarPicker, colors, FieldInput, FieldLabel, getInitials, spacing } from '@festival/ui';
+import {
+  Avatar,
+  AVATAR_EMOJIS,
+  AvatarPicker,
+  colors,
+  FieldInput,
+  FieldLabel,
+  getInitials,
+  spacing,
+  tabularNums,
+  textStyles,
+} from '@festival/ui';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -135,8 +146,12 @@ export function ProfileFields({ form }: { form: ProfileFormState }) {
       </View>
 
       <View style={styles.field}>
+        {/* Wraps at large text sizes so the counter is never pushed off the row. */}
         <View style={styles.labelRow}>
-          <FieldLabel>Display name</FieldLabel>
+          {/* The field below carries the same accessibility label, so the visible label is not read twice. */}
+          <View style={styles.label} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+            <FieldLabel>Display name</FieldLabel>
+          </View>
           <Text style={[styles.counter, form.nameTooLong && styles.counterOver]} accessibilityLabel={`${form.nameLength} of ${DISPLAY_NAME_MAX_LENGTH} characters`}>
             {form.nameLength}/{DISPLAY_NAME_MAX_LENGTH}
           </Text>
@@ -153,7 +168,6 @@ export function ProfileFields({ form }: { form: ProfileFormState }) {
           returnKeyType="done"
           textContentType="nickname"
           value={form.displayName}
-          style={styles.nameInput}
         />
         <Text style={styles.hint}>Your crew sees this name and avatar. Don&apos;t use your email or phone number.</Text>
       </View>
@@ -170,9 +184,15 @@ const styles = StyleSheet.create({
   fields: { gap: spacing.lg },
   avatarPreview: { alignItems: 'center' },
   field: { gap: spacing.sm },
-  labelRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  counter: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
+  labelRow: {
+    alignItems: 'center',
+    columnGap: spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  label: { flexShrink: 1 },
+  counter: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary },
   counterOver: { color: colors.destructive },
-  nameInput: { paddingVertical: 18, fontSize: 16, fontWeight: '700' },
-  hint: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, paddingHorizontal: spacing.xs },
+  hint: { ...textStyles.footnote, color: colors.textSecondary, paddingHorizontal: spacing.xs },
 });

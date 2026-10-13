@@ -1,22 +1,26 @@
 import { isWellFormedInviteCode, joinGroup, normaliseInviteCode, toUserMessage } from '@festival/data-access';
 import {
-  colors,
   FieldInput,
   FieldLabel,
   InlineMessage,
+  layout,
   PrimaryButton,
   SectionCard,
   spacing,
+  tabularNums,
+  textStyles,
   useOfflineStatus,
 } from '@festival/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
+import { KeyboardAvoidingScreen } from '@/src/components/KeyboardAvoidingScreen';
 import { SubScreenHeader } from '@/src/components/ScreenHeader';
 import { invalidateGroupQueries } from '@/src/hooks/query-keys';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
+import { useFestivalScreenTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
 function firstParam(value: string | string[] | undefined): string {
@@ -24,6 +28,7 @@ function firstParam(value: string | string[] | undefined): string {
 }
 
 export default function JoinGroupScreen() {
+  const screenBg = useFestivalScreenTint();
   const tabBarClearance = useTabBarClearance();
   const params = useLocalSearchParams<{ code?: string | string[] }>();
   const queryClient = useQueryClient();
@@ -61,8 +66,8 @@ export default function JoinGroupScreen() {
   }, [inviteCode, queryClient, setSelectedGroupId]);
 
   return (
-    <View style={styles.container}>
-      <SubScreenHeader title="Join a Crew" label="Enter your invite code" />
+    <KeyboardAvoidingScreen style={[styles.container, { backgroundColor: screenBg }]}>
+      <SubScreenHeader title="Join a crew" label="Enter your invite code" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} keyboardShouldPersistTaps="handled">
         <SectionCard subtitle="Codes are 6 letters and numbers. Paste or type the code a friend sent you.">
           <FieldLabel>Invite code</FieldLabel>
@@ -77,6 +82,9 @@ export default function JoinGroupScreen() {
             placeholder="AB12CD"
             value={inviteCode}
             style={styles.codeInput}
+            // A single-line field scrolls sideways instead of wrapping: capped so all six characters stay
+            // visible at the largest text sizes (the field still grows to 1.6×).
+            maxFontSizeMultiplier={1.6}
             accessibilityLabel="Invite code"
             returnKeyType="go"
             onSubmitEditing={() => {
@@ -91,16 +99,17 @@ export default function JoinGroupScreen() {
           <PrimaryButton disabled={loading || !wellFormed} label="Join crew" loading={loading} onPress={() => void handleJoin()} />
         </SectionCard>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: spacing.md, padding: spacing.lg },
+  /* The festival wash (`screenBg`) is applied inline; it is translucent over the Stack's `colors.background`. */
+  container: { flex: 1 },
+  content: { gap: spacing.md, padding: layout.screenGutter },
   codeInput: {
-    fontSize: 24,
-    fontWeight: '800',
+    ...textStyles.title2,
+    ...tabularNums,
     letterSpacing: 6,
     textAlign: 'center',
   },

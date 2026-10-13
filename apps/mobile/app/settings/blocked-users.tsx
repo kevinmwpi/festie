@@ -11,6 +11,7 @@ import {
   colors,
   EmptyState,
   InlineMessage,
+  layout,
   ListRow,
   ListSection,
   ScreenHeader,
@@ -18,7 +19,6 @@ import {
   spacing,
   useOfflineStatus,
 } from '@festival/ui';
-import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import React from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -108,12 +108,7 @@ export default function BlockedUsersScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.textSecondary} />}
       showsVerticalScrollIndicator={false}
     >
-      <ScreenHeader
-        title="Blocked users"
-        subtitle="Privacy"
-        onBack={() => goBackOr('/settings')}
-        backIcon={<Ionicons name="chevron-back" size={22} color={colors.textPrimary} />}
-      />
+      <ScreenHeader title="Blocked users" subtitle="Privacy" onBack={() => goBackOr('/settings')} />
 
       {offline ? <InlineMessage tone="muted" message="You're offline. Showing your saved list; unblocking needs a connection." /> : null}
       {!offline && refreshError ? <InlineMessage tone="muted" message={`Couldn't refresh: ${refreshError}`} /> : null}
@@ -138,8 +133,13 @@ export default function BlockedUsersScreen() {
               title={blockedName(user)}
               subtitle={blockedSince(user)}
               value="Unblock"
+              valueTone="action"
+              // Unblocking happens here (after a confirmation), so no navigation chevron.
+              accessory="none"
               loading={unblockingId === user.user_id}
               accessibilityLabel={`Unblock ${blockedName(user)}`}
+              // The label replaces the row text, so the blocked date is read as the hint.
+              accessibilityHint={blockedSince(user)}
               onPress={() => unblock(user)}
             />
           ))}
@@ -151,6 +151,6 @@ export default function BlockedUsersScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: colors.background, flex: 1 },
-  content: { gap: spacing.lg, padding: spacing.lg, paddingBottom: spacing.xxxl + spacing.xl },
+  content: { gap: spacing.lg, padding: layout.screenGutter, paddingBottom: spacing.xxxl + spacing.xl },
   loading: { alignItems: 'center', paddingVertical: spacing.xxl },
 });

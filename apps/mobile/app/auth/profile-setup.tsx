@@ -1,8 +1,9 @@
-import { colors, InlineMessage, PrimaryButton, spacing, TextLink } from '@festival/ui';
+import { colors, InlineMessage, layout, PrimaryButton, spacing, TextLink, textStyles } from '@festival/ui';
 import { router } from 'expo-router';
 import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { KeyboardAvoidingScreen } from '@/src/components/KeyboardAvoidingScreen';
 import { resetTo } from '@/src/providers/launch-route';
 import { ProfileFields, useProfileForm } from '@/src/providers/profile-form';
 import { performSignOut, signOutErrorMessage } from '@/src/providers/session-actions';
@@ -37,12 +38,12 @@ export default function ProfileSetupScreen() {
   }, [form]);
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingScreen style={styles.container}>
       <ScrollView contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title} accessibilityRole="header">Your Profile</Text>
+            <Text style={styles.title} accessibilityRole="header">Your profile</Text>
             <Text style={styles.subtitle}>Pick a name and avatar so your crew can spot you.</Text>
           </View>
 
@@ -64,16 +65,23 @@ export default function ProfileSetupScreen() {
             onPress={() => void handleSave()}
           />
           <View style={styles.signOutRow}>
-            <TextLink align="center" label={signingOut ? 'Signing out…' : 'Sign out'} onPress={signingOut ? () => undefined : handleSignOut} />
+            <TextLink
+              align="center"
+              role="button"
+              label={signingOut ? 'Signing out…' : 'Sign out'}
+              busy={signingOut}
+              onPress={signingOut ? () => undefined : handleSignOut}
+            />
             <TextLink
               align="center"
               label="Delete my account"
+              tone="destructive"
               onPress={signingOut ? () => undefined : () => router.push('/auth/delete-account')}
             />
           </View>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingScreen>
   );
 }
 
@@ -83,8 +91,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   contentContainer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: 60,
+    paddingHorizontal: layout.screenGutter,
+    paddingTop: spacing.xxxl,
     paddingBottom: spacing.xxxl,
   },
   content: {
@@ -95,19 +103,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  title: {
-    fontFamily: 'Georgia',
-    fontSize: 32,
-    fontWeight: '700',
-    fontStyle: 'italic',
-    color: colors.textPrimary,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  title: { ...textStyles.title1, color: colors.textPrimary, textAlign: 'center' },
+  subtitle: { ...textStyles.subheadline, color: colors.textSecondary, textAlign: 'center' },
   // TextLink is 20pt tall with 12pt hitSlop above and below: 24pt apart, the touch areas don't overlap.
   signOutRow: { alignItems: 'center', gap: spacing.xl },
 });

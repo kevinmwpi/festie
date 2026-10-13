@@ -1,6 +1,22 @@
 import type { CombinedSelectionRow } from '@festival/data-access';
 import { festivalDayKey, listFestivalDays } from '@festival/domain';
-import { Badge, Chip, colors, EmptyState, radii, SegmentedControl, spacing, useOfflineStatus } from '@festival/ui';
+import {
+  Badge,
+  Chip,
+  colors,
+  continuous,
+  deriveAccentColors,
+  EmptyState,
+  layout,
+  radii,
+  SectionCard,
+  SegmentedControl,
+  spacing,
+  tabularNums,
+  textStyles,
+  useOfflineStatus,
+} from '@festival/ui';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -11,11 +27,25 @@ import { ErrorState, FestivalBundleState, LoadingState, StaleDataNote } from '@/
 import { useFestivalBundle, useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useCombinedSelections, useGroupDetail } from '@/src/hooks/use-groups';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
+import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
+import { useAppStore } from '@/src/state/app-store';
 
 type ScheduleView = 'overlap' | 'per-person' | 'divergence';
 
 const ALL = 'all';
 const NO_ROWS: CombinedSelectionRow[] = [];
+const LONG_DATE: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' };
+const NO_BREAK_SPACE = String.fromCharCode(0x00a0);
+
+/**
+ * "Fri 1:30 PM – 2:15 PM" with no-break spaces inside each time ("Fri 1:30 PM", "2:15 PM"), so a long
+ * line wraps at the dash instead of between "1:30" and "PM". The visible text is unchanged.
+ */
+function keepTimesTogether(text: string): string {
+  return text
+    .replace(/([A-Za-z]) (?=\d{1,2}:\d{2})/g, `$1${NO_BREAK_SPACE}`)
+    .replace(/ (AM|PM)\b/g, `${NO_BREAK_SPACE}$1`);
+}
 
 /** Member names as wrapping pills (a single-line badge would cut the list off). */
 function NamePills({ names }: { names: string[] }) {
@@ -30,6 +60,10 @@ function NamePills({ names }: { names: string[] }) {
   );
 }
 
+/**
+ * One set in a crew card: a single screen-reader element that reads artist, stage and time, then
+ * `accessibilityDetail` (who is going, the next meetup). `accent` adds a coloured bar on the left.
+ */
 function SetRow({
   artistName,
   stageName,
@@ -38,6 +72,7 @@ function SetRow({
   clock,
   footer,
   accent,
+  accessibilityDetail,
 }: {
   artistName: string;
   stageName: string;
@@ -46,14 +81,21 @@ function SetRow({
   clock: FestivalClock;
   footer?: React.ReactNode;
   accent?: string;
+  accessibilityDetail?: string;
 }) {
+  const when = `${clock.day(startTime)} ${clock.range(startTime, endTime)}`;
   return (
-    <View style={[styles.setRow, accent ? { borderLeftColor: accent, borderLeftWidth: 3 } : null]}>
-      <Text style={styles.artistName}>{artistName}</Text>
-      <Text style={styles.setMeta}>
-        {`${stageName} · ${clock.day(startTime)} ${clock.range(startTime, endTime)}`.toUpperCase()}
-      </Text>
-      {footer}
+    <View
+      style={styles.setRow}
+      accessible
+      accessibilityLabel={[artistName, stageName, when, accessibilityDetail].filter(Boolean).join(', ')}
+    >
+      {accent ? <View style={[styles.setAccent, { backgroundColor: accent }]} /> : null}
+      <View style={styles.setBody}>
+        <Text style={styles.artistName}>{artistName}</Text>
+        <Text style={styles.setMeta}>{`${stageName} · ${keepTimesTogether(when)}`}</Text>
+        {footer}
+      </View>
     </View>
   );
 }
@@ -71,6 +113,10 @@ export default function CombinedScheduleScreen() {
   const festivalId = group?.festival_id ?? null;
   const bundle = useFestivalBundle(festivalId);
   const festival = bundle.data?.festival ?? null;
+  // The crew's festival wash, like the sibling schedule screens (the active festival's until it loads).
+  const activeFestivalAccent = useAppStore((state) => state.activeFestivalAccent);
+  const screenBg = deriveAccentColors(festival?.accent_color || activeFestivalAccent).bgTint;
+  useSafeAreaEdgeTint(screenBg);
   const clock = useFestivalClock(festival);
   const selections = useCombinedSelections(groupId, festivalId);
   const rows = selections.data ?? NO_ROWS;
@@ -129,11 +175,11 @@ export default function CombinedScheduleScreen() {
     [meetups],
   );
 
-  const header = <SubScreenHeader title="Crew Schedule" label={group ? `${group.name} · combined picks`.toUpperCase() : 'COMBINED PICKS'} />;
+  const header = <SubScreenHeader title="Crew schedule" label={group ? `${group.name} · combined picks` : 'Combined picks'} />;
 
   if (!group) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: screenBg }]}>
         {header}
         <View style={styles.statePad}>
           {detail.isLoading || detail.isRefreshing ? (
@@ -162,8 +208,10 @@ export default function CombinedScheduleScreen() {
       overlapRows.length === 0 ? (
         <EmptyState title="No shared picks" description="When two or more of you pick the same set, it shows up here." />
       ) : (
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>SHARED SETS · {overlapRows.length}</Text>
+        <SectionCard>
+          <Text style={styles.sectionLabel} accessibilityRole="header">
+            Shared sets · {overlapRows.length}
+          </Text>
           {overlapRows.map((entry) => (
             <SetRow
               key={entry.row.set_id}
@@ -173,6 +221,7 @@ export default function CombinedScheduleScreen() {
               endTime={entry.row.end_time}
               clock={clock}
               accent={colors.success}
+              accessibilityDetail={`${entry.userIds.size} going: ${entry.names.join(', ')}`}
               footer={
                 <>
                   <Badge label={`${entry.userIds.size} going`} tone="success" />
@@ -181,12 +230,14 @@ export default function CombinedScheduleScreen() {
               }
             />
           ))}
-        </View>
+        </SectionCard>
       );
   } else if (view === 'per-person') {
     content = byPerson.map(([userId, entry]) => (
-      <View key={userId} style={styles.card}>
-        <Text style={styles.sectionLabel}>{entry.name.toUpperCase()} · {entry.rows.length}</Text>
+      <SectionCard key={userId}>
+        <Text style={styles.sectionLabel} accessibilityRole="header">
+          {entry.name} · {entry.rows.length}
+        </Text>
         {entry.rows.map((row) => (
           <SetRow
             key={row.id}
@@ -198,14 +249,19 @@ export default function CombinedScheduleScreen() {
             accent={colors.primary}
           />
         ))}
-      </View>
+      </SectionCard>
     ));
   } else {
     content = (
-      <View style={styles.card}>
-        <Text style={styles.sectionLabel}>ALL PICKS · {bySet.length}</Text>
+      <SectionCard>
+        <Text style={styles.sectionLabel} accessibilityRole="header">
+          All picks · {bySet.length}
+        </Text>
         {bySet.map((entry) => {
           const meetup = nextMeetupAfter(entry.row.start_time);
+          const meetupText = meetup
+            ? `Next meetup: ${meetup.title} at ${clock.timeFrom(meetup.starts_at, entry.row.start_time)}`
+            : null;
           return (
             <SetRow
               key={entry.row.set_id}
@@ -214,14 +270,20 @@ export default function CombinedScheduleScreen() {
               startTime={entry.row.start_time}
               endTime={entry.row.end_time}
               clock={clock}
+              accessibilityDetail={[entry.names.join(', '), meetupText].filter(Boolean).join(', ')}
               footer={
                 <>
                   <NamePills names={entry.names} />
-                  {meetup ? (
+                  {meetupText ? (
                     <View style={styles.meetupHint}>
-                      <Text style={styles.meetupHintText}>
-                        📍 Next meetup: {meetup.title} at {clock.timeFrom(meetup.starts_at, entry.row.start_time)}
-                      </Text>
+                      <Ionicons
+                        name="location"
+                        size={14}
+                        color={colors.textSecondary}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no-hide-descendants"
+                      />
+                      <Text style={styles.meetupHintText}>{meetupText}</Text>
                     </View>
                   ) : null}
                 </>
@@ -229,12 +291,12 @@ export default function CombinedScheduleScreen() {
             />
           );
         })}
-      </View>
+      </SectionCard>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: screenBg }]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: tabBarClearance }}
@@ -248,7 +310,7 @@ export default function CombinedScheduleScreen() {
       >
         {header}
         <View style={styles.inner}>
-          <View style={styles.card}>
+          <SectionCard>
             <SegmentedControl
               value={view}
               options={[
@@ -266,12 +328,19 @@ export default function CombinedScheduleScreen() {
             {days.length > 1 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroller} contentContainerStyle={styles.dayRow}>
                 {[ALL, ...days].map((value) => (
-                  <Chip key={value} active={day === value} onPress={() => setDay(value)} label={value === ALL ? 'All days' : clock.date(value)} />
+                  <Chip
+                    key={value}
+                    variant="ink"
+                    active={day === value}
+                    onPress={() => setDay(value)}
+                    label={value === ALL ? 'All days' : clock.date(value)}
+                    accessibilityLabel={value === ALL ? 'All days' : clock.date(value, LONG_DATE)}
+                  />
                 ))}
               </ScrollView>
             ) : null}
             {festival ? <TimeZoneHint hint={clock.hint} /> : null}
-          </View>
+          </SectionCard>
 
           {festival ? (
             content
@@ -296,41 +365,41 @@ export default function CombinedScheduleScreen() {
 
 const styles = StyleSheet.create({
   // React Native gives horizontal ScrollViews flexGrow/flexShrink 1; in a flex column they would take
-  // a share of the free height away from the list below.
-  chipScroller: { flexGrow: 0 },
-  container: { flex: 1, backgroundColor: colors.background },
-  statePad: { padding: spacing.lg },
+  // a share of the free height away from the list below. The negative margin bleeds the day row to the
+  // card's edges, so chips scroll out from under its padding instead of stopping 20pt in.
+  chipScroller: { flexGrow: 0, marginHorizontal: -layout.cardPadding },
+  container: { flex: 1 },
+  statePad: { padding: layout.screenGutter },
   scroll: { flex: 1 },
-  inner: { gap: spacing.md, paddingHorizontal: spacing.lg },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.borderCard,
-    padding: spacing.xl,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-    gap: spacing.sm,
-  },
-  sectionLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2 },
-  viewHint: { color: colors.textSecondary, fontSize: 12, fontStyle: 'italic' },
-  dayRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
+  inner: { gap: spacing.md, paddingHorizontal: layout.screenGutter },
+  sectionLabel: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary, fontWeight: '600' },
+  viewHint: { ...textStyles.footnote, color: colors.textSecondary },
+  // Vertical padding keeps the chips' 44pt hitSlop inside the horizontal ScrollView.
+  dayRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: layout.cardPadding, paddingVertical: spacing.xs },
+  // `SectionCard` spaces its children 12pt apart, so the divider sits midway between two sets.
   setRow: {
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    gap: 4,
-    paddingLeft: spacing.sm,
-    paddingTop: spacing.sm,
-    alignItems: 'flex-start',
+    borderTopColor: colors.separator,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingTop: spacing.ms,
   },
-  artistName: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
-  setMeta: { color: colors.textSecondary, fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
-  namesPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  namePill: { backgroundColor: '#F0F4FF', borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
-  namePillText: { color: colors.link, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  meetupHint: { backgroundColor: '#F0F4FF', borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2 },
-  meetupHintText: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
+  setAccent: { borderRadius: radii.xs, width: spacing.xs },
+  setBody: { alignItems: 'flex-start', flex: 1, gap: spacing.xs },
+  artistName: { ...textStyles.headline, color: colors.textPrimary },
+  setMeta: { ...textStyles.footnote, ...tabularNums, color: colors.textSecondary },
+  namesPills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  namePill: { backgroundColor: colors.inputBg, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xxs },
+  namePillText: { ...textStyles.caption1, color: colors.link, fontWeight: '600' },
+  meetupHint: {
+    ...continuous,
+    alignItems: 'center',
+    backgroundColor: colors.inputBg,
+    borderRadius: radii.sm,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.ms,
+    paddingVertical: spacing.sm,
+  },
+  meetupHintText: { ...textStyles.caption1, ...tabularNums, color: colors.textPrimary, flexShrink: 1, fontWeight: '600' },
 });
