@@ -598,8 +598,9 @@ Demo login must work on the project you submit against (release gate 7).
 
 Do this before the build (§5): the build embeds the in-app Terms and Privacy screens generated from the
 Markdown (the app shows the in-app Terms whenever `EXPO_PUBLIC_TERMS_URL` is unset), and §5.1 needs the
-hosted URLs. The pages are generated from `docs/legal/*.md` into `docs/site/` (standalone HTML, no
-external assets) and `apps/mobile/app/legal/*.tsx`.
+hosted URLs. The pages are generated from `docs/legal/*.md` into `docs/site/` (standalone HTML with inline
+styles, plus `favicon.png` and `apple-touch-icon.png` copied from `apps/mobile/assets/images/`; no external
+requests) and `apps/mobile/app/legal/*.tsx`.
 
 1. Replace every placeholder in `docs/legal/privacy-policy.md`, `terms-of-use.md` and `support.md` (§7.1)
    and set `supportEmail` in `docs/legal/values.json` to the address you will use for
@@ -624,7 +625,8 @@ external assets) and `apps/mobile/app/legal/*.tsx`.
      `www.joinfestie.com`. The pages are at `https://joinfestie.com/privacy`, `/terms` and `/support`
      (requests for the `.html` paths redirect there).
    - **Any static host that serves just that folder** (Netlify, Cloudflare Pages, S3 + CloudFront, your
-     own server): upload the four files in `docs/site/` as they are. This is the cleanest option.
+     own server): upload the files in `docs/site/` as they are (the four pages, `favicon.png` and
+     `apple-touch-icon.png`). This is the cleanest option.
    - **GitHub Pages** (public repository, or a paid GitHub plan for private ones): repository Settings →
      Pages → Build and deployment → Deploy from a branch → your release branch, folder `/docs`. The pages
      are then at `https://<owner>.github.io/<repo>/site/privacy.html`, `…/terms.html`, `…/support.html`.
