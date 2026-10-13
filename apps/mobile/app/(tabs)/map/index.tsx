@@ -741,7 +741,9 @@ const styles = StyleSheet.create({
   // a share of the free height away from the list below.
   chipScroller: { flexGrow: 0 },
   container: { flex: 1 },
-  map: { left: 0, position: 'absolute', right: 0, top: 0 },
+  // Fills the whole screen: rnmapbox sizes the native map to this wrapper, so it needs every edge (a wrapper
+  // with only top/left/right has no height and the map collapses to nothing).
+  map: StyleSheet.absoluteFillObject,
   statePad: { padding: spacing.lg },
   scroll: { flex: 1 },
   scrollContent: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
