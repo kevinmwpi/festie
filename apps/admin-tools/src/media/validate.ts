@@ -15,8 +15,12 @@ import {
   ARTWORK_MAX_BYTES,
   ARTWORK_MAX_SIDE,
   ATTRIBUTION_REQUIRED,
+  ccLicenseDeedUrl,
+  ccLicenseIdFromUrl,
+  ccLicenseLabel,
   IMAGE_CREDIT_MAX_LENGTH,
   MEDIA_REGISTRY_VERSION,
+  normalizeLicenseText,
   type LicenseId,
   type MediaEntry,
   type MediaRegistry,
@@ -178,6 +182,21 @@ function validateLicense(c: Collector, value: unknown, path: string): void {
   }
   if (idOk && ATTRIBUTION_REQUIRED.includes(license.id as LicenseId) && attribution === '') {
     c.error(`${path}.attribution`, `${license.id} requires attribution text (e.g. "Photo: Jane Doe, CC BY-SA 4.0, via Wikimedia Commons")`);
+  }
+  if (!idOk) {
+    return;
+  }
+  const id = license.id as LicenseId;
+  const label = ccLicenseLabel(id);
+  // The app shows the credit text as given, so a CC credit has to name its licence itself.
+  if (label && ATTRIBUTION_REQUIRED.includes(id) && attribution !== '' && !normalizeLicenseText(attribution).includes(normalizeLicenseText(label))) {
+    c.error(`${path}.attribution`, `must name the licence ("${label}"), because the app shows this text as the credit`);
+  }
+  // The app links each CC licence id to its international deed; a link to another licence, or to a
+  // country version, means the entry and the app would disagree about the licence.
+  const deed = ccLicenseDeedUrl(id);
+  if (deed && typeof license.url === 'string' && isHttpsUrl(license.url) && ccLicenseIdFromUrl(license.url) !== id) {
+    c.error(`${path}.url`, `must link the ${label ?? id} licence itself (e.g. ${deed}); country versions are not accepted`);
   }
 }
 

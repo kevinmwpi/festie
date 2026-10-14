@@ -6,8 +6,8 @@ import { initialsOf, pastelFor } from './palette';
 
 /**
  * Artist tile: initials on a stable pastel, with the app-icon corner (`iconRadius(size)`) unless `radius`
- * is given. Festie shows no artist photos or artwork (factual schedule data only), so this replaces the
- * prototype's placeholder images.
+ * is given. Shown for every artist without a licensed photo, and by `ArtistAvatar` whenever a photo is
+ * missing or fails to load; it replaces the prototype's placeholder images.
  */
 export function ArtistMonogram({ name, colorKey, size = 112, radius }: { name: string; colorKey?: string; size?: number; radius?: number }) {
   return (

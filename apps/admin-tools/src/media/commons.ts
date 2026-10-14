@@ -2,11 +2,13 @@
  * Licence-aware artist photo fetcher: Wikidata (artist → P18 image) and Wikimedia Commons (licence,
  * author, 512 px thumbnail). Produces a *pending* registry entry; a human approves it before
  * `media:upload` touches anything. Only CC0, public domain, CC BY and CC BY-SA are accepted — NC forbids
- * a commercial app, ND forbids the crop, anything unknown is refused rather than guessed.
+ * a commercial app, ND forbids the crop, country versions ("CC BY-SA 3.0 de") would be linked to the wrong
+ * deed in the app, and anything unknown is refused rather than guessed.
  *
- * The attribution names Commons' `Artist` only. `Credit` is the Information template's *source* ("Own
+ * The attribution uses the credit line the author asks for (Commons `Attribution`) word for word when
+ * there is one, otherwise Commons' `Artist`. `Credit` is the Information template's *source* ("Own
  * work", "Flickr", a URL), not an author: it is kept in `source.note` for the reviewer, and a CC BY or
- * CC BY-SA file without an Artist is refused rather than credited to its source.
+ * CC BY-SA file with neither is refused rather than credited to its source.
  *
  * Wikimedia asks API clients for a descriptive User-Agent and a gentle request rate; `CommonsClient`
  * sends the agent on every call and waits at least `minIntervalMs` between calls.
@@ -21,6 +23,7 @@ import {
   ARTWORK_MAX_SIDE,
   ATTRIBUTION_REQUIRED,
   IMAGE_CREDIT_MAX_LENGTH,
+  normalizeLicenseText,
   type LicenseId,
   type MediaEntry,
 } from './types';
@@ -195,6 +198,11 @@ export interface CommonsImageInfo {
   /** Plain text (Commons returns HTML). */
   artist: string | null;
   credit: string | null;
+  /**
+   * The credit line the author asks for: the licence template's attribution parameter or a
+   * `{{Credit line}}` (CommonsMetadata maps both to `Attribution`). When present it must be used as given.
+   */
+  attribution: string | null;
   attributionRequired: boolean | null;
   restrictions: string | null;
 }
@@ -265,6 +273,7 @@ export async function getImageInfo(client: CommonsClient, fileName: string): Pro
     licenseUrl: metaText(meta, 'LicenseUrl'),
     artist: metaText(meta, 'Artist'),
     credit: metaText(meta, 'Credit'),
+    attribution: metaText(meta, 'Attribution'),
     attributionRequired: attributionRequired === null ? null : attributionRequired.toLowerCase() === 'true',
     restrictions: metaText(meta, 'Restrictions'),
   };
@@ -275,8 +284,15 @@ export type LicenseMapping =
   | { ok: false; reason: string };
 
 /**
- * Maps Commons' licence fields to a registry licence id. Ported CC variants ("CC BY-SA 3.0 de") map to
- * the base version. Anything NC, ND or unrecognised is refused.
+ * A CC licence with a country code or IGO after its version ("CC BY-SA 3.0 de", `cc-by-sa-3.0-de`).
+ * Checked per field, so the unported `CC BY-SA 3.0` + `cc-by-sa-3.0` pair does not match across them.
+ */
+const PORTED_CC_LICENSE = /cc[\s-]by(?:[\s-]sa)?[\s-]\d\.\d[\s-]+(?:[a-z]{2}|igo)(?![a-z])/i;
+
+/**
+ * Maps Commons' licence fields to a registry licence id. Anything NC, ND, ported or unrecognised is
+ * refused. Ported CC variants ("CC BY-SA 3.0 de") are refused because the app links each licence id to
+ * its international (unported) deed, which would misstate a country version.
  */
 export function mapLicense(shortName: string | null, license: string | null): LicenseMapping {
   const label = shortName ?? license ?? '';
@@ -289,6 +305,9 @@ export function mapLicense(shortName: string | null, license: string | null): Li
   }
   if (/(^|[\s-])nd([\s-]|$)|no-?deriv/.test(text)) {
     return { ok: false, reason: `${label} forbids derivatives (ND); the app crops and resizes` };
+  }
+  if ([shortName, license].some((field) => field !== null && PORTED_CC_LICENSE.test(field))) {
+    return { ok: false, reason: `${label} is a country version of a CC licence; only international (unported) versions are accepted` };
   }
   if (/cc0|cc-zero|creative commons zero/.test(text)) {
     return { ok: true, id: 'CC0-1.0', url: 'https://creativecommons.org/publicdomain/zero/1.0/', label: shortName ?? 'CC0' };
@@ -330,6 +349,23 @@ export function buildAttribution(author: string | null, licenseLabel: string): s
     name = `${name.slice(0, room - 1).trimEnd()}…`;
   }
   return `${prefix}${name}, ${suffix}`;
+}
+
+/**
+ * The credit for a file whose author asked for a specific credit line (Commons `Attribution`). The
+ * requested text is kept word for word: never shortened, prefixed with "Photo: " unless it already starts
+ * with a credit word, and followed by the licence (unless it already names it) and "via Wikimedia
+ * Commons". `null` when that does not fit the image_credit limit: a person must write the credit then.
+ */
+export function buildRequestedAttribution(requested: string, licenseLabel: string): string | null {
+  const text = requested.trim();
+  if (text === '') {
+    return null;
+  }
+  const prefix = /^(photo|foto|picture|image|credit|©|\(c\))/i.test(text) ? '' : 'Photo: ';
+  const namesLicense = normalizeLicenseText(text).includes(normalizeLicenseText(licenseLabel));
+  const credit = `${prefix}${text}, ${namesLicense ? '' : `${licenseLabel}, `}via Wikimedia Commons`;
+  return credit.length <= IMAGE_CREDIT_MAX_LENGTH ? credit : null;
 }
 
 export type CommonsStage = 'search' | 'entity' | 'imageinfo' | 'license' | 'download';
@@ -417,10 +453,22 @@ export async function fetchCommonsCandidate(options: FetchCommonsCandidateOption
   if (!license.ok) {
     return fail('license', license.reason, { wikidataId, fileName: entity.fileName, license: info.licenseShortName ?? info.license });
   }
-  // Only `Artist` names the author. `Credit` is the source ("Own work", "Flickr"): never credited as one.
+  // A credit line the author asked for wins over `Artist`: CC 4.0 requires the credit "in any reasonable
+  // manner requested by the Licensor", and CC 2.0–3.0 require crediting whoever the licensor designates.
+  // Otherwise only `Artist` names the author. `Credit` is the source ("Own work", "Flickr"): never
+  // credited as one.
+  const requested = info.attribution;
   const author = info.artist;
-  if (!author && ATTRIBUTION_REQUIRED.includes(license.id)) {
+  if (!requested && !author && ATTRIBUTION_REQUIRED.includes(license.id)) {
     return fail('license', `${license.label} requires attribution but Commons lists no author`, {
+      wikidataId,
+      fileName: entity.fileName,
+      license: license.label,
+    });
+  }
+  const attribution = requested ? buildRequestedAttribution(requested, license.label) : buildAttribution(author, license.label);
+  if (attribution === null) {
+    return fail('license', `the credit line the author asks for is too long for the app's ${IMAGE_CREDIT_MAX_LENGTH}-character credit; write the credit by hand or leave the photo out`, {
       wikidataId,
       fileName: entity.fileName,
       license: license.label,
@@ -452,6 +500,8 @@ export async function fetchCommonsCandidate(options: FetchCommonsCandidateOption
 
   const notes = [
     searchNote ?? `Wikidata ${wikidataId}`,
+    requested ? `Commons requested credit: ${requested}` : null,
+    requested && author ? `Commons author: ${author}` : null,
     info.credit ? `Commons credit: ${info.credit}` : null,
     info.restrictions ? `Commons restrictions: ${info.restrictions}` : null,
     entity.musicbrainzId ? `MusicBrainz ${entity.musicbrainzId}` : null,
@@ -477,7 +527,7 @@ export async function fetchCommonsCandidate(options: FetchCommonsCandidateOption
     license: {
       id: license.id,
       url: info.licenseUrl && /^https:\/\//.test(info.licenseUrl) ? info.licenseUrl : license.url,
-      attribution: buildAttribution(author, license.label),
+      attribution,
     },
     review: { status: 'pending', by: null, at: null, note: null },
   };

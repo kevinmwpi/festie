@@ -23,8 +23,8 @@ retrieved, a free-text note), its `license` (id, deed URL, attribution text) and
 | `license.id` | Credit required | Notes |
 | --- | --- | --- |
 | `CC0-1.0`, `public-domain` | no (still recorded when known) | |
-| `CC-BY-2.0` … `CC-BY-4.0` | yes | |
-| `CC-BY-SA-2.0` … `CC-BY-SA-4.0` | yes | the app only shows the photo; it is not relicensed |
+| `CC-BY-2.0` … `CC-BY-4.0` | yes, naming the licence | international or unported versions only |
+| `CC-BY-SA-2.0` … `CC-BY-SA-4.0` | yes, naming the licence | international or unported versions only; the app only shows the photo, it is not relicensed |
 | `organizer-permission` | as agreed | written permission on file, referenced in `source.note` |
 | `press-kit-editorial` | as the kit says | link the kit in `source.url` |
 | `generated` | no | made by us (e.g. a typographic mark) |
@@ -33,20 +33,37 @@ Anything else is refused by `media:validate` and by the Commons fetcher:
 
 - **NC (non-commercial)** licences cannot be used: Festie is a commercial app.
 - **ND (no derivatives)** licences cannot be used: the app crops, resizes and renders thumbnails.
+- **Country versions** ("CC BY-SA 3.0 de", "CC BY 2.0 fr", "CC BY-SA 3.0 IGO") are refused: the app
+  links each licence id to its international deed, which would misstate a country version.
 - **Unknown or unstated** licences, "all rights reserved", GFDL-only, fair-use and press photos
   without an editorial-use kit are refused. When in doubt, leave the artist without a photo; the app
   falls back to its monogram.
 
 Images of people carry personality rights separate from copyright; the fetcher copies Commons'
-`Restrictions` note into `source.note` so the reviewer sees it.
+`Restrictions` note into `source.note` so the reviewer sees it. A licence covers showing the photo next
+to the act in the app, never using it to promote Festie (docs/legal/ip-review.md §4).
+
+CC 2.0–3.0 licences end automatically on any breach of their conditions, with no chance to fix it, and
+photographers have sued over attribution mistakes; CC 4.0 gives 30 days to fix one. Whether to accept
+2.0–3.0 photos at all is an open decision (docs/legal/ip-review.md §6). Prefer a 4.0 or CC0 file when
+Commons has several.
 
 ## How attribution is shown
 
 `media:upload` writes `image_url`, `image_credit` (= `license.attribution`), `image_license` and
 `image_source_url` on the `artists` / `festivals` row (migration 012). The app shows the photo in the
-lineup and the credit on its **Photo credits** screen (Settings), one line per image, linking to the
-source page: `Photo: Jane Doe, CC BY-SA 4.0, via Wikimedia Commons`. Attribution text is required
-for every `CC-BY*` licence and is at most 300 characters.
+lineup and, on its **Photo credits** screen (Settings → About):
+
+- one row per image with the credit text exactly as `license.attribution` gives it, which opens the
+  source page: `Photo: Jane Doe, CC BY-SA 4.0, via Wikimedia Commons`;
+- a **Licences** section that links each Creative Commons licence in use to its deed on
+  creativecommons.org (the deed is derived from `license.id`; `license.url` must agree with it);
+- the note "Photos are resized and may be cropped to fit", because CC licences require changes to be
+  indicated.
+
+Attribution text is required for every `CC-BY*` licence, must name the licence (e.g. "CC BY-SA 4.0") and
+is at most 300 characters. When the Commons page asks for a particular credit line, that line is the
+credit, word for word.
 
 ## Workflow
 
@@ -58,16 +75,20 @@ for every `CC-BY*` licence and is at most 300 characters.
    ```
 
    The fetcher looks the artist up on Wikidata (keeping hits described as a musician, DJ, band,
-   singer, rapper, producer or duo), reads its image (P18), checks the licence on Commons, downloads
-   the 512 px thumbnail to `<into>/artists/<id>.<ext>` and appends a **pending** entry. `--into`
+   singer, rapper, producer or duo), reads its image (P18), checks the licence on Commons, builds the
+   credit from the credit line the author asks for (Commons `Attribution`) or else the author (`Artist`),
+   downloads the 512 px thumbnail to `<into>/artists/<id>.<ext>` and appends a **pending** entry. A
+   requested credit line that does not fit in 300 characters is refused, never shortened. `--into`
    defaults to `seed-data/media`; a candidate bundle uses `seed-data/candidates/<slug>/media`.
    Requests carry a descriptive User-Agent and are spaced at least one second apart. It needs
    internet access to wikidata.org, commons.wikimedia.org and upload.wikimedia.org.
 
-2. **Review.** Open the file and the source page. Check it really shows the artist, that the
-   licence on the page matches the entry, and that the credit names the photographer. Then set
-   `review.status` to `approved` (with `by` and `at`) or `rejected`. Nothing is uploaded until an
-   entry is `approved`; a subject has at most one approved entry.
+2. **Review.** Open the file and the source page. Check it really shows the artist; that the
+   licence on the page matches the entry and is an international or unported version; that the credit
+   is the line the page asks for, word for word (or names the photographer when it asks for none) and
+   names the licence; and that nothing on the page rules out this use (docs/legal/ip-review.md §2).
+   Then set `review.status` to `approved` (with `by` and `at`) or `rejected`. Nothing is uploaded until
+   an entry is `approved`; a subject has at most one approved entry.
 
 3. **Validate** (offline):
 
@@ -77,7 +98,8 @@ for every `CC-BY*` licence and is at most 300 characters.
 
    Checks every rule: version, fields and enums, subject exists in the seed files with the right
    type (a changed name is a warning), file under the registry directory, at most 2 MiB and 512 px,
-   sniffed type and `sha256` match, `https` URLs, attribution for CC-BY licences, one approved entry
+   sniffed type and `sha256` match, `https` URLs, attribution for CC-BY licences that names the
+   licence, a CC licence link that points at that licence (not a country version), one approved entry
    per subject, `by`/`at` on approved entries.
 
 4. **Upload** (service role):

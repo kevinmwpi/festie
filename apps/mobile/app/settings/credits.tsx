@@ -7,7 +7,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 
 import { pastelFor } from '@/src/components/palette';
 import { RemoteImage, useImageFallback } from '@/src/components/RemoteImage';
-import { groupImageCredits, imageCreditSubtitle } from '@/src/hooks/image-credits';
+import { groupImageCredits, imageCreditSubtitle, licensesInUse } from '@/src/hooks/image-credits';
 import { queryKeys } from '@/src/hooks/query-keys';
 import { useCacheFirstQuery } from '@/src/hooks/use-cache-first-query';
 import { goBackOr } from '@/src/providers/launch-route';
@@ -18,6 +18,12 @@ const THUMB_SIZE = 44;
 function openSourcePage(url: string): void {
   Linking.openURL(url).catch(() => showToast("Couldn't open the photo's source page.", 'error'));
 }
+
+function openLicense(url: string): void {
+  Linking.openURL(url).catch(() => showToast("Couldn't open the licence.", 'error'));
+}
+
+const photoCount = (count: number): string => (count === 1 ? '1 photo' : `${count} photos`);
 
 /** The credited photo itself (from the disk cache when offline); the subject's pastel when it cannot load. */
 function CreditThumbnail({ credit }: { credit: ImageCredit }) {
@@ -31,12 +37,15 @@ function CreditThumbnail({ credit }: { credit: ImageCredit }) {
 
 /**
  * Settings → About → Photo credits: every artist and festival photo this device can show, with its
- * attribution. Cache only, so it works offline and lists exactly the photos the app shows here.
+ * attribution, a link to each Creative Commons licence in use and a note that photos are resized and
+ * cropped (CC licences require the credit, a link to the licence and an indication of changes). Cache
+ * only, so it works offline and lists exactly the photos the app shows here.
  */
 export default function PhotoCreditsScreen() {
   const screenTint = useFestivalScreenTint();
   const credits = useCacheFirstQuery({ queryKey: queryKeys.imageCredits(), readLocal: getLocalImageCredits });
   const groups = React.useMemo(() => groupImageCredits(credits.data ?? []), [credits.data]);
+  const licenses = React.useMemo(() => licensesInUse(credits.data ?? []), [credits.data]);
 
   return (
     <ScrollView style={[styles.screen, { backgroundColor: screenTint }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -48,7 +57,8 @@ export default function PhotoCreditsScreen() {
       />
 
       <Text style={styles.intro}>
-        Festie shows artist and festival photos only when they're licensed for it, and credits the people who took them.
+        Festie shows artist and festival photos only when they're licensed for it, and credits the people who took them. Photos are
+        resized and may be cropped to fit.
       </Text>
 
       {credits.isLoading ? (
@@ -69,6 +79,7 @@ export default function PhotoCreditsScreen() {
                   title={credit.name}
                   subtitle={imageCreditSubtitle(credit)}
                   onPress={sourceUrl ? () => openSourcePage(sourceUrl) : undefined}
+                  accessory="external"
                   accessibilityHint={sourceUrl ? "Opens the photo's source page in a browser" : undefined}
                 />
               );
@@ -77,7 +88,28 @@ export default function PhotoCreditsScreen() {
         ))
       )}
 
-      {groups.length > 0 ? <Text style={styles.footer}>Tap a credit to open the page the photo came from.</Text> : null}
+      {licenses.length > 0 ? (
+        <ListSection title="Licences">
+          {licenses.map((license) => (
+            <ListRow
+              key={license.id}
+              title={license.label}
+              subtitle={photoCount(license.count)}
+              onPress={() => openLicense(license.url)}
+              accessory="external"
+              accessibilityHint="Opens the licence in a browser"
+            />
+          ))}
+        </ListSection>
+      ) : null}
+
+      {groups.length > 0 ? (
+        <Text style={styles.footer}>
+          {licenses.length > 0
+            ? 'Tap a credit to open the page the photo came from, or a licence to read it.'
+            : 'Tap a credit to open the page the photo came from.'}
+        </Text>
+      ) : null}
     </ScrollView>
   );
 }

@@ -299,6 +299,11 @@ Admin commands: [`festival-data.md`](./festival-data.md).
       source opens the source page in the browser, a row without one is not tappable. Works in airplane
       mode. With no photos cached (fresh install offline) it reads "No photos yet — Festie shows licensed
       photos only, with credit."
+- [ ] With at least one Creative Commons photo: the intro ends "Photos are resized and may be cropped to
+      fit."; a "Licences" section lists each licence in use once with its photo count (e.g.
+      "CC BY-SA 4.0", "2 photos"), and tapping it opens the licence's deed on creativecommons.org;
+      credit rows and licence rows show the external-link icon. Every credit line names its licence and
+      matches the photo's source page.
 - [ ] Delete account offline: "You're offline…" shown and nothing is deleted.
 - [ ] Delete account online (A is the only admin of a crew with B): type DELETE, tap "Delete my
       account": A returns to sign-in with "Your account has been deleted."; on B, A is gone from the crew,
