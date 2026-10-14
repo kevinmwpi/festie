@@ -424,7 +424,7 @@ Built with `@festival/ui` primitives: Profile (edit name/avatar) · Privacy (Blo
 | BE-FN | `supabase/functions/**`, `supabase/config.toml`, `supabase/templates/**` |
 | MOBILE-A (shell) | `apps/mobile/app/_layout.tsx`, `app/index.tsx`, `app/+not-found.tsx`, `app/+native-intent.tsx`, `app/auth/**`, `app/settings/**`, `apps/mobile/src/providers/**`, `apps/mobile/src/config/**`, `packages/ui/**`, `apps/mobile/app.json`, `apps/mobile/app.config.ts`, `apps/mobile/eas.json`, `apps/mobile/package.json`, root `app.json`/`eas.json` deletion, template leftovers |
 | MOBILE-B (features) | `apps/mobile/app/(tabs)/**`, `apps/mobile/src/state/**`, `apps/mobile/src/location/**`, `apps/mobile/src/hooks/**`, `apps/mobile/src/components/**`, `packages/notification-utils/**` |
-| DOCS | `docs/**` (except `festival-data.md`, `v1-architecture.md`), `apps/mobile/app/legal/**`, `README.md`, `.github/workflows/ci.yml` |
+| DOCS | `docs/**` (except `festival-data.md`, `v1-architecture.md`), `apps/mobile/app/legal/**`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `.github/workflows/ci.yml` |
 
 Interfaces between slices:
 
