@@ -1,0 +1,96 @@
+/* Lineup tab (apps/mobile/app/(tabs)/lineup/index.tsx).
+   Geometry: 1pt = .0364em (393pt screen = tile width). Text: footnote 13pt = .85em, i.e. the app at a
+   large text size, where the screen uses its stacked ArtistCard (80pt monogram above the text).
+   Screen wash: deriveAccentColors(the demo accent, peach).bgTint = peach at 7% over colors.background. */
+.shot-lineup {
+  background: color-mix(in srgb, var(--peach) 7%, var(--app-bg));
+}
+.shot-lineup b { font-weight: inherit; }
+
+/* ScreenHeader: Fredoka wordmark (40pt, max x1.3) over a subheadline breadcrumb. Padding 28 / 20 / 4. */
+.shot-lineup .lu-hdr { padding: 1.02em .73em .15em; }
+.shot-lineup .lu-wordmark {
+  font-family: var(--wordmark); font-weight: 700; font-size: 1.89em; line-height: 1.2; color: var(--app-ink);
+}
+.shot-lineup .lu-crumbs {
+  display: flex; align-items: center; gap: .22em; margin-top: .07em; font-size: .98em; line-height: 1.33; white-space: nowrap;
+}
+.shot-lineup .lu-crumb { flex: none; font-weight: 600; color: var(--app-ink); }
+.shot-lineup .lu-sep { flex: none; color: var(--app-ink3); }
+.shot-lineup .lu-trail { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--app-ink2); }
+
+/* Filter rows: horizontal scrollers, gap 8, padding 4 / 20. Chip: pill, footnote 600, white with an
+   ink-6% outline; ink chip for the day picker, festival-accent chip for stages. */
+.shot-lineup .lu-chips {
+  display: flex; gap: .29em; padding: .15em 0 .15em .73em; overflow: hidden; white-space: nowrap;
+}
+.shot-lineup .lu-chip {
+  flex: none; display: flex; align-items: center; box-sizing: border-box; height: 2.14em; padding: 0 .6em;
+  border: 1px solid var(--app-border); border-radius: 9em; background: var(--app-surface);
+  color: var(--app-ink2); font-size: .85em; font-weight: 600; line-height: 1.385; font-variant-numeric: tabular-nums;
+}
+.shot-lineup .lu-chip-ink { background: var(--app-ink); border-color: var(--app-ink); color: var(--white); }
+.shot-lineup .lu-chip-accent { background: var(--peach); border-color: var(--peach); color: var(--app-ink); }
+/* The chip the screen edge cuts off mid-scroll */
+.shot-lineup .lu-chip-cut {
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: clip;
+  padding-right: 0; border-right: 0; border-radius: 9em 0 0 9em;
+}
+
+/* Scroll content: padding-top 20, gutter 20, items 16 apart */
+.shot-lineup .lu-list { display: flex; flex-direction: column; gap: .58em; padding: .73em .73em 0; }
+/* TimeZoneHint: row centred on its (wrapped) text, time-outline icon, footnote 600 secondary */
+.shot-lineup .lu-hint {
+  display: flex; align-items: center; gap: .17em; color: var(--app-ink2);
+  font-size: .85em; font-weight: 600; line-height: 1.385;
+}
+.shot-lineup .lu-hint-icon { flex: none; width: 1.05em; height: 1.05em; }
+
+/* ArtistCard (stacked): white surface, card radius 26, 1px ink-6% border, padding 20, card elevation */
+.shot-lineup .lu-card {
+  position: relative; flex: none; display: flex; flex-direction: column; gap: .58em; padding: .73em;
+  border: 1px solid var(--app-border); border-radius: .95em; background: var(--app-surface);
+  box-shadow: 0 .11em .36em var(--app-fill);
+}
+/* ArtistMonogram 80pt: initials on a stable pastel, app-icon corner (22.37%), Georgia bold italic at 85% */
+.shot-lineup .lu-mono {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 2.91em; height: 2.91em; border-radius: .65em; background: var(--mono);
+}
+.shot-lineup .lu-mono b {
+  font-family: var(--display); font-style: italic; font-weight: 700; font-size: .95em; line-height: 1;
+  color: var(--app-ink); opacity: .85;
+}
+.shot-lineup .lu-info { display: flex; flex-direction: column; gap: .145em; min-width: 0; }
+/* Stage pill: link blue on the pale-blue input fill */
+.shot-lineup .lu-stage {
+  align-self: flex-start; max-width: 100%; box-sizing: border-box; margin-bottom: .17em; padding: .17em .51em;
+  border-radius: 9em; background: var(--app-input-bg); color: var(--app-link);
+  font-size: .85em; font-weight: 600; line-height: 1.385; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.shot-lineup .lu-name { display: flex; align-items: flex-start; gap: .145em; }
+.shot-lineup .lu-name b {
+  flex: 1; min-width: 0; font-family: var(--display); font-style: italic; font-weight: 700;
+  font-size: 1.31em; line-height: 1.25; color: var(--app-ink);
+}
+.shot-lineup .lu-heart { flex: none; width: .85em; height: .85em; margin-top: .4em; color: var(--app-ink); }
+.shot-lineup .lu-badges { display: flex; flex-wrap: wrap; gap: .145em; }
+.shot-lineup .lu-badges:empty { min-height: 0; }
+.shot-lineup .lu-badge {
+  padding: .09em .37em; border-radius: 9em; background: var(--app-fill-strong); color: var(--app-ink);
+  font-size: .785em; font-weight: 600; line-height: 1.33; white-space: nowrap;
+}
+.shot-lineup .lu-time {
+  color: var(--app-ink2); font-size: .85em; font-weight: 600; line-height: 1.385; font-variant-numeric: tabular-nums;
+}
+
+/* Add button: 44pt soft square (md radius 14), 4pt white cut-out ring, raised elevation; its corner sits
+   8pt past the monogram's (offset 80 - 44 + 8). Pastel blue "add", pastel green "checkmark" once picked. */
+.shot-lineup .lu-add {
+  position: absolute; left: 2.33em; top: 2.33em; box-sizing: border-box; width: 1.6em; height: 1.6em;
+  display: flex; align-items: center; justify-content: center;
+  border: .145em solid var(--app-surface); border-radius: .51em; background: var(--app-primary); color: var(--app-ink);
+  box-shadow: 0 .11em .29em var(--app-fill-strong);
+}
+.shot-lineup .lu-add-on { background: var(--app-success); }
+.shot-lineup .lu-add svg { width: .68em; height: .68em; }

@@ -10,7 +10,8 @@
  *
  * Sources (edit these):  docs/legal/privacy-policy.md, docs/legal/terms-of-use.md, docs/legal/support.md,
  *                        docs/legal/values.json (template values), docs/legal/home.css and home.js (the
- *                        home page's own styles and motion, inlined into index.html)
+ *                        home page's own styles and motion, inlined into index.html) and
+ *                        docs/legal/home-shots/*.html/.css (copies of app screens for the home page ring)
  * Outputs (never edit):  docs/site/{index,privacy,terms,support}.html,
  *                        docs/site/favicon.png and docs/site/apple-touch-icon.png (copied byte for byte
  *                        from apps/mobile/assets/images/favicon.png and icon.png),
@@ -530,17 +531,35 @@ const RING_TILES = [
   '<span class="tk">Your crew</span><span class="tfaces"><i>A</i><i>J</i><i>M</i></span><span class="ts">Picked this set</span>',
   '<span class="tk">Up next</span><span class="tb">8:20</span><span class="ts">Lakeside stage</span>',
 ];
-/** Tile colours, one per slot: the first lap and the second lap use different orders. */
-const RING_COLORS = [
-  'pink', 'blue', 'lemon', 'mint', 'white', 'lilac', 'peach', 'blue', 'pink', 'mint',
-  'lilac', 'peach', 'lemon', 'pink', 'blue', 'mint', 'lilac', 'white', 'peach', 'blue',
+/**
+ * Pieces of the real app for the ring: miniature copies of its screens and components, written from the app's
+ * source with the same tokens and its fictional demo data (docs/legal/home-shots/<id>.html and .css). A "screen"
+ * is a phone screen cropped from the header down; a "part" is one component.
+ */
+const RING_SHOTS = {
+  schedule: 'screen', lineup: 'screen', crew: 'screen', map: 'screen',
+  festivals: 'part', location: 'part', crewpicks: 'part',
+};
+/**
+ * The ring, slot by slot: a small tile (index into RING_TILES, with its fill) or a piece of the app. Phones show
+ * every other slot (the even ones), so both halves mix tiles and pieces.
+ */
+const RING_SLOTS = [
+  { tile: 0, color: 'pink' }, { shot: 'festivals' }, { shot: 'schedule' }, { tile: 1, color: 'blue' },
+  { tile: 2, color: 'lemon' }, { tile: 4, color: 'white' }, { shot: 'crew' }, { shot: 'crewpicks' },
+  { tile: 3, color: 'mint' }, { tile: 5, color: 'lilac' }, { shot: 'map' }, { tile: 6, color: 'peach' },
+  { tile: 7, color: 'blue' }, { tile: 9, color: 'mint' }, { shot: 'location' }, { tile: 8, color: 'pink' },
+  { tile: 1, color: 'lilac' }, { tile: 3, color: 'peach' }, { shot: 'lineup' }, { tile: 4, color: 'blue' },
 ];
 
 function ringHtml() {
-  const slots = RING_COLORS.map((color, i) => {
-    const html = RING_TILES[i % RING_TILES.length];
-    const face = `<div class="tile${i % RING_TILES.length === 0 ? ' tile-icon' : ''}">${html}</div>`;
-    return `<li class="slot" style="--i:${i};--c:var(--${color})">${face}${face}</li>`;
+  const slots = RING_SLOTS.map((slot, i) => {
+    if (slot.shot) {
+      const face = `<div class="tile tile-shot">${readSource(`docs/legal/home-shots/${slot.shot}.html`)}</div>`;
+      return `<li class="slot is-${RING_SHOTS[slot.shot]}" style="--i:${i}">${face}${face}</li>`;
+    }
+    const face = `<div class="tile${slot.tile === 0 ? ' tile-icon' : ''}">${RING_TILES[slot.tile]}</div>`;
+    return `<li class="slot" style="--i:${i};--c:var(--${slot.color})">${face}${face}</li>`;
   });
   return `<div class="ring-wrap" aria-hidden="true"><ul class="ring" role="list">${slots.join('')}</ul></div>`;
 }
@@ -615,7 +634,7 @@ function renderIndex(values) {
   ].join('\n');
   const head = [
     '<link rel="preload" href="fredoka-bold.ttf" as="font" type="font/ttf" crossorigin>',
-    `<style>\n${readSource('docs/legal/home.css')}\n</style>`,
+    `<style>\n${[readSource('docs/legal/home.css'), ...Object.keys(RING_SHOTS).map((id) => readSource(`docs/legal/home-shots/${id}.css`))].join('\n')}\n</style>`,
     `<script>${MOTION_SWITCH}</script>`,
     '',
   ].join('\n');

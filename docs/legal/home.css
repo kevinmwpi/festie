@@ -17,6 +17,13 @@
   /* Ring tiles and feature motifs: pastel fills with the dark ink in both schemes. */
   --pink: #FFB3D9; --blue: #B2CEFE; --peach: #FFD6A5; --lilac: #C8B6FF; --mint: #B2D8B2; --lemon: #FDFD96; --white: #FFFFFF;
   --tile-ink: #2C3327; --warn-bg: #FFF4D6; --warn-text: #7A4A00;
+  /* The app's own light tokens (packages/ui/src/theme.ts) for the screen copies in the ring; the app is
+     light-only, so they stay the same on the dark page, as a screenshot would. */
+  --app-bg: #FFF5F9; --app-surface: #FFFFFF; --app-ink: #2C3327; --app-ink2: rgba(44, 51, 39, .7); --app-ink3: rgba(44, 51, 39, .45);
+  --app-link: #2F5DA8; --app-primary: #B2CEFE; --app-brand: #FFB3D9; --app-tinted: #EAF1FF;
+  --app-border: rgba(44, 51, 39, .06); --app-separator: rgba(44, 51, 39, .12); --app-fill: rgba(44, 51, 39, .05); --app-fill-strong: rgba(44, 51, 39, .1);
+  --app-overlay: rgba(255, 255, 255, .95); --app-success: #B2D8B2; --app-success-bg: #E8F5E8; --app-success-text: #1F5C2E;
+  --app-warning: #FDFD96; --app-warning-bg: #FFF4D6; --app-warning-text: #7A4A00; --app-input-bg: #F0F4FF;
   --wordmark: "Fredoka", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
   --system: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mark-size: min(17rem, 22vw, 30svh);
@@ -76,6 +83,12 @@ main { max-width: none; padding: 0; }
 .tfaces { display: flex; }
 .tfaces i { display: grid; place-items: center; width: calc(var(--cw) * .25); height: calc(var(--cw) * .25); margin-right: calc(var(--cw) * -.05);
   border-radius: 50%; background: var(--white); box-shadow: 0 0 0 2px var(--c); font: 700 calc(var(--cw) * .1)/1 var(--system); font-style: normal; }
+/* A piece of the app (docs/legal/home-shots): a phone screen is taller than the tiles and grows upward, so the
+   ring's lower edge stays level. */
+.slot.is-screen { height: calc(var(--cw) * 1.9); top: calc(var(--ch) / 2 - var(--cw) * 1.9); }
+.tile-shot { padding: 0; background: var(--app-bg); }
+.shot { position: absolute; inset: 0; overflow: hidden; border-radius: 14px; font-size: calc(var(--cw) * .07); line-height: 1.25;
+  background: var(--app-bg); color: var(--app-ink); font-family: var(--system); box-shadow: inset 0 0 0 1px rgba(44, 51, 39, .08); }
 .tile-icon { justify-content: center; align-items: center; }
 .tile-icon img { display: block; width: 72%; height: auto; border-radius: 22.37%; }
 @keyframes spin { from { transform: rotateX(-9deg) rotateY(0deg); } to { transform: rotateX(-9deg) rotateY(-360deg); } }
