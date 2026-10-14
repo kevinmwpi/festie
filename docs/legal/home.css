@@ -89,7 +89,6 @@ main { max-width: none; padding: 0; }
   padding: 8px var(--gutter) clamp(56px, 11svh, 112px); text-align: center; }
 .app-icon { display: block; width: 64px; height: 64px; border-radius: 22.37%; box-shadow: 0 1px 2px rgba(44, 51, 39, .1), 0 6px 16px rgba(44, 51, 39, .14); }
 .lead { margin: 0; font: italic 700 clamp(1.6rem, 3.6vw, 2.4rem)/1.15 var(--display); text-wrap: balance; }
-.hero-text { margin: 0; max-width: 36rem; }
 .meta { display: inline-flex; align-items: center; min-height: 36px; margin: 0; padding: 0 14px; border-radius: 999px;
   background: var(--card); box-shadow: inset 0 0 0 1px var(--rule); color: var(--muted); font-size: .85rem; font-weight: 600; }
 .cue { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 6px; color: var(--text); font-weight: 600; font-size: .9rem; text-decoration: none; }

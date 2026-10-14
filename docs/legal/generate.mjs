@@ -580,7 +580,6 @@ function renderIndex(values) {
     '<div class="hero-copy">',
     '<img class="app-icon" src="apple-touch-icon.png" width="64" height="64" alt="">',
     '<p class="lead">Plan your festival with your crew.</p>',
-    '<p class="hero-text">Festie helps you plan a music festival with your crew: build your schedule, see which sets your friends picked, set up meetups and, only when you choose, share your location with your crew.</p>',
     '<p class="meta">Free, for iPhone. No ads, no tracking.</p>',
     `<a class="cue" href="#what-you-can-do">What you can do${CHEVRON}</a>`,
     '</div>',
