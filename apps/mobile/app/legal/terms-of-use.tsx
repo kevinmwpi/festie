@@ -19,7 +19,7 @@ type Span =
 type Block = { type: 'h2' | 'h3' | 'p' | 'li'; spans: Span[] };
 
 const TITLE = "Terms of Use";
-const UPDATED = "October 5, 2026";
+const UPDATED = "October 14, 2026";
 const SUPPORT_EMAIL_TOKEN = '__SUPPORT_EMAIL__';
 /** docs/legal/values.json `supportEmail`, used only when the build has no EXPO_PUBLIC_SUPPORT_EMAIL. */
 const SUPPORT_EMAIL_FALLBACK: string | null = "support@joinfestie.com";
@@ -31,7 +31,7 @@ const CONTENT: Block[] = [
     "spans": [
       {
         "kind": "text",
-        "text": "These Terms of Use (\"Terms\") are an agreement between you and Kevin M Pi (\"Festie\", \"we\", \"us\") for using the Festie app and its services. By creating an account or using Festie you agree to these Terms and confirm you have read our "
+        "text": "These Terms of Use (\"Terms\") are an agreement between you and Kevin Pi (\"Festie\", \"we\", \"us\") for using the Festie app and its services. By creating an account or using Festie you agree to these Terms and confirm you have read our "
       },
       {
         "kind": "route",
@@ -607,7 +607,7 @@ const CONTENT: Block[] = [
     "spans": [
       {
         "kind": "text",
-        "text": "Kevin M Pi"
+        "text": "Kevin Pi"
       }
     ]
   },
