@@ -3,7 +3,9 @@
 The single, ordered path from a green checkout to an App Store submission, written to be followed top to
 bottom and copied from. It replaces the old `native-beta-release.md` and `supabase-operations.md`.
 
-- Contract: [`v1-architecture.md`](./v1-architecture.md) (rev 2.1).
+- Contract: [`v1-architecture.md`](./v1-architecture.md) (rev 2.2; its §9 overrides earlier sections).
+- Legal and liability items still open: [`legal/liability-checklist.md`](./legal/liability-checklist.md)
+  (§7.2 and §7.3 gate on them).
 - Festival data, demo content, moderation commands: [`festival-data.md`](./festival-data.md) (linked, not
   repeated here).
 - Device QA: [`qa-checklist.md`](./qa-checklist.md). App Privacy answers: [`app-store-privacy.md`](./app-store-privacy.md).
@@ -931,7 +933,23 @@ Legal text is not legal advice; have it reviewed if you can.
 - [ ] **Age rating declares user-generated content and location sharing** (13+ or higher).
 - [ ] Privacy policy and support URLs entered; screenshots, description, review notes and demo
       credentials entered (§6).
+- [ ] **Liability items due at submission are closed** in
+      [`legal/liability-checklist.md`](./legal/liability-checklist.md) §2: the LLC decision is made (L1),
+      the trademark search (L2), the EU trader decision (L3) and the IP review update (L4) are done, and
+      the store description promises no safety or outcomes (L9).
 - [ ] Someone will run `reports:list` every day and answer data requests by email after release (§8).
+
+### 7.3 Before releasing the approved build to the public
+
+§6 chooses a manual release, so approval does not publish the app. Before pressing release, close the
+*Public launch* items in [`legal/liability-checklist.md`](./legal/liability-checklist.md) §2:
+
+- [ ] The operator is final (L1): if an LLC, the developer membership is converted and the Terms and
+      Privacy Policy name it.
+- [ ] DMCA designated agent registered and named on the support page; Terms updated (L5).
+- [ ] Terms acceptance recorded on the server (L6), or deliberately deferred with the lawyer's agreement.
+- [ ] Incident-response procedure written (L7).
+- [ ] Lawyer review done and its changes shipped (L8).
 
 ---
 

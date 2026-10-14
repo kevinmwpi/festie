@@ -15,6 +15,9 @@ The authoritative design and security contract is [`docs/v1-architecture.md`](do
 The visual design follows the separate `festival_app_aistudio` prototype, which is only a design
 reference: it is not part of this repository, not built and not shipped.
 
+This repository is the only source of truth for Festie. Coding agents start at [`AGENTS.md`](AGENTS.md)
+(`CLAUDE.md` imports it); product direction after v1 is in [`docs/roadmap.md`](docs/roadmap.md).
+
 ## Repository layout
 
 ```text
@@ -114,7 +117,9 @@ Never run `deno` against `supabase/` from the repository root without `--config`
 | [`docs/festival-data.md`](docs/festival-data.md) | Entering real festivals, the demo festival, moderation commands |
 | [`docs/app-store-privacy.md`](docs/app-store-privacy.md) | App Privacy answers, age rating, export compliance, URLs |
 | [`docs/app-review-notes.md`](docs/app-review-notes.md) | Template for the App Review notes |
-| [`docs/legal/`](docs/legal) | Privacy policy, terms, support page sources (`generate.mjs` builds the app screens and `docs/site/`), data inventory, security controls, IP review |
+| [`docs/legal/`](docs/legal) | Privacy policy, terms, support page sources (`generate.mjs` builds the app screens and `docs/site/`), data inventory, security controls, IP review, liability checklist |
+| [`docs/roadmap.md`](docs/roadmap.md) | Product thesis and direction after v1; nothing on it is built until the contract includes it |
+| [`AGENTS.md`](AGENTS.md) | Start here for coding agents: reading order, v1 non-goals, rules for every change (`CLAUDE.md` imports it) |
 
 ## Legal content
 
