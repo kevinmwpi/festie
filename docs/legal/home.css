@@ -1,0 +1,258 @@
+/*
+ * Home page only (docs/site/index.html). The legal and support pages use SITE_CSS alone and stay script-free.
+ * Motion needs the `motion` class on <html>, which the inline script in <head> adds when JavaScript runs and
+ * Reduce Motion is off. Without it the page is static: solid section colours, a still ring, no fixed wordmark.
+ * Rules: docs/design-system.md ("Website").
+ */
+@font-face {
+  font-family: "Fredoka";
+  src: url("fredoka-bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  /* Sections use the app's pastel accents at full strength; headings on them use the dark ink (at least 7:1). */
+  --sec-hero: #FFF5F9; --sec-features: #B2CEFE; --sec-privacy: #B2D8B2; --sec-help: #C8B6FF; --sec-end: #FFF5F9;
+  /* Ring tiles and feature motifs: pastel fills with the dark ink in both schemes. */
+  --pink: #FFB3D9; --blue: #B2CEFE; --peach: #FFD6A5; --lilac: #C8B6FF; --mint: #B2D8B2; --lemon: #FDFD96; --white: #FFFFFF;
+  --tile-ink: #2C3327; --warn-bg: #FFF4D6; --warn-text: #7A4A00;
+  /* The app's own light tokens (packages/ui/src/theme.ts) for the screen copies in the ring; the app is
+     light-only, so they stay the same on the dark page, as a screenshot would. */
+  --app-bg: #FFF5F9; --app-surface: #FFFFFF; --app-ink: #2C3327; --app-ink2: rgba(44, 51, 39, .7); --app-ink3: rgba(44, 51, 39, .45);
+  --app-link: #2F5DA8; --app-primary: #B2CEFE; --app-brand: #FFB3D9; --app-tinted: #EAF1FF;
+  --app-border: rgba(44, 51, 39, .06); --app-separator: rgba(44, 51, 39, .12); --app-fill: rgba(44, 51, 39, .05); --app-fill-strong: rgba(44, 51, 39, .1);
+  --app-overlay: rgba(255, 255, 255, .95); --app-success: #B2D8B2; --app-success-bg: #E8F5E8; --app-success-text: #1F5C2E;
+  --app-warning: #FDFD96; --app-warning-bg: #FFF4D6; --app-warning-text: #7A4A00; --app-input-bg: #F0F4FF;
+  --wordmark: "Fredoka", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  --system: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mark-size: min(17rem, 22vw, 30svh);
+  /* The wordmark sits high, in the space under the header; the ring turns below and around it. */
+  --mark-y: 25svh;
+  --ring-y: 48svh;
+  /* Ring: radius, tile size, tile count and one full turn */
+  --R: min(36vw, 490px, 62svh);
+  --cw: clamp(56px, calc(var(--R) * .27), 148px);
+  --ch: calc(var(--cw) * 1.34);
+  --n: 20;
+  --spin: 80s;
+}
+/* On phones the ring is small, so it tucks up closer under the wordmark. */
+@media (max-width: 599px) { :root { --R: 40vw; --ring-y: 37svh; } .ring-wrap { top: 52%; } }
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* The hero and footer go dark; the sections keep the same pastels, with the dark cards on top. */
+    --sec-hero: #1B1D1A; --sec-end: #1B1D1A;
+  }
+}
+
+.skip { z-index: 4; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+body > header { position: absolute; top: 0; left: 0; right: 0; z-index: 3; }
+body > header, body > footer { max-width: calc(1120px + 2 * var(--gutter)); }
+main { max-width: none; padding: 0; }
+.blocks { display: none; }
+
+/* ─── Hero: the wordmark with a ring of app moments around it ─── */
+.hero { position: relative; z-index: 1; }
+.hero-stage { position: relative; height: clamp(380px, 68svh, 720px); overflow-x: clip; pointer-events: none; }
+.mark { position: absolute; left: 50%; top: 30%; margin: 0; transform: translate(-50%, -50%);
+  font: 700 var(--mark-size)/.9 var(--wordmark); letter-spacing: -.015em; white-space: nowrap; color: var(--text); }
+.mark-letters span { display: inline-block; }
+.ring-wrap { position: absolute; left: 50%; top: 64%; width: 0; height: 0; perspective: calc(var(--R) * 3.6); }
+/* Tiles stand like spokes, so they are edge-on at the front and back and face you at the sides. */
+.ring { position: absolute; margin: 0; padding: 0; list-style: none; transform-style: preserve-3d;
+  animation: spin var(--spin) linear infinite paused; }
+.slot { position: absolute; left: calc(var(--cw) / -2); top: calc(var(--ch) / -2); width: var(--cw); height: var(--ch);
+  margin: 0; transform-style: preserve-3d;
+  transform: rotateY(calc(var(--i) * 360deg / var(--n))) translateZ(var(--R)) rotateY(90deg); }
+.tile { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between;
+  gap: calc(var(--cw) * .04); padding: calc(var(--cw) * .11) calc(var(--cw) * .1); border-radius: 14px; overflow: hidden;
+  background: var(--c); color: var(--tile-ink); box-shadow: inset 0 0 0 1px rgba(44, 51, 39, .08);
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  /* Fades on the far side of the ring: the same turn as .ring, offset by the tile's place on it. */
+  animation: depth var(--spin) linear infinite paused; animation-delay: calc((var(--i) / var(--n) - 1) * var(--spin)); }
+.tile + .tile { transform: rotateY(180deg); }
+.tk { font: 800 calc(var(--cw) * .075)/1.2 var(--system); letter-spacing: .08em; text-transform: uppercase; }
+.tb { font: italic 700 calc(var(--cw) * .3)/1 var(--display); font-variant-numeric: tabular-nums; }
+.tb svg { width: calc(var(--cw) * .3); height: calc(var(--cw) * .3); display: block; }
+.ts { font: 500 calc(var(--cw) * .085)/1.25 var(--system); }
+.tcode { font: 700 calc(var(--cw) * .13)/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; }
+.tbadge { align-self: flex-start; padding: .2em .65em; border-radius: 999px; background: var(--warn-bg); color: var(--warn-text);
+  font: 700 calc(var(--cw) * .08)/1.3 var(--system); }
+.tfaces { display: flex; }
+.tfaces i { display: grid; place-items: center; width: calc(var(--cw) * .25); height: calc(var(--cw) * .25); margin-right: calc(var(--cw) * -.05);
+  border-radius: 50%; background: var(--white); box-shadow: 0 0 0 2px var(--c); font: 700 calc(var(--cw) * .1)/1 var(--system); font-style: normal; }
+/* A piece of the app (docs/legal/home-shots): a phone screen is taller than the tiles and grows upward, so the
+   ring's lower edge stays level. */
+.slot.is-screen { height: calc(var(--cw) * 1.9); top: calc(var(--ch) / 2 - var(--cw) * 1.9); }
+.tile-shot { padding: 0; background: var(--app-bg); }
+.shot { position: absolute; inset: 0; overflow: hidden; border-radius: 14px; font-size: calc(var(--cw) * .07); line-height: 1.25;
+  background: var(--app-bg); color: var(--app-ink); font-family: var(--system); box-shadow: inset 0 0 0 1px rgba(44, 51, 39, .08); }
+.tile-icon { justify-content: center; align-items: center; }
+.tile-icon img { display: block; width: 72%; height: auto; border-radius: 22.37%; }
+@keyframes spin { from { transform: rotateX(-9deg) rotateY(0deg); } to { transform: rotateX(-9deg) rotateY(-360deg); } }
+@keyframes depth { 0%, 26% { opacity: 1; } 40% { opacity: .28; } 50% { opacity: .08; } 60% { opacity: .28; } 74%, 100% { opacity: 1; } }
+@media (max-width: 599px) {
+  .slot:nth-child(even) { display: none; }
+  .tk, .ts { display: none; }
+  .tile { justify-content: center; align-items: center; }
+}
+
+.hero-copy { position: relative; z-index: 1; display: grid; justify-items: center; gap: 16px; max-width: 42rem; margin: 0 auto;
+  padding: 8px var(--gutter) clamp(56px, 11svh, 112px); text-align: center; }
+.app-icon { display: block; width: 64px; height: 64px; border-radius: 22.37%; box-shadow: 0 1px 2px rgba(44, 51, 39, .1), 0 6px 16px rgba(44, 51, 39, .14); }
+.lead { margin: 0; font: italic 700 clamp(1.6rem, 3.6vw, 2.4rem)/1.15 var(--display); text-wrap: balance; }
+.meta { display: inline-flex; align-items: center; min-height: 36px; margin: 0; padding: 0 14px; border-radius: 999px;
+  background: var(--card); box-shadow: inset 0 0 0 1px var(--rule); color: var(--muted); font-size: .85rem; font-weight: 600; }
+.cue { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 6px; color: var(--text); font-weight: 600; font-size: .9rem; text-decoration: none; }
+.cue:hover { color: var(--text); text-decoration-line: underline; }
+.cue svg { flex: none; }
+
+/* ─── Sections ─── */
+.sec { position: relative; z-index: 1; }
+.sec-features { background: var(--sec-features); }
+.sec-privacy { background: var(--sec-privacy); }
+.sec-help { background: var(--sec-help); }
+.sec-features { overflow-x: clip; }
+/* A tilted strip of what the app does, like a festival wristband, crossing into the features */
+.tape { width: 112%; margin: 0 -6%; padding: 14px 0; overflow: hidden; background: var(--tile-ink); color: var(--white); transform: rotate(-2.5deg); }
+.tape-track { display: flex; width: max-content; }
+.tape-track span { display: flex; align-items: center; gap: 28px; padding-right: 28px; white-space: nowrap; font: italic 700 clamp(1.4rem, 3vw, 2.1rem)/1.2 var(--display); }
+.tape-track i { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--c); }
+.sec-inner { display: grid; gap: 28px; max-width: 1120px; margin: 0 auto; padding: clamp(72px, 14svh, 150px) var(--gutter); }
+.sec h2 { margin: 0; font: italic 700 clamp(2.2rem, 5.4vw, 4rem)/1.05 var(--display); letter-spacing: -.01em; color: var(--tile-ink); }
+@media (min-width: 900px) {
+  .sec-inner { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; align-items: start; }
+  .sec-head { position: sticky; top: 22svh; }
+  .sec-privacy .sec-inner { min-height: 84svh; }
+  /* Help is short: equal space above and below, then the footer. */
+  .sec-help .sec-inner { align-items: center; }
+  .sec-help .sec-head { position: static; }
+}
+.feat-list, .checks { margin: 0; padding: 0; list-style: none; }
+.feat-list { display: grid; gap: 16px; }
+.feat-list li + li, .checks li + li { margin-top: 0; }
+.feat { display: grid; grid-template-columns: minmax(0, 1fr) 156px; align-items: center; gap: 22px; padding: 22px 22px 22px 26px;
+  background: var(--card); border-radius: var(--radius); box-shadow: 0 3px 10px rgba(44, 51, 39, .06); }
+.feat h3 { margin: 0 0 .3em; font-size: 1.12rem; line-height: 1.3; }
+.feat > div:first-child { min-width: 0; }
+.feat p { margin: 0; color: var(--muted); }
+@media (max-width: 560px) { .feat { grid-template-columns: minmax(0, 1fr); padding: 18px; } .motif { order: -1; } }
+.panel { padding: clamp(22px, 4vw, 34px); background: var(--card); border-radius: var(--radius); box-shadow: 0 3px 10px rgba(44, 51, 39, .06); }
+.panel p { margin: 0; }
+.checks { display: grid; gap: 14px; margin-bottom: 22px; }
+.checks li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; }
+.checks svg { display: block; width: 30px; height: 30px; }
+.checks circle { fill: var(--mint); }
+.checks path { fill: none; stroke: var(--tile-ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 18; stroke-dashoffset: 0; }
+
+/* ─── Feature motifs: a small moving picture of each feature (decorative; the text says it all) ─── */
+.motif { position: relative; height: 116px; border-radius: 18px; overflow: hidden; background: var(--m); color: var(--tile-ink);
+  font: 700 .68rem/1.2 var(--system); font-variant-numeric: tabular-nums; }
+.motif i, .motif b, .motif em { font-style: normal; font-weight: inherit; }
+.m-schedule { --m: var(--lilac); }
+.m-schedule .lane { position: absolute; left: 8%; right: 8%; top: var(--y); height: 17%; }
+.m-schedule .lane i { position: absolute; top: 0; bottom: 0; left: var(--x); width: var(--w); border-radius: 6px; background: rgba(255, 255, 255, .55); }
+.m-schedule .lane i.pick { background: var(--white); }
+.m-schedule .lane i.clash { box-shadow: inset 0 0 0 2px var(--warn-text); }
+.m-schedule .now { position: absolute; inset: 8% 8% 6% 8%; }
+.m-schedule .now::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; border-radius: 2px; background: var(--tile-ink); }
+.m-schedule .flag { position: absolute; right: 7%; top: 6%; padding: 2px 7px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-text); font-size: .62rem; }
+.m-crew { --m: var(--pink); display: grid; align-content: center; justify-items: center; gap: 9px; }
+.m-crew .set, .m-crew .code { padding: 4px 9px; border-radius: 8px; background: var(--white); }
+.m-crew .code { background: rgba(255, 255, 255, .6); font: 700 .72rem/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .14em; }
+.m-crew .faces { display: flex; }
+.m-crew .faces i { display: grid; place-items: center; width: 28px; height: 28px; margin-left: -7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--pink); }
+.m-crew .faces i:first-child { margin-left: 0; }
+.m-meet { --m: var(--mint); }
+.m-meet .road { position: absolute; border-radius: 9px; background: rgba(255, 255, 255, .7); }
+.m-meet .r1 { left: -10%; right: -10%; top: 62%; height: 9px; transform: rotate(-8deg); }
+.m-meet .r2 { top: -10%; bottom: -10%; left: 28%; width: 9px; transform: rotate(14deg); }
+.m-meet .pin { position: absolute; left: 50%; top: 18%; width: 26px; height: 34px; margin-left: -13px; }
+.m-meet .pin svg { display: block; width: 100%; height: 100%; }
+.m-meet .pin path { fill: var(--pink); stroke: var(--tile-ink); stroke-width: 2; }
+.m-meet .pin circle { fill: var(--tile-ink); }
+.m-meet .ripple { position: absolute; left: 50%; top: calc(18% + 32px); width: 30px; height: 12px; margin: -6px 0 0 -15px; border-radius: 50%; border: 2px solid var(--tile-ink); opacity: 0; }
+.m-meet .when { position: absolute; right: 8%; top: 9%; padding: 3px 8px; border-radius: 999px; background: var(--white); }
+.m-loc { --m: var(--blue); display: grid; align-content: center; justify-items: center; gap: 16px; }
+.m-loc .seg { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); width: 80%; padding: 3px; border-radius: 10px; background: rgba(255, 255, 255, .5); }
+.m-loc .seg b { position: relative; z-index: 1; padding: 5px 0; text-align: center; }
+.m-loc .thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); border-radius: 8px; background: var(--white);
+  box-shadow: 0 1px 3px rgba(44, 51, 39, .15); transform: translateX(100%); }
+.m-loc .dot { position: relative; width: 14px; height: 14px; border-radius: 50%; background: var(--tile-ink); box-shadow: 0 0 0 3px var(--white); }
+.m-loc .dot::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid var(--white); opacity: 0; }
+.m-off { --m: var(--peach); display: grid; align-content: center; justify-items: center; gap: 12px; }
+.m-off .bars { display: flex; align-items: flex-end; gap: 4px; height: 34px; }
+.m-off .bars i { width: 8px; border-radius: 3px; background: var(--tile-ink); opacity: .22; }
+.m-off .bars i:nth-child(1) { height: 25%; } .m-off .bars i:nth-child(2) { height: 50%; --b: 1; }
+.m-off .bars i:nth-child(3) { height: 75%; --b: 2; } .m-off .bars i:nth-child(4) { height: 100%; --b: 3; }
+.m-off .states { position: relative; width: 100%; height: 24px; }
+.m-off .states b { position: absolute; left: 50%; top: 0; transform: translateX(-50%); padding: 4px 9px; border-radius: 999px; background: var(--white); white-space: nowrap; opacity: 0; }
+.m-off .states .s-saved { opacity: 1; }
+
+/* ─── Motion (JavaScript on, Reduce Motion off) ─── */
+.motion .hero { min-height: 100svh; padding-top: calc(var(--ring-y) + var(--R) * .42); }
+.motion .hero-stage { position: fixed; inset: 0; z-index: 0; height: auto; overflow: hidden; }
+.motion .mark { top: var(--mark-y); }
+.motion .ring-wrap { top: var(--ring-y); }
+/* --hero-p goes from 0 to 1 over the first half of the hero (home.js): the ring lifts away, and the wordmark holds
+   still and fades out before the hero text scrolls over it, so it is gone by the next section. */
+.motion .mark { opacity: calc(1 - min(1, var(--hero-p, 0) * 2.4)); transform: translate(-50%, -50%) scale(calc(1 - var(--hero-p, 0) * .08)); }
+.motion .ring-wrap { opacity: calc(1 - var(--hero-p, 0) * 1.7); transform: translateY(calc(var(--hero-p, 0) * -14svh)); }
+.motion .ring, .motion .tile { animation-play-state: running; }
+/* Arrival: the letters bounce in one by one and the ring settles around them. */
+.motion .mark-letters span { animation: letter-in .9s cubic-bezier(.3, 1.45, .5, 1) both calc(var(--l) * 70ms + 120ms); }
+.motion .ring-wrap { animation: ring-in 1.6s cubic-bezier(.2, .7, .2, 1) backwards; }
+.motion .tape-track { animation: tape 38s linear infinite; }
+.motion.ring-off .ring-wrap, .motion.ring-off .mark { visibility: hidden; }
+.motion.ring-off .ring, .motion.ring-off .tile { animation-play-state: paused; }
+.motion .blocks { display: block; position: fixed; left: 0; top: 0; z-index: -1; width: 100%; height: 100lvh; }
+.motion .sec { background: transparent; }
+.motion body > footer { position: relative; z-index: 1; }
+.motion .cue svg { animation: bob 2.4s ease-in-out infinite; }
+.motion .feat, .motion .panel { transform: translateY(28px); transition: transform .8s cubic-bezier(.2, .7, .2, 1); }
+.motion .feat.in, .motion .panel.in { transform: none; }
+/* With a mouse, a card leans toward the pointer and its motif drifts a little (home.js sets --tx and --ty, -0.5 to 0.5). */
+.motion .feat.in { transform: perspective(900px) rotateX(calc(var(--ty, 0) * -5deg)) rotateY(calc(var(--tx, 0) * 6deg)); transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+.motion .feat .motif { transform: translate(calc(var(--tx, 0) * 8px), calc(var(--ty, 0) * 6px)); transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+.motion .checks path { stroke-dashoffset: 18; transition: stroke-dashoffset .5s ease-out calc(var(--k) * .12s + .3s); }
+.motion .panel.in .checks path { stroke-dashoffset: 0; }
+.motion .m-schedule .now { animation: sweep 7s linear infinite; }
+.motion .m-schedule .flag { animation: blink 2.4s ease-in-out infinite; }
+.motion .m-crew .faces i { animation: pop 6s cubic-bezier(.3, 1.4, .5, 1) infinite calc(var(--d) * .3s); }
+.motion .m-meet .pin { animation: drop 3.6s cubic-bezier(.3, 1.3, .5, 1) infinite; }
+.motion .m-meet .ripple { animation: ripple 3.6s ease-out infinite; }
+.motion .m-loc .thumb { animation: seg 6s cubic-bezier(.5, 0, .2, 1) infinite; }
+.motion .m-loc .dot::after { animation: pulse 2s ease-out infinite; }
+.motion .m-off .bars i { animation: bars 8s ease-in-out infinite calc(var(--b, 0) * .08s); }
+.motion .m-off .s-none { animation: say-none 8s linear infinite; }
+.motion .m-off .s-saved { opacity: 0; animation: say-saved 8s linear infinite; }
+.motion .m-off .s-synced { animation: say-synced 8s linear infinite; }
+@keyframes bob { 50% { transform: translateY(4px); } }
+@keyframes letter-in { from { opacity: 0; transform: translateY(45%) scale(.6) rotate(-8deg); } to { opacity: 1; transform: none; } }
+@keyframes ring-in { from { opacity: 0; scale: .82; } }
+@keyframes tape { to { transform: translateX(-50%); } }
+@keyframes sweep { from { transform: translateX(0); } to { transform: translateX(100%); } }
+@keyframes blink { 50% { opacity: .45; } }
+@keyframes pop { 0%, 4% { transform: scale(0); } 12%, 82% { transform: scale(1); } 90%, 100% { transform: scale(0); } }
+@keyframes drop { 0% { transform: translateY(-30px); opacity: 0; } 14% { transform: none; opacity: 1; } 86% { transform: none; opacity: 1; } 100% { transform: none; opacity: 0; } }
+@keyframes ripple { 0%, 14% { transform: scale(.4); opacity: 0; } 18% { opacity: .7; } 50%, 100% { transform: scale(2.2); opacity: 0; } }
+@keyframes seg { 0%, 28% { transform: translateX(0); } 33%, 61% { transform: translateX(100%); } 66%, 94% { transform: translateX(200%); } 100% { transform: translateX(0); } }
+@keyframes pulse { from { transform: scale(1); opacity: .9; } to { transform: scale(2.6); opacity: 0; } }
+@keyframes bars { 0%, 18% { opacity: 1; } 24%, 66% { opacity: .22; } 72%, 100% { opacity: 1; } }
+@keyframes say-none { 0%, 22% { opacity: 0; } 25%, 38% { opacity: 1; } 41%, 100% { opacity: 0; } }
+@keyframes say-saved { 0%, 41% { opacity: 0; } 44%, 63% { opacity: 1; } 66%, 100% { opacity: 0; } }
+@keyframes say-synced { 0%, 12% { opacity: 1; } 15%, 70% { opacity: 0; } 73%, 100% { opacity: 1; } }
+
+@media print {
+  .blocks, .ring-wrap, .cue, .motif, .tape { display: none !important; }
+  body > header { position: static; }
+  .hero-stage { position: static !important; height: auto; }
+  .mark { position: static; transform: none !important; opacity: 1 !important; font-size: 3rem; }
+  .hero, .motion .hero { min-height: 0; padding-top: 0; }
+  .sec { background: none !important; }
+  .sec-inner { display: block; padding: 0; min-height: 0 !important; }
+  .feat, .panel { padding: 0; box-shadow: none; transform: none !important; }
+  .app-icon { box-shadow: none; }
+}

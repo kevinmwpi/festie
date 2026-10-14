@@ -74,28 +74,15 @@ li::marker { color: var(--muted); }
 .toc li + li { margin-top: 0; }
 .toc a { display: flex; align-items: center; min-height: 44px; padding: 4px 0; line-height: 1.35; text-decoration: none; }
 .toc a:hover { text-decoration-line: underline; }
-.home { padding: 16px 0 32px; }
-.home section + section { margin-top: 2.25rem; }
-.home h2 { margin-top: 0; }
-.home p, .home ul:not(.features) { max-width: var(--measure); }
-.app-icon { display: block; width: 88px; height: 88px; border-radius: 22.37%; box-shadow: 0 1px 2px rgba(44, 51, 39, .1), 0 6px 16px rgba(44, 51, 39, .14); margin: 0 0 20px; }
-.lead { font-size: 1.3rem; line-height: 1.3; font-weight: 600; margin: 0 0 .6em; }
-.meta { font-size: .88rem; color: var(--muted); }
-.features { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; }
-.features li { margin: 0; padding: 20px; background: var(--fill); border-radius: 18px; }
-.features h3 { margin: 0 0 .25em; }
-.features p { margin: 0; }
 footer { padding-bottom: 40px; color: var(--muted); }
 footer p, footer ul { font-size: .82rem; }
 .footer-links { list-style: none; display: flex; flex-wrap: wrap; column-gap: 1.25rem; margin: 0; padding: 4px 0 0; border-top: 1px solid var(--rule); }
 .footer-links li + li { margin-top: 0; }
 .footer-links a { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
-@media (min-width: 600px) { h1 { font-size: 2.35rem; } .home section + section { margin-top: 3rem; } }
+@media (min-width: 600px) { h1 { font-size: 2.35rem; } }
 @media (min-width: 720px) {
   .toc ol { columns: 2; column-gap: 32px; }
   .toc li { break-inside: avoid; }
-  .features { grid-template-columns: 1fr 1fr; gap: 16px; }
-  .features li:first-child { grid-column: 1 / -1; }
 }
 @media print {
   :root { --bg: #FFFFFF; --card: #FFFFFF; --text: #000000; --muted: #000000; --link: #000000; --link-pressed: #000000; --fill: transparent; }
@@ -103,8 +90,6 @@ footer p, footer ul { font-size: .82rem; }
   .skip, header nav, .toc, .footer-links { display: none; }
   header, main, footer { max-width: none; padding: 0; }
   article { margin: 0; padding: 0; border-radius: 0; box-shadow: none; }
-  .features li { padding: 0; }
-  .app-icon { box-shadow: none; }
   a[href^="http"]::after { content: " (" attr(href) ")"; }
   h2, h3 { break-after: avoid; }
   p, li { break-inside: avoid; }
