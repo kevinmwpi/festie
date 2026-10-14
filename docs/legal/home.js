@@ -36,17 +36,50 @@
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   };
 
+  // The shades run through OKLCH so the steps between two colours stay clear instead of turning grey: lightness
+  // moves evenly, the hue turns the short way round, and a near-grey end (the dark hero, the cream wash) takes
+  // the other end's hue and colourfulness.
+  const linear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const gamma = (v) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+  function toOklch(color) {
+    const [r, g, b] = color.map((v) => linear(v / 255));
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+    const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+    return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, Math.hypot(A, B), Math.atan2(B, A)];
+  }
+  function fromOklch([L, C, h]) {
+    const A = C * Math.cos(h);
+    const B = C * Math.sin(h);
+    const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
+    const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
+    const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3;
+    return [
+      4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+    ].map((v) => Math.round(255 * Math.min(1, gamma(Math.max(0, v)))));
+  }
+  function blend(from, to, t) {
+    let [L1, C1, h1] = toOklch(from);
+    let [L2, C2, h2] = toOklch(to);
+    if (C1 < 0.03) [C1, h1] = [Math.max(C1, C2), h2];
+    if (C2 < 0.03) [C2, h2] = [Math.max(C2, C1), h1];
+    const turn = ((h2 - h1 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+    return fromOklch([L1 + (L2 - L1) * t, C1 + (C2 - C1) * t, h1 + turn * t]);
+  }
+
   function readColors() {
     const style = getComputedStyle(root);
     fills = paneColors.map((name) => style.getPropertyValue(name).trim());
-    // For each edge, SHADES + 1 colours from this pane's to the next pane's, both ends included.
-    shades = fills.slice(1).map((next, k) => {
-      const [from, to] = [rgb(fills[k]), rgb(next)];
-      return Array.from({ length: SHADES + 1 }, (_, step) => {
-        const t = step / SHADES;
-        return `rgb(${from.map((v, i) => Math.round(v + (to[i] - v) * t)).join(', ')})`;
-      });
-    });
+    // For each edge, SHADES + 1 colours from this pane's to the next pane's; the two ends are the panes' own.
+    shades = fills.slice(1).map((next, k) => Array.from({ length: SHADES + 1 }, (_, step) => {
+      if (step === 0) return fills[k];
+      if (step === SHADES) return next;
+      return `rgb(${blend(rgb(fills[k]), rgb(next), step / SHADES).join(', ')})`;
+    }));
   }
 
   function layout() {

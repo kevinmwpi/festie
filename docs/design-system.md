@@ -227,11 +227,12 @@ inlines into `index.html`.
   app does turns below and around it. As you scroll, the ring lifts away and the wordmark holds still, then fades
   out before the next section.
 - **Sections meet along a band of small squares** that follows the boundary as you scroll, about four rows
-  deep: each square takes a random shade between the two sections' colours, and the mix reshuffles as the edge
-  moves, like a schedule grid filling in. The footer gets a straight edge. The colours
-  are the pink wash, then the `primary` blue, `success` mint and lilac accents at full strength, with ink text
-  (at least 7:1); in dark mode each is a 20–26% tint on the dark ground (warm pastels turn brown there, so
-  none is used). Links stay on white panels, because `link` on those pastels is under 4.5:1.
+  deep: each square takes a random shade between the two sections' colours (blended in OKLCH, so the steps stay
+  clear instead of turning grey), and the mix reshuffles as the edge moves, like a schedule grid filling in. The
+  footer gets a straight edge. The colours are the pink wash, then the `primary` blue, `success` mint and lilac
+  accents at full strength, with ink headings (at least 7:1). In dark mode the hero and footer go dark and the
+  sections keep the same pastels, with ink headings and the dark cards on top.
+  Links stay on the cards, because `link` on those pastels is under 4.5:1.
 - **One arrival moment**: the wordmark's letters bounce in one after another and the ring settles around them.
 - **A tilted tape** of what the app does scrolls across the top of the features, like a festival wristband.
 - **Each feature card has a small looping motif** (the clash flag, crew faces, a dropped pin, the 1/4/8 h
