@@ -212,40 +212,9 @@ decisions, translated to web conventions:
 - Long-form measure of about 60–75 characters, line height around 1.6, clear h2/h3 rhythm, sentence-case
   metadata, and an "On this page" index on long documents.
 - Visible focus rings, 44px navigation targets, a skip link, hover and pressed states on links, print
-  styles, `prefers-reduced-motion` respected. No trackers or third-party requests on any page.
-- The legal and support pages use no JavaScript and no web fonts: static documents gain nothing from scripted
-  motion.
-
-### Home page
-
-The home page is the one place where motion decorates; the Motion rules above still hold for the app and every
-other page. Its styles and script live in `docs/legal/home.css` and `docs/legal/home.js`, which the generator
-inlines into `index.html`.
-
-- **The wordmark stays and the page moves around it.** The Fredoka "Festie" logotype (self-hosted from the
-  app's bundled font, with its OFL licence beside it) sits high in the hero, and a ring turns below and around it:
-  small tiles mixed with miniature copies of real app screens and components (`docs/legal/home-shots`), built
-  from the app's source with its light tokens and fictional demo data, so they look the same on the dark page,
-  as a screenshot would. As you scroll, the ring lifts away and the wordmark holds still, then fades
-  out before the next section.
-- **Sections meet along a band of small squares** that follows the boundary as you scroll, about four rows
-  deep: each square takes a lighter or deeper shade of one of the two sections' colours, never a third hue
-  (shades worked out in OKLCH so they keep their hue), and the mix reshuffles as the edge moves, like a schedule
-  grid filling in. The footer gets a straight edge. The colours are the pink wash, then the `primary` blue,
-  `success` mint and lilac accents at full strength, with ink headings (at least 7:1). In dark mode the hero and
-  footer go dark and the sections keep the same pastels, with ink headings and the dark cards on top. Links stay
-  on the cards, because `link` on those pastels is under 4.5:1.
-- **One arrival moment**: the wordmark's letters bounce in one after another and the ring settles around them.
-- **A tilted tape** of what the app does scrolls across the top of the features, like a festival wristband.
-- **Each feature card has a small looping motif** (the clash flag, crew faces, a dropped pin, the 1/4/8 h
-  control, signal bars). Motifs and ring tiles are hidden from assistive technology; the text carries the
-  meaning. With a mouse or trackpad, a card leans a few degrees toward the pointer.
-- **Motion is a layer, never a requirement.** It runs only when JavaScript is on and Reduce Motion is off.
-  Otherwise the page is static (solid section colours, a still ring, no fixed wordmark) with every word in
-  place. Only `transform`, `opacity` and one background canvas animate. No animation libraries: CSS and about
-  200 lines of plain JavaScript, so the site still has no build step.
-- Ring tiles show generic examples (times, a crew code, a clash) and the screen copies use the app's fictional
-  demo festival; never a real festival, artist or poster (`docs/legal/ip-review.md`).
+  styles, `prefers-reduced-motion` respected. No JavaScript, web fonts, trackers or third-party requests.
+- GSAP and other animation libraries are deliberately not used: static legal and support pages gain nothing
+  from scripted motion, and the site has no build step.
 
 ## Not in scope (deliberately)
 
