@@ -227,9 +227,10 @@ inlines into `index.html`.
   app does turns below and around it. As you scroll, the ring lifts away and the wordmark stays fixed behind the
   sections as a 7% watermark.
 - **Sections meet along a ragged edge of small squares** that follows the boundary as you scroll: two colours
-  only, about three rows deep, like a schedule grid filling in. The colours are the pink wash, then the
-  `primary` blue, `success` mint and peach accents at full strength, with ink text (at least 8:1). Links stay
-  on white panels, because `link` on those pastels is under 4.5:1.
+  only, about three rows deep, like a schedule grid filling in; the footer gets a straight edge. The colours
+  are the pink wash, then the `primary` blue, `success` mint and lilac accents at full strength, with ink text
+  (at least 7:1); in dark mode each is a 20–26% tint on the dark ground (warm pastels turn brown there, so
+  none is used). Links stay on white panels, because `link` on those pastels is under 4.5:1.
 - **One arrival moment**: the wordmark's letters bounce in one after another and the ring settles around them.
 - **A tilted tape** of what the app does scrolls across the top of the features, like a festival wristband.
 - **Each feature card has a small looping motif** (the clash flag, crew faces, a dropped pin, the 1/4/8 h

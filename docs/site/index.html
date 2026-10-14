@@ -111,8 +111,8 @@ footer p, footer ul { font-size: .82rem; }
   font-display: swap;
 }
 :root {
-  /* Sections use the app's pastel accents at full strength; text on them is --text (at least 8:1). */
-  --sec-hero: #FFF5F9; --sec-features: #B2CEFE; --sec-privacy: #B2D8B2; --sec-help: #FFD6A5; --sec-end: #FFF5F9;
+  /* Sections use the app's pastel accents at full strength; text on them is --text (at least 7:1). */
+  --sec-hero: #FFF5F9; --sec-features: #B2CEFE; --sec-privacy: #B2D8B2; --sec-help: #C8B6FF; --sec-end: #FFF5F9;
   /* Ring tiles and feature motifs: pastel fills with the dark ink in both schemes. */
   --pink: #FFB3D9; --blue: #B2CEFE; --peach: #FFD6A5; --lilac: #C8B6FF; --mint: #B2D8B2; --lemon: #FDFD96; --white: #FFFFFF;
   --tile-ink: #2C3327; --warn-bg: #FFF4D6; --warn-text: #7A4A00;
@@ -133,7 +133,7 @@ footer p, footer ul { font-size: .82rem; }
 @media (max-width: 599px) { :root { --R: 40vw; --ring-y: 37svh; } .ring-wrap { top: 52%; } }
 @media (prefers-color-scheme: dark) {
   :root {
-    --sec-hero: #1B1D1A; --sec-features: #394048; --sec-privacy: #394238; --sec-help: #494236; --sec-end: #1B1D1A;
+    --sec-hero: #1B1D1A; --sec-features: #394048; --sec-privacy: #394238; --sec-help: #484556; --sec-end: #1B1D1A;
   }
 }
 
@@ -421,6 +421,7 @@ main { max-width: none; padding: 0; }
   const paneColors = ['--sec-hero', '--sec-features', '--sec-privacy', '--sec-help', '--sec-end'];
   // The band, in rows of squares around a pane's top edge: each column's edge sits somewhere in STEP, and some
   // columns throw one square a row ahead of it. Outside BAND every square is plainly one pane or the other.
+  // The footer gets a straight edge.
   const STEP = [-1, 0.6];
   const STRAY_SHARE = 0.25;
   const BAND = [STEP[0] - 2, STEP[1]];
@@ -448,10 +449,9 @@ main { max-width: none; padding: 0; }
     const cell = width < 600 ? 24 : 32;
     cols = Math.ceil(width / cell);
     rows = Math.ceil(height / cell);
-    edges = panes.slice(1).map((_, k) => Array.from({ length: cols }, (_, c) => ({
-      step: STEP[0] + (STEP[1] - STEP[0]) * noise(c, 0, k + 1),
-      stray: noise(c, 1, k + 1) < STRAY_SHARE,
-    })));
+    edges = panes.slice(1).map((pane, k) => Array.from({ length: cols }, (_, c) => (pane.tagName === 'FOOTER'
+      ? { step: 0, stray: false }
+      : { step: STEP[0] + (STEP[1] - STEP[0]) * noise(c, 0, k + 1), stray: noise(c, 1, k + 1) < STRAY_SHARE })));
   }
 
   function draw() {

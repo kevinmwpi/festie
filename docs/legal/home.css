@@ -12,8 +12,8 @@
   font-display: swap;
 }
 :root {
-  /* Sections use the app's pastel accents at full strength; text on them is --text (at least 8:1). */
-  --sec-hero: #FFF5F9; --sec-features: #B2CEFE; --sec-privacy: #B2D8B2; --sec-help: #FFD6A5; --sec-end: #FFF5F9;
+  /* Sections use the app's pastel accents at full strength; text on them is --text (at least 7:1). */
+  --sec-hero: #FFF5F9; --sec-features: #B2CEFE; --sec-privacy: #B2D8B2; --sec-help: #C8B6FF; --sec-end: #FFF5F9;
   /* Ring tiles and feature motifs: pastel fills with the dark ink in both schemes. */
   --pink: #FFB3D9; --blue: #B2CEFE; --peach: #FFD6A5; --lilac: #C8B6FF; --mint: #B2D8B2; --lemon: #FDFD96; --white: #FFFFFF;
   --tile-ink: #2C3327; --warn-bg: #FFF4D6; --warn-text: #7A4A00;
@@ -34,7 +34,7 @@
 @media (max-width: 599px) { :root { --R: 40vw; --ring-y: 37svh; } .ring-wrap { top: 52%; } }
 @media (prefers-color-scheme: dark) {
   :root {
-    --sec-hero: #1B1D1A; --sec-features: #394048; --sec-privacy: #394238; --sec-help: #494236; --sec-end: #1B1D1A;
+    --sec-hero: #1B1D1A; --sec-features: #394048; --sec-privacy: #394238; --sec-help: #484556; --sec-end: #1B1D1A;
   }
 }
 

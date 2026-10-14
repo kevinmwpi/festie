@@ -18,6 +18,7 @@
   const paneColors = ['--sec-hero', '--sec-features', '--sec-privacy', '--sec-help', '--sec-end'];
   // The band, in rows of squares around a pane's top edge: each column's edge sits somewhere in STEP, and some
   // columns throw one square a row ahead of it. Outside BAND every square is plainly one pane or the other.
+  // The footer gets a straight edge.
   const STEP = [-1, 0.6];
   const STRAY_SHARE = 0.25;
   const BAND = [STEP[0] - 2, STEP[1]];
@@ -45,10 +46,9 @@
     const cell = width < 600 ? 24 : 32;
     cols = Math.ceil(width / cell);
     rows = Math.ceil(height / cell);
-    edges = panes.slice(1).map((_, k) => Array.from({ length: cols }, (_, c) => ({
-      step: STEP[0] + (STEP[1] - STEP[0]) * noise(c, 0, k + 1),
-      stray: noise(c, 1, k + 1) < STRAY_SHARE,
-    })));
+    edges = panes.slice(1).map((pane, k) => Array.from({ length: cols }, (_, c) => (pane.tagName === 'FOOTER'
+      ? { step: 0, stray: false }
+      : { step: STEP[0] + (STEP[1] - STEP[0]) * noise(c, 0, k + 1), stray: noise(c, 1, k + 1) < STRAY_SHARE })));
   }
 
   function draw() {
