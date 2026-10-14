@@ -6,7 +6,7 @@ Paste the text between the lines into App Store Connect → your version → App
 
 Before every submission, follow [`release-runbook.md`](./release-runbook.md) §3.3: the demo login must work
 on the production project, `demo:seed` must have run after migration 007, and the demo festival should be
-shifted so its sets are "now playing" during the review window. The email and code are the
+shifted so its sets are "up next" during the review window. The email and code are the
 `DEMO_LOGIN_EMAIL` / `DEMO_LOGIN_CODE` Supabase function secrets; never commit them.
 
 Every tap below was checked against the v1 code (screen labels in quotes are the exact on-screen text).

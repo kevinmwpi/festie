@@ -12,11 +12,13 @@ changes sync when the signal comes back.
 - Admin: a local TypeScript CLI for festival data, the App Review demo and moderation.
 
 The authoritative design and security contract is [`docs/v1-architecture.md`](docs/v1-architecture.md).
-The visual design follows the separate `festival_app_aistudio` prototype, which is only a design
-reference: it is not part of this repository, not built and not shipped.
+The visual and interaction rules are in [`docs/design-system.md`](docs/design-system.md); Apple's Human
+Interface Guidelines cover anything it does not. The earlier `festival_app_aistudio` prototype is history only: it is not part
+of this repository and has no authority.
 
 This repository is the only source of truth for Festie. Coding agents start at [`AGENTS.md`](AGENTS.md)
-(`CLAUDE.md` imports it); product direction after v1 is in [`docs/roadmap.md`](docs/roadmap.md).
+(`CLAUDE.md` imports it); the plan, with the end goal and the ordered steps toward it, is
+[`docs/roadmap.md`](docs/roadmap.md).
 
 ## Repository layout
 
@@ -96,7 +98,7 @@ request; run them locally before pushing:
 ```sh
 npm run build                       # turbo: package builds + mobile tsc
 npm run lint                        # turbo: tsc --noEmit everywhere
-npm run test                        # vitest: domain, sync-engine, data-access, map-utils, admin-tools
+npm run test                        # vitest: domain, sync-engine, data-access, map-utils, admin-tools, mobile
 npm run db:test                     # migrations 001–014 on a throwaway Postgres 16 + rls.sql + races
 (cd supabase/functions && deno check */index.ts && deno test && deno lint)
 node docs/legal/generate.mjs --check    # in-app legal screens and docs/site match docs/legal/*.md
@@ -118,7 +120,9 @@ Never run `deno` against `supabase/` from the repository root without `--config`
 | [`docs/app-store-privacy.md`](docs/app-store-privacy.md) | App Privacy answers, age rating, export compliance, URLs |
 | [`docs/app-review-notes.md`](docs/app-review-notes.md) | Template for the App Review notes |
 | [`docs/legal/`](docs/legal) | Privacy policy, terms, support page sources (`generate.mjs` builds the app screens and `docs/site/`), data inventory, security controls, IP review, liability checklist |
-| [`docs/roadmap.md`](docs/roadmap.md) | Product thesis and direction after v1; nothing on it is built until the contract includes it |
+| [`docs/roadmap.md`](docs/roadmap.md) | The plan: end goal, where v1 stands, owner decisions, ordered steps, critique verdicts, guardrails, which document owns what |
+| [`docs/design-system.md`](docs/design-system.md) | Visual and interaction rules for the app and the website; tokens live in `packages/ui/src/theme.ts` |
+| [`docs/agents/festival-pipeline.md`](docs/agents/festival-pipeline.md) | How festival data and artwork get in: scout agent, human review, publish |
 | [`AGENTS.md`](AGENTS.md) | Start here for coding agents: reading order, v1 non-goals, rules for every change (`CLAUDE.md` imports it) |
 
 ## Legal content
