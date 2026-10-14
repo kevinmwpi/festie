@@ -1,5 +1,6 @@
 import {
   CACHE_TABLES,
+  CATALOG_TABLES,
   LOCAL_SCHEMA_VERSION,
   PERSISTENT_TABLES,
   SCHEMA_VERSION_META_KEY,
@@ -142,6 +143,14 @@ function normaliseParams(params: unknown[]): unknown[] {
   return params.map(toSqlValue);
 }
 
+async function tableExists(database: LocalDatabase, table: string): Promise<boolean> {
+  const row = await database.getFirstAsync<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?;",
+    [quoteIdentifier(table)],
+  );
+  return row !== null && row !== undefined;
+}
+
 async function getColumnNames(database: LocalDatabase, table: string): Promise<Set<string>> {
   const rows = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(${quoteIdentifier(table)});`);
   return new Set(rows.map((row) => row.name));
@@ -176,9 +185,29 @@ export async function initialiseSchema(database: LocalDatabase): Promise<void> {
   const currentVersion = versionRow ? Number(versionRow.value) : null;
 
   if (currentVersion === LOCAL_SCHEMA_VERSION) {
-    for (const [name, definition] of Object.entries(CACHE_TABLES) as Array<[string, TableDefinition]>) {
-      await createTable(database, name, definition);
-    }
+    await database.transaction(async (tx) => {
+      let catalogChanged = false;
+      for (const [name, definition] of Object.entries(CACHE_TABLES) as Array<[string, TableDefinition]>) {
+        const existedBefore = await tableExists(tx, name);
+        await createTable(tx, name, definition);
+        if (!existedBefore) {
+          catalogChanged ||= CATALOG_TABLES.has(name);
+        }
+        const existing = await getColumnNames(tx, name);
+        for (const [column, columnDefinition] of definition.columns) {
+          if (!existing.has(column)) {
+            await tx.execAsync(`ALTER TABLE ${name} ADD COLUMN ${column} ${columnDefinition};`);
+            catalogChanged ||= CATALOG_TABLES.has(name);
+          }
+        }
+      }
+      // Rows cached before a catalog column existed hold its default, not the server value, and a
+      // catalog table added by this release is empty for every cached festival. Keep the rows for
+      // offline use, but mark every bundle stale so the next online open refetches it.
+      if (catalogChanged) {
+        await tx.runAsync('UPDATE festivals SET bundle_version = 0 WHERE bundle_version IS NOT NULL;');
+      }
+    });
     return;
   }
 
@@ -278,7 +307,7 @@ export async function upsertRows(table: string, rows: Array<Record<string, unkno
 }
 
 export async function replaceRowsForFestival(
-  table: 'stages' | 'sets',
+  table: 'stages' | 'sets' | 'festival_artists',
   festivalId: string,
   rows: Array<Record<string, unknown>>,
   db?: LocalDatabase,

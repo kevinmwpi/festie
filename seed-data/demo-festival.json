@@ -152,7 +152,10 @@
       "stage_id": "381b8cb0-ef18-52d5-85fb-5b05d12ff0de",
       "start_time": "2027-06-18T13:30:00-04:00",
       "end_time": "2027-06-18T14:15:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "308ed1a5-8871-569f-86a3-85f7f7fad462",
@@ -161,7 +164,10 @@
       "stage_id": "090b178e-4ead-51fd-b9fa-452ef56b1fcd",
       "start_time": "2027-06-18T14:00:00-04:00",
       "end_time": "2027-06-18T14:45:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "ac90d3b1-c2e1-5506-8405-b9b403fe921f",
@@ -170,7 +176,10 @@
       "stage_id": "9d9af215-48e0-5961-bc85-b7f038055419",
       "start_time": "2027-06-18T15:00:00-04:00",
       "end_time": "2027-06-18T16:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "692610a4-1c28-50ce-aff0-5787124c6a28",
@@ -179,7 +188,10 @@
       "stage_id": "128d84c9-99f8-5858-88f7-1ea6b30e281e",
       "start_time": "2027-06-18T15:30:00-04:00",
       "end_time": "2027-06-18T16:15:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "38c4e285-005b-5b77-8775-d97bc898f389",
@@ -188,7 +200,10 @@
       "stage_id": "090b178e-4ead-51fd-b9fa-452ef56b1fcd",
       "start_time": "2027-06-18T16:30:00-04:00",
       "end_time": "2027-06-18T17:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "d60ab6b2-dd7d-5939-b1eb-3f1fad6260b2",
@@ -197,7 +212,10 @@
       "stage_id": "381b8cb0-ef18-52d5-85fb-5b05d12ff0de",
       "start_time": "2027-06-18T17:00:00-04:00",
       "end_time": "2027-06-18T18:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "a232ae49-05ae-5e68-be25-20d1f87e8f81",
@@ -206,7 +224,10 @@
       "stage_id": "9d9af215-48e0-5961-bc85-b7f038055419",
       "start_time": "2027-06-18T18:00:00-04:00",
       "end_time": "2027-06-18T19:15:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "61ca728f-8fdd-5ba4-86c9-6a3337afcc4b",
@@ -215,7 +236,10 @@
       "stage_id": "090b178e-4ead-51fd-b9fa-452ef56b1fcd",
       "start_time": "2027-06-18T19:30:00-04:00",
       "end_time": "2027-06-18T20:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "ee2d7992-f52e-5838-8af9-0c256547e137",
@@ -224,7 +248,10 @@
       "stage_id": "381b8cb0-ef18-52d5-85fb-5b05d12ff0de",
       "start_time": "2027-06-18T20:00:00-04:00",
       "end_time": "2027-06-18T21:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "9d1cb896-5ffc-582c-bc63-064ca5971bd7",
@@ -233,7 +260,10 @@
       "stage_id": "9d9af215-48e0-5961-bc85-b7f038055419",
       "start_time": "2027-06-18T21:00:00-04:00",
       "end_time": "2027-06-18T22:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "11d08741-b0b3-5a1c-bab1-d3457be97376",
@@ -242,7 +272,10 @@
       "stage_id": "128d84c9-99f8-5858-88f7-1ea6b30e281e",
       "start_time": "2027-06-18T22:00:00-04:00",
       "end_time": "2027-06-18T23:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "90b1d66d-c837-50b5-ad00-3d603aa20240",
@@ -251,7 +284,10 @@
       "stage_id": "128d84c9-99f8-5858-88f7-1ea6b30e281e",
       "start_time": "2027-06-18T23:30:00-04:00",
       "end_time": "2027-06-19T00:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "4482237e-ea97-583e-a4a0-5ff2b3e763b6",
@@ -260,7 +296,10 @@
       "stage_id": "381b8cb0-ef18-52d5-85fb-5b05d12ff0de",
       "start_time": "2027-06-19T13:30:00-04:00",
       "end_time": "2027-06-19T14:15:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "64f92d86-0fc4-57c6-a28c-b7e8ad04e055",
@@ -269,7 +308,10 @@
       "stage_id": "090b178e-4ead-51fd-b9fa-452ef56b1fcd",
       "start_time": "2027-06-19T14:00:00-04:00",
       "end_time": "2027-06-19T14:45:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "ae807efe-924b-565b-ae0c-286dadc59f3e",
@@ -278,7 +320,10 @@
       "stage_id": "9d9af215-48e0-5961-bc85-b7f038055419",
       "start_time": "2027-06-19T15:00:00-04:00",
       "end_time": "2027-06-19T16:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "48224f19-9414-5544-bf9c-e182f89d8cc6",
@@ -287,7 +332,10 @@
       "stage_id": "128d84c9-99f8-5858-88f7-1ea6b30e281e",
       "start_time": "2027-06-19T15:30:00-04:00",
       "end_time": "2027-06-19T16:15:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "e6fdc15f-326c-595f-99fc-1af46c8e76a3",
@@ -296,7 +344,10 @@
       "stage_id": "090b178e-4ead-51fd-b9fa-452ef56b1fcd",
       "start_time": "2027-06-19T16:30:00-04:00",
       "end_time": "2027-06-19T17:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "9d19d4fa-dbe3-5b7e-8011-2b1b6af0a9d4",
@@ -305,7 +356,10 @@
       "stage_id": "381b8cb0-ef18-52d5-85fb-5b05d12ff0de",
       "start_time": "2027-06-19T17:00:00-04:00",
       "end_time": "2027-06-19T18:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "4f2dc89b-5f45-5cc2-bdd1-70edba3904d3",
@@ -314,7 +368,10 @@
       "stage_id": "9d9af215-48e0-5961-bc85-b7f038055419",
       "start_time": "2027-06-19T18:00:00-04:00",
       "end_time": "2027-06-19T19:15:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "5a13264c-925d-54c7-a25e-79aa3b224837",
@@ -323,7 +380,10 @@
       "stage_id": "090b178e-4ead-51fd-b9fa-452ef56b1fcd",
       "start_time": "2027-06-19T19:30:00-04:00",
       "end_time": "2027-06-19T20:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "5f18fa9a-4933-5926-bc7a-2588bf154d85",
@@ -332,7 +392,10 @@
       "stage_id": "381b8cb0-ef18-52d5-85fb-5b05d12ff0de",
       "start_time": "2027-06-19T20:00:00-04:00",
       "end_time": "2027-06-19T21:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "157b35d1-d14b-5c7b-93eb-f8fa8a19bb29",
@@ -341,7 +404,10 @@
       "stage_id": "9d9af215-48e0-5961-bc85-b7f038055419",
       "start_time": "2027-06-19T21:00:00-04:00",
       "end_time": "2027-06-19T22:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "8c12512c-77b7-5495-bfa9-dde7ff5bedd0",
@@ -350,7 +416,10 @@
       "stage_id": "128d84c9-99f8-5858-88f7-1ea6b30e281e",
       "start_time": "2027-06-19T22:00:00-04:00",
       "end_time": "2027-06-19T23:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "abfcf9aa-88d5-5f22-883c-b1431791487f",
@@ -359,7 +428,10 @@
       "stage_id": "128d84c9-99f8-5858-88f7-1ea6b30e281e",
       "start_time": "2027-06-19T23:30:00-04:00",
       "end_time": "2027-06-20T00:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "125d1080-d085-57de-a902-b55bd2081750",
@@ -368,7 +440,10 @@
       "stage_id": "381b8cb0-ef18-52d5-85fb-5b05d12ff0de",
       "start_time": "2027-06-20T13:30:00-04:00",
       "end_time": "2027-06-20T14:15:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "16e93893-708a-5d8a-a229-c86919a36a35",
@@ -377,7 +452,10 @@
       "stage_id": "090b178e-4ead-51fd-b9fa-452ef56b1fcd",
       "start_time": "2027-06-20T14:00:00-04:00",
       "end_time": "2027-06-20T14:45:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "ac7c8fc5-6cd3-5dea-ad8e-67c485c59261",
@@ -386,7 +464,10 @@
       "stage_id": "9d9af215-48e0-5961-bc85-b7f038055419",
       "start_time": "2027-06-20T15:00:00-04:00",
       "end_time": "2027-06-20T16:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "05824c0c-93b2-5ae8-b06e-b92a41f640b8",
@@ -395,7 +476,10 @@
       "stage_id": "128d84c9-99f8-5858-88f7-1ea6b30e281e",
       "start_time": "2027-06-20T15:30:00-04:00",
       "end_time": "2027-06-20T16:15:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "99738bee-d135-5646-82b6-3e9b8b89e761",
@@ -404,7 +488,10 @@
       "stage_id": "090b178e-4ead-51fd-b9fa-452ef56b1fcd",
       "start_time": "2027-06-20T16:30:00-04:00",
       "end_time": "2027-06-20T17:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "980587e7-fca8-532c-91b7-7d26845b5ae4",
@@ -413,7 +500,10 @@
       "stage_id": "381b8cb0-ef18-52d5-85fb-5b05d12ff0de",
       "start_time": "2027-06-20T17:00:00-04:00",
       "end_time": "2027-06-20T18:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "23523b6d-1cdb-52aa-b135-9b67959a3a1a",
@@ -422,7 +512,10 @@
       "stage_id": "9d9af215-48e0-5961-bc85-b7f038055419",
       "start_time": "2027-06-20T18:00:00-04:00",
       "end_time": "2027-06-20T19:15:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "92d5239b-f6c8-53b5-bde5-06cdc9d607e3",
@@ -431,7 +524,10 @@
       "stage_id": "090b178e-4ead-51fd-b9fa-452ef56b1fcd",
       "start_time": "2027-06-20T19:30:00-04:00",
       "end_time": "2027-06-20T20:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "f660f0d2-7b53-54bb-b349-76994ecd5917",
@@ -440,7 +536,10 @@
       "stage_id": "381b8cb0-ef18-52d5-85fb-5b05d12ff0de",
       "start_time": "2027-06-20T20:00:00-04:00",
       "end_time": "2027-06-20T21:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "8bd7a392-ca86-5396-bfd0-d8ec065d8110",
@@ -449,7 +548,10 @@
       "stage_id": "9d9af215-48e0-5961-bc85-b7f038055419",
       "start_time": "2027-06-20T21:00:00-04:00",
       "end_time": "2027-06-20T22:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "53b79998-d623-5ead-8013-7f48fb3ced99",
@@ -458,7 +560,10 @@
       "stage_id": "128d84c9-99f8-5858-88f7-1ea6b30e281e",
       "start_time": "2027-06-20T22:00:00-04:00",
       "end_time": "2027-06-20T23:00:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     },
     {
       "id": "3048a1d2-4626-504f-b351-2b2208ae7a8b",
@@ -467,7 +572,10 @@
       "stage_id": "128d84c9-99f8-5858-88f7-1ea6b30e281e",
       "start_time": "2027-06-20T23:30:00-04:00",
       "end_time": "2027-06-21T00:30:00-04:00",
-      "set_type": "performance"
+      "set_type": "performance",
+      "status": "scheduled",
+      "original_start_time": null,
+      "change_note": null
     }
   ]
 }

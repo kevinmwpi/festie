@@ -13,11 +13,22 @@ import {
 } from '@festival/domain';
 import { useMemo } from 'react';
 
+import { restoreSetReminders } from '@/src/notifications/restore-reminders';
 import { useAppStore } from '@/src/state/app-store';
 
 import { formatFestivalDayLabel, formatTimeFromDay } from './festival-time-labels';
 import { queryKeys } from './query-keys';
 import { useCacheFirstQuery } from './use-cache-first-query';
+
+/**
+ * Downloads the festival bundle when its version changed, then brings the user's set reminders in
+ * line with it (moved picks are rescheduled, cancelled picks lose their reminder). Never prompts.
+ */
+async function refreshBundleAndReminders(festivalId: string): Promise<FestivalBundle | null> {
+  const bundle = await fetchAndCacheFestival(festivalId);
+  void restoreSetReminders(festivalId);
+  return bundle;
+}
 
 /**
  * A festival's cached bundle (festival, stages, artists, sets), refreshed in the background with the
@@ -27,7 +38,7 @@ export function useFestivalBundle(festivalId: string | null | undefined) {
   return useCacheFirstQuery<FestivalBundle | null>({
     queryKey: queryKeys.festivalBundle(festivalId ?? 'none'),
     readLocal: () => (festivalId ? getLocalFestivalBundle(festivalId) : Promise.resolve(null)),
-    refresh: festivalId ? () => fetchAndCacheFestival(festivalId) : undefined,
+    refresh: festivalId ? () => refreshBundleAndReminders(festivalId) : undefined,
     enabled: Boolean(festivalId),
     refreshStaleTime: 5 * 60_000,
   });

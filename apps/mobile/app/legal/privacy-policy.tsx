@@ -19,7 +19,7 @@ type Span =
 type Block = { type: 'h2' | 'h3' | 'p' | 'li'; spans: Span[] };
 
 const TITLE = "Privacy Policy";
-const UPDATED = "October 14, 2026";
+const UPDATED = "October 12, 2026";
 const SUPPORT_EMAIL_TOKEN = '__SUPPORT_EMAIL__';
 /** docs/legal/values.json `supportEmail`, used only when the build has no EXPO_PUBLIC_SUPPORT_EMAIL. */
 const SUPPORT_EMAIL_FALLBACK: string | null = "support@joinfestie.com";
@@ -31,7 +31,7 @@ const CONTENT: Block[] = [
     "spans": [
       {
         "kind": "text",
-        "text": "Festie is a festival planning app operated by Kevin Pi (\"Festie\", \"we\", \"us\"). This policy explains what information the Festie app and its servers handle, why, who can see it, how long we keep it and the choices you have. If you have a question, email __SUPPORT_EMAIL__."
+        "text": "Festie is a festival planning app operated by Kevin Pi. In this policy, \"we\", \"us\" and \"our\" mean Kevin Pi, and \"Festie\" means the app and its services. This policy explains what information the Festie app and our servers handle, why, who can see it, how long we keep it and the choices you have. If you have a question, email __SUPPORT_EMAIL__."
       }
     ]
   },
@@ -377,7 +377,7 @@ const CONTENT: Block[] = [
     "spans": [
       {
         "kind": "text",
-        "text": "To work offline at a festival, Festie keeps your sign-in session, a copy of your schedule, crews and meetups, changes waiting to sync, your reminders and your settings in the app's private storage on your phone, which iOS protects with its standard data protection. Signing out or deleting your account in the app removes your account data from the phone. If you are signed out without doing it yourself (for example, your sign-in expires or you deleted your account on another device), Festie keeps that copy, including changes not yet synced, so nothing is lost: it cannot be viewed while you are signed out, and it is removed when you sign in again and then sign out, when a different account (including a new one after a deletion) signs in on the phone, or when you delete the app. Deleting the app removes everything."
+        "text": "To work offline at a festival, Festie keeps your sign-in session, a copy of your schedule, crews and meetups, changes waiting to sync, your reminders and your settings in the app's private storage on your phone, which iOS protects with its standard data protection. Signing out or deleting your account in the app removes your account data from the phone. If you are signed out without doing it yourself (for example, your sign-in expires or you deleted your account on another device), Festie keeps that copy, including changes not yet synced, so nothing is lost. The app does not show it while you are signed out. It is removed when you sign in again and then sign out, when a different account (including a new one after a deletion) signs in on the phone, or when you delete the app. Deleting the app removes everything."
       }
     ]
   },
@@ -773,7 +773,7 @@ const CONTENT: Block[] = [
       },
       {
         "kind": "text",
-        "text": " deleted automatically, with their meetups, when the last member leaves. Their photos are deleted with them when the last member deletes their account, and otherwise by routine cleanup within about a week."
+        "text": " deleted automatically, with their meetups, when the last member leaves. The crew's photos go at the same time when that member deleted their account; otherwise routine cleanup removes them within about a week."
       }
     ]
   },

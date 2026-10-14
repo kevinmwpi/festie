@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { configureReminderNotifications } from '@festival/notification-utils';
 import { colors, elevation, layout, radii, spacing, textStyles } from '@festival/ui';
+import { PlatformPressable } from '@react-navigation/elements';
+import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSyncEventBridge } from '@/src/hooks/use-sync-events';
@@ -18,7 +20,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
  */
 const UNFOCUSED_TAB_INK = 'rgba(44, 51, 39, 0.85)';
 
-/** The floating pill's height; the icon + label stack is centred in it. */
+/** The floating pill's height; the icon + label stack is centred in it (see TabButton). */
 const TAB_BAR_HEIGHT = 80;
 /**
  * Box React Navigation gives each tab icon. Its default (31×28) is sized for a bare glyph; ours stacks a
@@ -40,6 +42,22 @@ const TAB_CONFIG: Record<string, { icon: IoniconName; iconFocused: IoniconName; 
   group:     { icon: 'people-outline',        iconFocused: 'people',         label: 'Crews'    },
   map:       { icon: 'map-outline',           iconFocused: 'map',            label: 'Map'      },
 };
+
+/**
+ * React Navigation puts `tabBarItemStyle` on a wrapper View, while the pressable inside it fills that
+ * wrapper top-aligned with 5 pt of padding (`tabVerticalUiKit`). Centring the wrapper therefore moves
+ * nothing, and the icon stack sits about 8 pt above the middle of the pill. Centre the pressable itself.
+ */
+function TabButton(props: BottomTabBarButtonProps) {
+  return (
+    <PlatformPressable
+      {...props}
+      // A borderless ripple spills past the pill's rounded ends; keep it inside the tab, in neutral ink.
+      android_ripple={{ color: colors.fillStrong, borderless: false }}
+      style={[props.style, styles.tabButton]}
+    />
+  );
+}
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const cfg = TAB_CONFIG[name];
@@ -75,8 +93,8 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        // Centre each tab (React Navigation top-aligns them) in the full height of the pill.
-        tabBarItemStyle: { justifyContent: 'center', paddingVertical: 0 },
+        // Centre each tab's icon stack in the full height of the pill (see TabButton).
+        tabBarButton: TabButton,
         tabBarIconStyle: { width: '100%', height: TAB_ICON_BOX_HEIGHT },
         tabBarStyle: {
           backgroundColor: accent,
@@ -90,6 +108,10 @@ export default function TabLayout() {
           position: 'absolute',
           borderCurve: 'continuous',
           ...elevation.floating,
+          // Android only: clip the tab ripple to the pill's rounded ends. Android draws `elevation` from
+          // the view's outline, so the shadow survives the clip; iOS would clip its layer shadow, so the
+          // pill stays unclipped there (the ripple is Android-only anyway).
+          overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
           // Subtle white edge, as in the reference (border-white/20).
           borderWidth: 1,
           borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -107,6 +129,8 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  // Overrides the library's `justifyContent: 'flex-start', padding: 5` on the tab pressable.
+  tabButton: { justifyContent: 'center', padding: 0 },
   iconContainer: {
     alignItems: 'center',
     gap: spacing.xs,

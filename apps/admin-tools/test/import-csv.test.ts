@@ -32,6 +32,9 @@ describe('buildSeedFromCsv', () => {
     const validated = validateFestivalSeed(built.seed);
     expect(validated.errors).toEqual([]);
     expect(validated.seed).toEqual(demoFestivalJson());
+    // Byte for byte, as festival:import-csv writes it: an optional field that is left out (billing)
+    // must stay left out, or every re-import would rewrite the golden file.
+    expect(`${JSON.stringify(validated.seed, null, 2)}\n`).toBe(readRepoFile('seed-data/demo-festival.json'));
   });
 
   it('converts local times with the festival offset and matches names case-insensitively', () => {
@@ -60,6 +63,65 @@ describe('buildSeedFromCsv', () => {
     expect(second.sets[2].id).toBe(first.sets[2].id);
     expect(second.festival.id).toBe(first.festival.id);
     expect(second.artists.map((artist) => artist.id)).toEqual(first.artists.map((artist) => artist.id));
+  });
+
+  it('reads status, original_start and note, and keeps the id of a set that moved to another day', () => {
+    const before = validateFestivalSeed(buildSeedFromCsv(minimal).seed).seed!;
+    const built = buildSeedFromCsv({
+      ...minimal,
+      'sets.csv': [
+        'artist,stage,start,end,status,original_start,note',
+        // Friday 19:00 moved to Saturday 21:00: the id still comes from Friday.
+        'Artist One,Main,2027-08-07 21:00,2027-08-07 22:00,Moved,2027-08-06 19:00,"Moved to Saturday, weather"',
+        'artist one,tent,2027-08-07 01:00,2027-08-07 02:00,,,',
+        '"Artist, Two",Main,2027-08-07T18:00:00-05:00,2027-08-07T19:00:00-05:00,Canceled,,Artist withdrew',
+      ].join('\n'),
+    });
+    expect(built.errors).toEqual([]);
+    const result = validateFestivalSeed(built.seed);
+    expect(result.errors).toEqual([]);
+    const seed = result.seed!;
+    expect(seed.sets.map((set) => set.id)).toEqual(before.sets.map((set) => set.id));
+    expect(seed.sets.map((set) => [set.status, set.original_start_time, set.change_note])).toEqual([
+      ['moved', '2027-08-06T19:00:00-05:00', 'Moved to Saturday, weather'],
+      ['scheduled', null, null],
+      ['cancelled', null, 'Artist withdrew'],
+    ]);
+  });
+
+  it('reproduces seed-data/head-trip-2026.json from its CSVs, keeping the pre-change set ids', () => {
+    const csv = (file: string) => readRepoFile(`seed-data/head-trip-2026-csv/${file}`);
+    const built = buildSeedFromCsv({
+      'festival.csv': csv('festival.csv'),
+      'stages.csv': csv('stages.csv'),
+      'artists.csv': csv('artists.csv'),
+      'sets.csv': csv('sets.csv'),
+    });
+    expect(built.errors).toEqual([]);
+    const seed = validateFestivalSeed(built.seed).seed!;
+    expect(seed).toEqual(JSON.parse(readRepoFile('seed-data/head-trip-2026.json')));
+    // Calvin Harris moved from Saturday 23:00 to Sunday and keeps the id of his Saturday slot.
+    const calvin = seed.sets.find((set) => set.original_start_time === '2026-10-10T23:00:00-07:00');
+    expect(calvin).toMatchObject({ id: 'd7a78947-0a4d-5f80-a039-05879861acd6', status: 'moved', start_time: '2026-10-11T21:10:00-07:00' });
+  });
+
+  it('reads billing from artists.csv and leaves it out of the JSON when empty', () => {
+    const built = buildSeedFromCsv({
+      ...minimal,
+      'artists.csv': ['name,genre,billing', 'Artist One,Rock,2', '"Artist, Two",,1', 'Artist Three,,'].join('\n'),
+    });
+    expect(built.errors).toEqual([]);
+    const artists = (built.seed as { artists: Array<Record<string, unknown>> }).artists;
+    expect(artists.map((artist) => artist.billing_order)).toEqual([2, 1, undefined]);
+    expect('billing_order' in artists[2]).toBe(false);
+    expect(validateFestivalSeed(built.seed).errors).toEqual([]);
+
+    const bad = buildSeedFromCsv({ ...minimal, 'artists.csv': ['name,billing', 'Artist One,top', '"Artist, Two",0', 'Artist Three,10001'].join('\n') });
+    expect(bad.errors).toEqual([
+      { path: 'artists.csv:2 billing', message: '"top" must be a whole number between 1 and 10000 (1 = top billing)' },
+      { path: 'artists.csv:3 billing', message: '"0" must be a whole number between 1 and 10000 (1 = top billing)' },
+      { path: 'artists.csv:4 billing', message: '"10001" must be a whole number between 1 and 10000 (1 = top billing)' },
+    ]);
   });
 
   it('respects ids given in the CSV', () => {

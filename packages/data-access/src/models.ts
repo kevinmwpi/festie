@@ -3,6 +3,7 @@ import type { Database } from './database.types';
 type PublicTables = Database['public']['Tables'];
 
 export type ArtistRow = PublicTables['artists']['Row'];
+export type FestivalArtistRow = PublicTables['festival_artists']['Row'];
 export type FestivalRow = PublicTables['festivals']['Row'];
 export type GroupMemberRow = PublicTables['group_members']['Row'];
 export type GroupRow = PublicTables['groups']['Row'];
@@ -27,11 +28,20 @@ export type Stage = Omit<StageRow, 'map_x' | 'map_y'>;
 
 export type Artist = ArtistRow;
 
+/** One announced act of a festival (`festival_artists`, migration 014). */
+export type FestivalArtist = FestivalArtistRow;
+
+/** An announced artist whose set times the festival has not published yet. */
+export interface UnscheduledArtist extends Artist {
+  billing_order: number | null;
+}
+
 export type FestivalSet = SetRow;
 
 export interface FestivalBundle {
   festival: Festival;
   stages: Stage[];
+  /** Every artist of the festival: the announced lineup plus any set's artist, by name. */
   artists: Artist[];
   sets: FestivalSet[];
 }

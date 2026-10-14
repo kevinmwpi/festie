@@ -1,5 +1,6 @@
 export * from './auth';
 export * from './config';
+export * from './credits';
 export * from './database.types';
 export * from './errors';
 export * from './festivals';
@@ -13,6 +14,7 @@ export * from './profile';
 export * from './schedule';
 export { planSelectionMerge, type SelectionMergePlan } from './selection-merge';
 export * from './session';
+export * from './suggestions';
 export {
   callRpc,
   getSupabase,

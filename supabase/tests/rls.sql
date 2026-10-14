@@ -10,7 +10,7 @@
 -- Run with: npm run db:test
 
 begin;
-select plan(298);
+select plan(385);
 
 -- ===========================================================================
 -- Identities
@@ -130,7 +130,17 @@ insert into public.stages (id, festival_id, name, latitude, longitude) values
 
 insert into public.artists (id, name) values
   ('ad000000-0000-4000-8000-000000000001', 'Artist One'),
-  ('ad000000-0000-4000-8000-000000000002', 'Artist Two');
+  ('ad000000-0000-4000-8000-000000000002', 'Artist Two'),
+  ('ad000000-0000-4000-8000-000000000003', 'Artist Three');
+
+-- The announced lineup (014): every set's artist must be in it (sets_lineup_fkey). Artist Three is
+-- announced for Published One without a set yet ("set times to be announced").
+insert into public.festival_artists (festival_id, artist_id, billing_order) values
+  ('f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000001', 1),
+  ('f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000002', 2),
+  ('f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000003', null),
+  ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000001', null),
+  ('f0000000-0000-4000-8000-000000000003', 'ad000000-0000-4000-8000-000000000002', 1);
 
 insert into public.sets (id, festival_id, artist_id, stage_id, start_time, end_time) values
   ('e5000000-0000-4000-8000-000000000001', 'f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', '2027-06-01T20:00:00Z', '2027-06-01T21:00:00Z'),
@@ -236,7 +246,7 @@ select is_empty(
   $$ select tablename, policyname from pg_policies
      where schemaname = 'public'
        and tablename in ('chat_messages', 'group_invite_generations', 'auth_attempts', 'reports',
-                         'moderation_terms', 'rate_limit_events') $$,
+                         'moderation_terms', 'rate_limit_events', 'festival_suggestions') $$,
   'A2 locked tables have no policies'
 );
 
@@ -250,7 +260,7 @@ select is(
       and has_table_privilege('anon', c.oid, p.priv)
     order by 1
   ),
-  array['artists:SELECT', 'festivals:SELECT', 'sets:SELECT', 'stages:SELECT'],
+  array['artists:SELECT', 'festival_artists:SELECT', 'festivals:SELECT', 'sets:SELECT', 'stages:SELECT'],
   'A3 anon table privileges are exactly the public catalog'
 );
 
@@ -265,7 +275,7 @@ select is(
     order by 1
   ),
   array[
-    'artists:SELECT', 'festivals:SELECT', 'group_members:SELECT', 'groups:DELETE', 'groups:SELECT',
+    'artists:SELECT', 'festival_artists:SELECT', 'festivals:SELECT', 'group_members:SELECT', 'groups:DELETE', 'groups:SELECT',
     'location_shares:SELECT', 'meetups:DELETE', 'meetups:INSERT', 'meetups:SELECT', 'meetups:UPDATE',
     'sets:SELECT', 'stages:SELECT', 'user_blocks:SELECT', 'user_festivals:DELETE', 'user_festivals:INSERT',
     'user_festivals:SELECT', 'user_set_selections:DELETE', 'user_set_selections:INSERT',
@@ -357,6 +367,7 @@ select is(
       'public.rotate_invite_code(uuid)',
       'public.share_location(uuid, double precision, double precision, double precision, double precision)',
       'public.stop_sharing_location(uuid)',
+      'public.suggest_festival(text, text, text)',
       'public.unblock_user(uuid)',
       'public.upsert_my_profile(text, text, text)'
     ]) x order by 1
@@ -441,8 +452,8 @@ select is(
 );
 select is(
   (select count(*)::int from public.artists where id::text like 'ad000000-%'),
-  2,
-  'B4 anon sees artists'
+  3,
+  'B4 anon sees artists (every artist, including one announced without a set)'
 );
 select throws_ok(
   $$ insert into public.festivals (name, start_date, end_date, timezone) values ('x', '2027-01-01', '2027-01-02', 'UTC') $$,
@@ -2174,6 +2185,522 @@ select is(
   (select count(*)::int from public.join_group((select invite_code from public.groups where id = '90000000-0000-4000-8000-00000000000a'))),
   1,
   'P12 the new invite code works (control)'
+);
+
+-- ===========================================================================
+-- Q. Set status: moved and cancelled sets (011)
+-- ===========================================================================
+select pg_temp.become('superuser');
+select is(
+  array(select status || ':' || coalesce(original_start_time::text, '-') || ':' || coalesce(change_note, '-')
+        from public.sets where id::text like 'e5000000-%' order by id),
+  array['scheduled:-:-', 'scheduled:-:-', 'scheduled:-:-', 'scheduled:-:-'],
+  'Q1 existing sets default to scheduled with no original start or note'
+);
+-- carol picks the set that Q2 cancels (she already picks e5..01, which Q2 moves; fixture 5e..06).
+insert into public.user_set_selections (id, user_id, festival_id, set_id)
+values ('5e000000-0000-4000-8000-000000000021', 'b0000000-0000-4000-8000-000000000003',
+        'f0000000-0000-4000-8000-000000000001', 'e5000000-0000-4000-8000-000000000002');
+
+select pg_temp.become('service_role');
+select lives_ok(
+  $$ update public.sets
+     set status = 'moved', original_start_time = '2027-05-31T23:00:00Z',
+         start_time = '2027-06-01T20:00:00Z', change_note = 'Moved to Sunday (weather)'
+     where id = 'e5000000-0000-4000-8000-000000000001';
+     update public.sets set status = 'cancelled', change_note = 'Artist withdrew'
+     where id = 'e5000000-0000-4000-8000-000000000002' $$,
+  'Q2 the service role can mark sets moved and cancelled'
+);
+select throws_ok(
+  $$ update public.sets set status = 'postponed' where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q3 an unknown status is rejected'
+);
+select throws_ok(
+  $$ update public.sets set status = null where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23502', null, 'Q4 status cannot be null'
+);
+select throws_ok(
+  $$ update public.sets set original_start_time = now() where id = 'e5000000-0000-4000-8000-000000000002' $$,
+  '23514', null, 'Q5 a cancelled set cannot carry an original start time'
+);
+select throws_ok(
+  $$ update public.sets set original_start_time = now() where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q6 a scheduled set cannot carry an original start time'
+);
+select throws_ok(
+  $$ update public.sets set change_note = '' where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q7 an empty change note is rejected'
+);
+select throws_ok(
+  $$ update public.sets set change_note = repeat('x', 141) where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q8 a change note over 140 characters is rejected'
+);
+select throws_ok(
+  $$ update public.sets set change_note = ' Weather ' where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '23514', null, 'Q9 a change note with surrounding whitespace is rejected'
+);
+select lives_ok(
+  $$ update public.sets set change_note = repeat('x', 140) where id = 'e5000000-0000-4000-8000-000000000003';
+     update public.sets set change_note = null where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  'Q10 a 140-character note on a scheduled set is accepted (control)'
+);
+
+select pg_temp.become('anon');
+select is(
+  array(select status || ':' || coalesce((original_start_time = timestamptz '2027-05-31T23:00:00Z')::text, '-')
+               || ':' || coalesce(change_note, '-')
+        from public.sets where id::text like 'e5000000-%' order by id),
+  array['moved:true:Moved to Sunday (weather)', 'cancelled:-:Artist withdrew', 'scheduled:-:-'],
+  'Q11 anon reads status, original start and note of published sets'
+);
+
+select pg_temp.become('carol');
+select throws_ok(
+  $$ update public.sets set status = 'cancelled' where id = 'e5000000-0000-4000-8000-000000000003' $$,
+  '42501', null, 'Q12 authenticated users cannot change a set''s status'
+);
+
+-- Picks are never refused or removed because of a status, so a pick queued offline before a
+-- cancellation still syncs and users keep their picks of moved and cancelled sets.
+select pg_temp.become('carol');
+select is(
+  array(select id::text || ':' || set_id::text from public.user_set_selections
+        where user_id = 'b0000000-0000-4000-8000-000000000003' and festival_id = 'f0000000-0000-4000-8000-000000000001'
+        order by set_id),
+  array['5e000000-0000-4000-8000-000000000006:e5000000-0000-4000-8000-000000000001',
+        '5e000000-0000-4000-8000-000000000021:e5000000-0000-4000-8000-000000000002'],
+  'Q13 picks made before a set moved or was cancelled survive the change'
+);
+select pg_temp.become('frank');
+select lives_ok(
+  $$ insert into public.user_set_selections (id, user_id, festival_id, set_id)
+     values ('5e000000-0000-4000-8000-000000000020', 'b0000000-0000-4000-8000-000000000006',
+             'f0000000-0000-4000-8000-000000000001', 'e5000000-0000-4000-8000-000000000002') $$,
+  'Q14 a user can still pick a cancelled set (an offline pick queued before the change syncs)'
+);
+
+-- ===========================================================================
+-- R. Artwork: image credits (012) and the public artwork bucket (013)
+-- ===========================================================================
+-- admin-tools (service role) uploads artwork and writes the credit columns;
+-- the fixture uses the superuser for the first row.
+select pg_temp.become('superuser');
+insert into storage.objects (bucket_id, name, owner, owner_id) values
+  ('artwork', 'artists/ad000000-0000-4000-8000-000000000001.jpg', null, null);
+update public.artists
+set image_url = 'https://cdn.example.com/storage/v1/object/public/artwork/artists/ad000000-0000-4000-8000-000000000001.jpg',
+    image_credit = 'Jane Doe / Wikimedia Commons',
+    image_license = 'CC BY-SA 4.0',
+    image_source_url = 'https://commons.wikimedia.org/wiki/File:Artist_One.jpg'
+where id = 'ad000000-0000-4000-8000-000000000001';
+
+select pg_temp.become('anon');
+select is(
+  (select count(*)::int from storage.objects where bucket_id = 'artwork'),
+  1,
+  'R1 anon can read artwork object rows (public bucket)'
+);
+select is(
+  (select image_credit || '|' || image_license || '|' || image_source_url from public.artists
+    where id = 'ad000000-0000-4000-8000-000000000001'),
+  'Jane Doe / Wikimedia Commons|CC BY-SA 4.0|https://commons.wikimedia.org/wiki/File:Artist_One.jpg',
+  'R2 anon reads an artist''s image credit, licence and source through the catalog grant'
+);
+select throws_ok(
+  $$ insert into storage.objects (bucket_id, name) values ('artwork', 'artists/ad000000-0000-4000-8000-000000000002.jpg') $$,
+  '42501', null, 'R3 anon cannot upload artwork'
+);
+
+select pg_temp.become('carol');
+select is(
+  (select count(*)::int from storage.objects where bucket_id = 'artwork'),
+  1,
+  'R4 authenticated can read artwork object rows'
+);
+select is(
+  (select image_credit || '|' || image_license from public.artists where id = 'ad000000-0000-4000-8000-000000000001'),
+  'Jane Doe / Wikimedia Commons|CC BY-SA 4.0',
+  'R5 authenticated reads an artist''s image credit and licence'
+);
+select throws_ok(
+  $$ insert into storage.objects (bucket_id, name, owner_id)
+     values ('artwork', 'artists/ad000000-0000-4000-8000-000000000002.jpg', 'a0000000-0000-4000-8000-000000000003') $$,
+  '42501', null, 'R6 authenticated cannot upload artwork'
+);
+with u as (
+  update storage.objects set metadata = '{"x":1}' where bucket_id = 'artwork' returning 1
+)
+select is(count(*)::int, 0, 'R7 authenticated cannot update artwork objects') from u;
+select set_config('storage.allow_delete_query', 'true', true);
+with d as (
+  delete from storage.objects where bucket_id = 'artwork' returning 1
+)
+select is(count(*)::int, 0, 'R8 authenticated cannot delete artwork objects') from d;
+select set_config('storage.allow_delete_query', 'false', true);
+select throws_ok(
+  $$ update public.artists set image_credit = 'me' where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '42501', null, 'R9 authenticated users cannot change image credits'
+);
+
+-- Whatever permissive (e.g. dashboard-made) policies exist, a client never writes artwork objects:
+-- a probe policy that allows everything to authenticated still leaves the artwork bucket read-only.
+select pg_temp.become('superuser');
+insert into storage.buckets (id, name) values ('rls_probe', 'rls_probe');
+create policy rls_probe_allow_all on storage.objects for all to authenticated using (true) with check (true);
+select pg_temp.become('carol');
+select lives_ok(
+  $$ insert into storage.objects (bucket_id, name, owner_id) values ('rls_probe', 'probe.jpg', 'a0000000-0000-4000-8000-000000000003') $$,
+  'R10 the probe policy does let carol write another bucket (control)'
+);
+select throws_ok(
+  $$ insert into storage.objects (bucket_id, name, owner_id)
+     values ('artwork', 'artists/ad000000-0000-4000-8000-000000000002.jpg', 'a0000000-0000-4000-8000-000000000003') $$,
+  '42501', null, 'R11 the restrictive guard still refuses an artwork upload'
+);
+with u as (
+  update storage.objects set metadata = '{"x":1}' where bucket_id = 'artwork' returning 1
+)
+select is(count(*)::int, 0, 'R12 the restrictive guard still refuses artwork updates') from u;
+select set_config('storage.allow_delete_query', 'true', true);
+with d as (
+  delete from storage.objects where bucket_id = 'artwork' returning 1
+)
+select is(count(*)::int, 0, 'R13 the restrictive guard still refuses artwork deletes') from d;
+select set_config('storage.allow_delete_query', 'false', true);
+select pg_temp.become('superuser');
+drop policy rls_probe_allow_all on storage.objects;
+
+select pg_temp.become('service_role');
+select lives_ok(
+  $$ insert into storage.objects (bucket_id, name) values ('artwork', 'festivals/f0000000-0000-4000-8000-000000000001.webp') $$,
+  'R14 the service role (admin-tools) can upload artwork'
+);
+select lives_ok(
+  $$ update public.festivals
+     set image_url = 'https://cdn.example.com/storage/v1/object/public/artwork/festivals/f0000000-0000-4000-8000-000000000001.webp',
+         image_credit = 'Festival press kit', image_license = 'Used with permission'
+     where id = 'f0000000-0000-4000-8000-000000000001' $$,
+  'R15 the service role can set a festival image with its licence (control)'
+);
+select throws_ok(
+  $$ update public.artists set image_url = 'https://cdn.example.com/x.jpg', image_license = null
+     where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R16 an artist image without a licence is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_url = 'https://cdn.example.com/x.jpg', image_license = ''
+     where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R16b an empty licence id is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_credit = repeat('x', 301) where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R17 an image credit over 300 characters is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_credit = '' where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R18 an empty image credit is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_url = 'http://cdn.example.com/x.jpg' where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R19 a non-https artist image URL is rejected'
+);
+select throws_ok(
+  $$ update public.artists set image_source_url = 'ftp://example.com/x' where id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R20 a non-https image source URL is rejected'
+);
+select throws_ok(
+  $$ update public.festivals set image_url = 'https://cdn.example.com/x.jpg', image_license = null
+     where id = 'f0000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R21 a festival image without a licence is rejected'
+);
+select throws_ok(
+  $$ update public.festivals set image_url = 'http://cdn.example.com/x.jpg' where id = 'f0000000-0000-4000-8000-000000000001' $$,
+  '23514', null, 'R22 a non-https festival image URL is rejected'
+);
+select lives_ok(
+  $$ update public.artists set image_credit = repeat('x', 300), image_source_url = null
+     where id = 'ad000000-0000-4000-8000-000000000001';
+     update public.artists set image_url = null, image_credit = null, image_license = null
+     where id = 'ad000000-0000-4000-8000-000000000002' $$,
+  'R23 a 300-character credit without a source and an image-less artist are accepted (control)'
+);
+select pg_temp.become('superuser');
+select ok(
+  (select public and file_size_limit = 2097152 and allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+   from storage.buckets where id = 'artwork'),
+  'R24 artwork bucket is public, 2 MiB, JPEG/PNG/WebP'
+);
+select is(
+  (select array_agg(policyname::text order by policyname) from pg_policies
+    where schemaname = 'storage' and tablename = 'objects' and policyname like 'artwork%'),
+  array['artwork_no_client_delete', 'artwork_no_client_insert', 'artwork_no_client_update', 'artwork_select_public'],
+  'R25 exactly the 013 artwork policies exist'
+);
+
+-- ===========================================================================
+-- S. Festival suggestions (012): locked table, suggest_festival RPC
+-- ===========================================================================
+select pg_temp.become('carol');
+select lives_ok(
+  $$ select public.suggest_festival('Countdown NYE', 'https://countdownnye.com', 'please') $$,
+  'S1 a user can suggest a festival'
+);
+select is(
+  public.suggest_festival('Countdown NYE', 'https://countdownnye.com', 'please'),
+  public.suggest_festival('  countdown nye  '),
+  'S2 suggesting the same name again (any case or spacing) returns the existing id'
+);
+select pg_temp.become('service_role');
+select is(
+  (select count(*)::int from public.festival_suggestions where user_id = 'b0000000-0000-4000-8000-000000000003'),
+  1,
+  'S3 a repeated suggestion inserts no second row'
+);
+select is(
+  (select name || '|' || url || '|' || note || '|' || status from public.festival_suggestions
+    where user_id = 'b0000000-0000-4000-8000-000000000003'),
+  'Countdown NYE|https://countdownnye.com|please|new',
+  'S4 the service role (admin-tools) reads suggestions; they are stored trimmed with status new'
+);
+
+select pg_temp.become('anon');
+select throws_ok(
+  $$ select public.suggest_festival('Anon Fest') $$,
+  '42501', null, 'S5 anon cannot call suggest_festival'
+);
+select throws_ok(
+  $$ select 1 from public.festival_suggestions limit 1 $$,
+  '42501', null, 'S6 anon cannot read festival_suggestions'
+);
+select pg_temp.become('nopro');
+select throws_ok(
+  $$ select public.suggest_festival('No Profile Fest') $$,
+  'P0001', 'profile_required', 'S7 an auth user without a profile cannot suggest'
+);
+
+select pg_temp.become('carol');
+select throws_ok(
+  $$ select 1 from public.festival_suggestions limit 1 $$,
+  '42501', null, 'S8 authenticated cannot read festival_suggestions directly'
+);
+select throws_ok(
+  $$ insert into public.festival_suggestions (user_id, name) values ('b0000000-0000-4000-8000-000000000003', 'Direct') $$,
+  '42501', null, 'S9 authenticated cannot insert festival_suggestions directly'
+);
+select throws_ok(
+  $$ update public.festival_suggestions set status = 'accepted' $$,
+  '42501', null, 'S10 authenticated cannot update festival_suggestions directly'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Bad URL Fest', 'http://example.com') $$,
+  'P0001', 'invalid_input', 'S11 a non-https url is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Long URL Fest', 'https://example.com/' || repeat('x', 500)) $$,
+  'P0001', 'invalid_input', 'S12 a url over 500 characters is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival('   ') $$,
+  'P0001', 'invalid_input', 'S13 a blank name is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival(repeat('x', 121)) $$,
+  'P0001', 'invalid_input', 'S14 a name over 120 characters is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Long Note Fest', null, repeat('x', 301)) $$,
+  'P0001', 'invalid_input', 'S15 a note over 300 characters is rejected'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Nazi Fest') $$,
+  'P0001', 'content_not_allowed', 'S16 a disallowed word in the name is refused'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Nice Fest', null, 'fuck this') $$,
+  'P0001', 'content_not_allowed', 'S17 a disallowed word in the note is refused'
+);
+-- Rate limit: 5 new suggestions per user per day. Countdown NYE was the first;
+-- the repeated call and the refused calls above did not count.
+select lives_ok(
+  $$ select public.suggest_festival('Fest ' || n) from generate_series(2, 5) n $$,
+  'S18 four more distinct suggestions are accepted (five in a day)'
+);
+select throws_ok(
+  $$ select public.suggest_festival('Fest 6') $$,
+  'P0001', 'rate_limited', 'S19 the 6th new suggestion in a day is rate limited'
+);
+select lives_ok(
+  $$ select public.suggest_festival('Countdown NYE') $$,
+  'S20 a repeated name still returns its id while rate limited'
+);
+select pg_temp.become('alice');
+select lives_ok(
+  $$ select public.suggest_festival('Countdown NYE') $$,
+  'S21 another user can suggest the same festival (the limit is per user)'
+);
+
+select pg_temp.become('service_role');
+select is(
+  array(select name from public.festival_suggestions
+        where user_id = 'b0000000-0000-4000-8000-000000000003' order by name),
+  array['Countdown NYE', 'Fest 2', 'Fest 3', 'Fest 4', 'Fest 5'],
+  'S22 exactly five suggestions were stored for the rate-limited user'
+);
+select is(
+  (select count(*)::int from public.festival_suggestions where lower(name) = 'countdown nye'),
+  2,
+  'S23 the same festival is stored once per user'
+);
+select throws_ok(
+  $$ update public.festival_suggestions set status = 'maybe' where name = 'Fest 2' $$,
+  '23514', null, 'S24 an unknown suggestion status is rejected'
+);
+select lives_ok(
+  $$ update public.festival_suggestions set status = 'duplicate' where name = 'Fest 2' $$,
+  'S25 admin-tools can set a suggestion status (control)'
+);
+
+-- ===========================================================================
+-- T. Festival lineup: announced acts with or without a set (014)
+-- ===========================================================================
+-- festival:seed (service role) writes the lineup; the fixture (top of this file) uses the superuser.
+-- Artist Three is announced for Published One but has no set yet ("set times to be announced").
+select pg_temp.become('superuser');
+-- Scenario main also carries the dirty fixture's backfilled Legacy Fest row: count only this fixture.
+select is(
+  (select count(*)::int from public.festival_artists where festival_id::text like 'f0000000-%'),
+  5,
+  'T1 the lineup fixture is in place (control)'
+);
+
+select pg_temp.become('anon');
+select is(
+  array(select right(festival_id::text, 1) || ':' || right(artist_id::text, 1) || ':' || coalesce(billing_order::text, '-')
+        from public.festival_artists order by festival_id, artist_id),
+  array['1:1:1', '1:2:2', '1:3:-', '2:1:-'],
+  'T2 anon reads the lineup of published festivals, including an act without a set, but not of a draft'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000002') $$,
+  '42501', null, 'T3 anon cannot add an act to a lineup'
+);
+
+select pg_temp.become('carol');
+select is(
+  (select count(*)::int from public.festival_artists where festival_id::text like 'f0000000-%'),
+  4,
+  'T4 a signed-in user reads the same four published lineup rows'
+);
+select is(
+  (select count(*)::int from public.festival_artists where festival_id = 'f0000000-0000-4000-8000-000000000003'),
+  0,
+  'T5 a signed-in user sees no lineup row of a draft festival'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000002') $$,
+  '42501', null, 'T6 a signed-in user cannot add an act to a lineup'
+);
+select throws_ok(
+  $$ update public.festival_artists set billing_order = 9
+     where festival_id = 'f0000000-0000-4000-8000-000000000001' $$,
+  '42501', null, 'T7 a signed-in user cannot change billing'
+);
+select throws_ok(
+  $$ delete from public.festival_artists where festival_id = 'f0000000-0000-4000-8000-000000000001' $$,
+  '42501', null, 'T8 a signed-in user cannot remove an act from a lineup'
+);
+
+select pg_temp.become('service_role');
+select lives_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id, billing_order)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000003', 10000);
+     update public.festival_artists set billing_order = null
+     where festival_id = 'f0000000-0000-4000-8000-000000000002' and artist_id = 'ad000000-0000-4000-8000-000000000003';
+     delete from public.festival_artists
+     where festival_id = 'f0000000-0000-4000-8000-000000000002' and artist_id = 'ad000000-0000-4000-8000-000000000003' $$,
+  'T9 the service role (festival:seed) adds, re-bills and removes acts (control)'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000001', 'ad000000-0000-4000-8000-000000000001') $$,
+  '23505', null, 'T10 an act is listed once per festival'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id, billing_order)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000003', 0) $$,
+  '23514', null, 'T11 billing starts at 1'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id, billing_order)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000003', 10001) $$,
+  '23514', null, 'T12 billing is capped at 10000'
+);
+select throws_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-0000000000ee') $$,
+  '23503', null, 'T13 a lineup row needs an existing artist'
+);
+select throws_ok(
+  $$ delete from public.artists where id = 'ad000000-0000-4000-8000-000000000003' $$,
+  '23503', null, 'T14 an artist that is in a lineup cannot be deleted (like one with a set)'
+);
+
+select pg_temp.become('superuser');
+insert into public.festivals (id, name, start_date, end_date, timezone, status)
+values ('f0000000-0000-4000-8000-0000000000ee', 'Throwaway', '2027-10-01', '2027-10-02', 'UTC', 'draft');
+insert into public.festival_artists (festival_id, artist_id)
+values ('f0000000-0000-4000-8000-0000000000ee', 'ad000000-0000-4000-8000-000000000003');
+delete from public.festivals where id = 'f0000000-0000-4000-8000-0000000000ee';
+select is(
+  (select count(*)::int from public.festival_artists where festival_id = 'f0000000-0000-4000-8000-0000000000ee'),
+  0,
+  'T15 deleting a festival deletes its lineup rows'
+);
+select is(
+  (select count(*)::int from public.artists where id = 'ad000000-0000-4000-8000-000000000003'),
+  1,
+  'T16 the artist survives the festival (artists are global)'
+);
+select ok(
+  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'festival_artists_artist_id_idx'),
+  'T17 the artist foreign key is indexed'
+);
+select is(
+  (select array_agg(policyname::text order by policyname) from pg_policies
+    where schemaname = 'public' and tablename = 'festival_artists'),
+  array['festival_artists_select_published'],
+  'T18 exactly the 014 lineup policy exists on festival_artists'
+);
+-- The lineup never lags the schedule: a set needs its artist in the festival's lineup, and an act with
+-- a set cannot be dropped from the lineup (festival:seed deletes stale sets first).
+select pg_temp.become('service_role');
+select throws_ok(
+  $$ insert into public.sets (id, festival_id, artist_id, stage_id, start_time, end_time)
+     values ('e5000000-0000-4000-8000-0000000000ee', 'f0000000-0000-4000-8000-000000000002',
+             'ad000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000003',
+             '2027-07-01T22:00:00Z', '2027-07-01T23:00:00Z') $$,
+  '23503', null, 'T19 a set whose artist is not in the festival''s lineup is refused'
+);
+select throws_ok(
+  $$ delete from public.festival_artists
+     where festival_id = 'f0000000-0000-4000-8000-000000000001' and artist_id = 'ad000000-0000-4000-8000-000000000001' $$,
+  '23503', null, 'T20 an act that still has a set cannot be dropped from the lineup'
+);
+select lives_ok(
+  $$ insert into public.festival_artists (festival_id, artist_id)
+     values ('f0000000-0000-4000-8000-000000000002', 'ad000000-0000-4000-8000-000000000003');
+     insert into public.sets (id, festival_id, artist_id, stage_id, start_time, end_time)
+     values ('e5000000-0000-4000-8000-0000000000ee', 'f0000000-0000-4000-8000-000000000002',
+             'ad000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000003',
+             '2027-07-01T22:00:00Z', '2027-07-01T23:00:00Z') $$,
+  'T21 the same set is accepted once the act is in the lineup (control)'
+);
+select ok(
+  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'sets_festival_id_artist_id_idx'),
+  'T22 the composite lineup foreign key on sets is indexed'
 );
 
 select * from finish();

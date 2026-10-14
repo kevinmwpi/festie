@@ -24,6 +24,80 @@ describe('validateFestivalSeed', () => {
     expect(result.warnings.map((warning) => warning.path)).toEqual(['stages[1]']);
   });
 
+  it('defaults every set to scheduled with no original start or note', () => {
+    const result = validateFestivalSeed(realFestival());
+    expect(result.seed?.sets.map((set) => [set.status, set.original_start_time, set.change_note])).toEqual([
+      ['scheduled', null, null],
+      ['scheduled', null, null],
+    ]);
+  });
+
+  it('accepts moved and cancelled sets, trims notes, and skips cancelled sets in the overlap check', () => {
+    const result = validateFestivalSeed(
+      mutate((file) => {
+        Object.assign(file.sets[0], {
+          status: 'moved',
+          start_time: '2027-08-07T19:00:00-05:00',
+          end_time: '2027-08-07T20:00:00-05:00',
+          original_start_time: '2027-08-06T19:00:00-05:00',
+          change_note: '  Moved to Saturday (weather)  ',
+        });
+        file.sets.push({
+          id: '44444444-4444-4444-8444-444444444443',
+          artist_id: '33333333-3333-4333-8333-333333333332',
+          stage_id: '22222222-2222-4222-8222-222222222221',
+          start_time: '2027-08-07T19:30:00-05:00',
+          end_time: '2027-08-07T20:30:00-05:00',
+          status: 'cancelled',
+          change_note: 'Artist withdrew',
+        });
+      }),
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.seed?.sets[0]).toMatchObject({
+      status: 'moved',
+      original_start_time: '2027-08-06T19:00:00-05:00',
+      change_note: 'Moved to Saturday (weather)',
+    });
+    expect(result.seed?.sets[2]).toMatchObject({ status: 'cancelled', original_start_time: null, change_note: 'Artist withdrew' });
+    expect(result.warnings.map((warning) => warning.path)).toEqual(['stages[1]']);
+  });
+
+  it('rejects set changes the database would refuse', () => {
+    expect(errorsOf(mutate((file) => (file.sets[0].status = 'postponed')))).toEqual([
+      'sets[0].status: must be one of scheduled, moved, cancelled',
+    ]);
+    expect(errorsOf(mutate((file) => (file.sets[0].original_start_time = '2027-08-06T18:00:00-05:00')))).toEqual([
+      'sets[0].original_start_time: is only allowed when status is "moved"',
+    ]);
+    expect(
+      errorsOf(mutate((file) => Object.assign(file.sets[0], { status: 'moved', original_start_time: '2027-08-06 18:00' }))),
+    ).toEqual(['sets[0].original_start_time: must be an ISO 8601 timestamp with an offset, e.g. 2027-06-18T19:30:00-04:00']);
+    expect(
+      errorsOf(mutate((file) => Object.assign(file.sets[0], { status: 'moved', original_start_time: '2027-09-01T18:00:00-05:00' }))),
+    ).toEqual([
+      'sets[0].original_start_time: is on 2027-09-01 (America/Chicago), outside the festival dates ±1 day (2027-08-05..2027-08-08)',
+    ]);
+    expect(errorsOf(mutate((file) => (file.sets[0].change_note = 'x'.repeat(141))))).toEqual([
+      'sets[0].change_note: must be at most 140 characters (got 141)',
+    ]);
+    expect(errorsOf(mutate((file) => (file.sets[0].change_note = 'Line one\nLine two')))).toEqual([
+      'sets[0].change_note: must be a single line',
+    ]);
+  });
+
+  it('warns about a moved set without its old time, or with an unchanged one', () => {
+    const missing = validateFestivalSeed(mutate((file) => (file.sets[0].status = 'moved')));
+    expect(missing.errors).toEqual([]);
+    expect(missing.warnings.map((warning) => warning.path)).toContain('sets[0].original_start_time');
+    const unchanged = validateFestivalSeed(
+      mutate((file) => Object.assign(file.sets[0], { status: 'moved', original_start_time: file.sets[0].start_time })),
+    );
+    expect(unchanged.warnings.map((warning) => `${warning.path}: ${warning.message}`)).toContain(
+      'sets[0].original_start_time: equals start_time; leave it empty for a set that only changed stage',
+    );
+  });
+
   it('accepts the bundled demo festival', () => {
     const result = validateFestivalSeed(demoFestivalJson());
     expect(result.errors).toEqual([]);
@@ -136,10 +210,27 @@ describe('validateFestivalSeed', () => {
     );
   });
 
-  it('requires sets before publishing and warns about overlaps', () => {
-    expect(errorsOf(mutate((file) => { file.festival.status = 'published'; file.sets = []; }))).toContain(
-      'sets: a published festival needs at least one set',
+  it('publishes a lineup without set times, but never an empty one, and warns about overlaps', () => {
+    // Announcement mode: artists announced, set times to be announced.
+    const lineupOnly = validateFestivalSeed(mutate((file) => { file.festival.status = 'published'; file.sets = []; }));
+    expect(lineupOnly.errors).toEqual([]);
+    expect(lineupOnly.seed?.artists).toHaveLength(2);
+    expect(lineupOnly.warnings.map((warning) => `${warning.path}: ${warning.message}`)).toContain(
+      'sets: no set times yet: the app shows the lineup as "set times to be announced"',
     );
+    expect(errorsOf(mutate((file) => { file.festival.status = 'published'; file.sets = []; file.artists = []; }))).toEqual([
+      'artists: a published festival needs a lineup: at least one artist (set times can follow later)',
+    ]);
+    // A draft may be empty.
+    expect(errorsOf(mutate((file) => { file.sets = []; file.artists = []; }))).toEqual([]);
+
+    // Partly timed: the acts still waiting are named.
+    const partial = validateFestivalSeed(mutate((file) => { file.sets.pop(); }));
+    expect(partial.errors).toEqual([]);
+    expect(partial.warnings.map((warning) => `${warning.path}: ${warning.message}`)).toContain(
+      'artists: 1 of 2 artists have no set yet (Artist Two): the app lists them under "set times to be announced"',
+    );
+
     const overlapping = mutate((file) => {
       file.sets[1].stage_id = file.sets[0].stage_id;
       file.sets[1].start_time = '2027-08-06T19:30:00-05:00';
@@ -148,6 +239,33 @@ describe('validateFestivalSeed', () => {
     const result = validateFestivalSeed(overlapping);
     expect(result.errors).toEqual([]);
     expect(result.warnings.map((warning) => warning.message)).toContain('overlaps sets[0] on the same stage');
+  });
+
+  it('accepts billing order per artist and reports the database range', () => {
+    const billed = validateFestivalSeed(mutate((file) => { file.artists[0].billing_order = 2; file.artists[1].billing_order = 1; }));
+    expect(billed.errors).toEqual([]);
+    expect(billed.seed?.artists.map((artist) => artist.billing_order)).toEqual([2, 1]);
+    // Left out when not given, so files without billing round-trip unchanged.
+    expect('billing_order' in validateFestivalSeed(realFestival()).seed!.artists[0]).toBe(false);
+    expect(errorsOf(mutate((file) => (file.artists[0].billing_order = 0)))).toEqual([
+      'artists[0].billing_order: must be an integer between 1 and 10000 (1 = top billing)',
+    ]);
+    expect(errorsOf(mutate((file) => (file.artists[0].billing_order = 1.5)))).toEqual([
+      'artists[0].billing_order: must be an integer between 1 and 10000 (1 = top billing)',
+    ]);
+    expect(errorsOf(mutate((file) => (file.artists[0].billing_order = '1')))).toEqual([
+      'artists[0].billing_order: must be an integer between 1 and 10000 (1 = top billing)',
+    ]);
+    // A poster's tiers: several acts share a number and sort alphabetically within it.
+    const tiered = validateFestivalSeed(mutate((file) => { file.artists[0].billing_order = 1; file.artists[1].billing_order = 1; }));
+    expect(tiered.errors).toEqual([]);
+    expect(tiered.warnings.map((warning) => warning.path)).not.toContain('artists[1].billing_order');
+  });
+
+  it('never lets the demo festival go without set times', () => {
+    const demo = demoFestivalJson();
+    demo.sets = [];
+    expect(errorsOf(demo)).toEqual(["sets: the demo festival needs set times: demo:seed builds the sample crew's picks and meetups from them"]);
   });
 
   it('rejects non-object input', () => {

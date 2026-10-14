@@ -9,17 +9,17 @@ Placeholders (__LIKE_THIS__) are listed in docs/release-runbook.md, section 7.1.
 template variable filled in by the generator (see docs/legal/generate.mjs), not a placeholder.
 -->
 
-Last updated: October 14, 2026
+Last updated: October 12, 2026
 
-These Terms of Use ("Terms") are an agreement between you and Kevin Pi ("Festie", "we", "us") for using the Festie app and its services. By creating an account or using Festie you agree to these Terms and confirm you have read our [Privacy Policy](./privacy-policy.md). If you do not agree, do not use Festie.
+These Terms of Use are an agreement between you and Kevin Pi, who operates the Festie app and its services. In these Terms, "we", "us" and "our" mean Kevin Pi, and "Festie" means the app and its services. By creating an account or using Festie, you agree to these Terms and confirm you have read our [Privacy Policy](./privacy-policy.md). If you do not agree, do not use Festie.
 
 ## 1. Zero tolerance for objectionable content and abuse
 
-Festie has zero tolerance for objectionable content or abusive users; we act on reports within 24 hours by removing content and ejecting offenders. You can report any person, crew, meetup or photo and block any person from within the app.
+We have zero tolerance for objectionable content or abusive users: we act on reports within 24 hours by removing content and ejecting offenders. You can report any person, crew, meetup or photo and block any person from within the app.
 
 ## 2. Who can use Festie
 
-- You must be at least 13 years old. If you are under the age of majority where you live, you may use Festie only with the permission of a parent or guardian, who agrees to these Terms for you.
+- You must be at least 13 years old. If you are under the age of majority where you live (18 in most places), you may use Festie only with the permission of a parent or guardian, who agrees to these Terms for you.
 - You must not use Festie if we have banned you, or if the law where you live does not allow you to.
 - You need a valid email address that you control. Keep access to it secure: anyone who can read your email can sign in to your account. You are responsible for what happens in your account.
 

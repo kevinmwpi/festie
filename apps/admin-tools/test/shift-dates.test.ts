@@ -36,6 +36,15 @@ describe('shiftFestivalDates', () => {
     expect(moved.end_time.slice(0, 16)).toBe(`${addOneDay(moved.start_time.slice(0, 10))}T00:30`);
   });
 
+  it('shifts the original start of a moved set with the rest of the schedule', () => {
+    const original = demoSeed();
+    const set = original.sets[0];
+    original.sets[0] = { ...set, status: 'moved', original_start_time: set.start_time };
+    const { seed } = shiftFestivalDates(original, '2026-10-09');
+    expect(seed.sets[0].original_start_time).toBe(seed.sets[0].start_time);
+    expect(seed.sets[1].original_start_time).toBeNull();
+  });
+
   it('refuses real festivals and invalid dates', () => {
     const real = validateFestivalSeed(realFestival()).seed!;
     expect(() => shiftFestivalDates(real, '2027-09-01')).toThrow(/only moves demo festivals/);

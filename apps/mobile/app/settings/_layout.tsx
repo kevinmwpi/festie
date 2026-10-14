@@ -17,6 +17,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="blocked-users" />
+      <Stack.Screen name="credits" />
       <Stack.Screen name="delete-account" />
     </Stack>
   );

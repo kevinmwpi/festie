@@ -1,8 +1,10 @@
 import { getConflictSetIds, type ScheduleRow } from '@festival/data-access';
 import {
   DEFAULT_DAY_START_HOUR,
+  describeSetChange,
   festivalDayKey,
   festivalDayMinutesRange,
+  isCancelledSet,
   listFestivalDays,
 } from '@festival/domain';
 import { syncSetReminders } from '@festival/notification-utils';
@@ -33,11 +35,13 @@ import { ActionSheet } from '@/src/components/BottomSheet';
 import { TimeZoneHint } from '@/src/components/FestivalNotes';
 import { pastelFor } from '@/src/components/palette';
 import { ScreenHeader } from '@/src/components/ScreenHeader';
+import { cancelledTextStyle, ScheduleChangesNotice, setChangeDetailText } from '@/src/components/SetChange';
 import { FestivalBundleState, LoadingState, NoFestivalState, StaleDataNote } from '@/src/components/StateViews';
 import { useFestivalClock, type FestivalClock } from '@/src/hooks/use-festival';
 import { useMySchedule } from '@/src/hooks/use-lineup';
 import { useSetSelection } from '@/src/hooks/use-set-selection';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
+import { runReminderTask } from '@/src/notifications/reminder-queue';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { useAppStore } from '@/src/state/app-store';
 
@@ -172,13 +176,17 @@ function layoutTimeline(rows: ScheduleRow[], timeZone: string, conflictIds: Set<
 function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; clock: FestivalClock; onPress: () => void }) {
   const widthPercent = 100 / block.totalColumns;
   const time = clock.range(block.row.start_time, block.row.end_time);
+  const change = describeSetChange(block.row, clock.timeZone);
+  const cancelled = change?.status === 'cancelled';
+  // Small blocks have room for one status word in place of the stage line.
+  const stageLine = change?.label ? `${change.label} · ${block.row.stage_name}` : block.row.stage_name;
   return (
     // The slot fills the block's column; its horizontal padding leaves a 4pt gap between side-by-side
     // blocks (2pt at the grid edges) without pushing the block past its column.
     <PressableScale
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${block.row.artist_name}, ${block.row.stage_name}, ${time}${block.isConflict ? ', conflicts with another pick' : ''}`}
+      accessibilityLabel={`${block.row.artist_name}, ${block.row.stage_name}, ${time}${block.isConflict ? ', conflicts with another pick' : ''}${change ? `. ${change.accessibilityLabel}` : ''}`}
       accessibilityHint="Shows options for this set"
       style={[
         styles.blockSlot,
@@ -196,11 +204,14 @@ function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; cloc
           style={[
             styles.blockClip,
             { borderLeftColor: pastelFor(block.row.stage_id) },
+            cancelled && styles.blockCancelled,
+            change?.status === 'moved' && styles.blockMoved,
+            // Last, so a moved set that now clashes still shows the conflict ring.
             block.isConflict && styles.blockConflict,
           ]}
         >
           <Text
-            style={styles.blockArtist}
+            style={[styles.blockArtist, cancelled && cancelledTextStyle]}
             numberOfLines={block.height >= ARTIST_TWO_LINE_MIN_HEIGHT ? 2 : 1}
             maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}
           >
@@ -212,8 +223,12 @@ function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; cloc
             ) : null}
             {block.row.artist_name}
           </Text>
-          <Text style={styles.blockStage} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
-            {block.row.stage_name}
+          <Text
+            style={[styles.blockStage, change?.label ? (cancelled ? styles.blockStatusCancelled : styles.blockStatusMoved) : null]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}
+          >
+            {stageLine}
           </Text>
           {block.height >= TIME_LINE_MIN_HEIGHT ? (
             <Text style={styles.blockTime} numberOfLines={1} maxFontSizeMultiplier={BLOCK_MAX_FONT_SCALE}>
@@ -226,6 +241,16 @@ function TimelineBlock({ block, clock, onPress }: { block: PositionedBlock; cloc
   );
 }
 
+function actionSheetMessage(row: ScheduleRow, clock: FestivalClock): string {
+  const when = `${row.stage_name} · ${clock.day(row.start_time, { weekday: 'short', month: 'short', day: 'numeric' })} · ${clock.range(row.start_time, row.end_time)}`;
+  const change = describeSetChange(row, clock.timeZone);
+  if (!change) {
+    return when;
+  }
+  const detail = setChangeDetailText(change);
+  return [when, [change.label, detail].filter(Boolean).join(': ')].filter(Boolean).join('\n');
+}
+
 /* ─── Screen ────────────────────────────────────────────── */
 
 export default function PersonalScheduleScreen() {
@@ -236,7 +261,9 @@ export default function PersonalScheduleScreen() {
   useSafeAreaEdgeTint(screenBg);
   const isOffline = useOfflineStatus();
 
-  const { bundle, schedule, festival } = useMySchedule(festivalId);
+  const { bundle, schedule, unscheduled, festival } = useMySchedule(festivalId);
+  // Announcement mode: the lineup is out but no set has a time yet, so there is nothing to pick.
+  const setTimesPending = bundle.data?.sets.length === 0 && (unscheduled.data?.length ?? 0) > 0;
   const clock = useFestivalClock(festival);
   const { toggle } = useSetSelection(festival);
   const rows = schedule.data ?? NO_ROWS;
@@ -263,9 +290,11 @@ export default function PersonalScheduleScreen() {
   );
 
   const days = React.useMemo(() => (festival ? listFestivalDays(festival, rows) : []), [festival, rows]);
+  // Day chips count the sets the user will actually see (cancelled picks stay listed but not counted).
   const countsByDay = React.useMemo(() => {
     const counts = new Map<string, number>();
     rows.forEach((row) => {
+      if (isCancelledSet(row)) return;
       const day = dayOf(row);
       if (day) counts.set(day, (counts.get(day) ?? 0) + 1);
     });
@@ -292,16 +321,21 @@ export default function PersonalScheduleScreen() {
   const dayRows = React.useMemo(() => rows.filter((row) => dayOf(row) === activeDay), [activeDay, dayOf, rows]);
   const timeline = React.useMemo(() => layoutTimeline(dayRows, timeZone, conflictIds), [conflictIds, dayRows, timeZone]);
 
-  // Keep existing reminders in step with picks (cancel removed sets, reschedule moved ones). Never prompts.
+  // Keep existing reminders in step with picks (cancel removed and cancelled sets, reschedule moved
+  // ones). Never prompts. Keyed on primitives, not the festival object: a new festival version
+  // re-creates that object before the picks are re-read, and a run with those stale picks would
+  // move a rescheduled reminder back. Queued with the other reminder work for the same reason.
+  const syncFestivalId = festival?.id ?? null;
+  const syncTimeZone = festival?.timezone ?? null;
   React.useEffect(() => {
-    if (!festival || schedule.isLoading || schedule.data === undefined) {
+    if (!syncFestivalId || !syncTimeZone || schedule.isLoading || schedule.data === undefined) {
       return;
     }
-    void syncSetReminders(
-      rows.map((row) => ({ id: row.id, start_time: row.start_time, artist_name: row.artist_name, stage_name: row.stage_name })),
-      { timeZone: festival.timezone, festivalId: festival.id },
-    );
-  }, [festival, rows, schedule.data, schedule.isLoading]);
+    const picks = rows
+      .filter((row) => !isCancelledSet(row))
+      .map((row) => ({ id: row.id, start_time: row.start_time, artist_name: row.artist_name, stage_name: row.stage_name }));
+    void runReminderTask(() => syncSetReminders(picks, { timeZone: syncTimeZone, festivalId: syncFestivalId }));
+  }, [syncFestivalId, syncTimeZone, rows, schedule.data, schedule.isLoading]);
 
   const handleRefresh = React.useCallback(async () => {
     await Promise.all([bundle.refetch(), schedule.refetch()]);
@@ -314,8 +348,8 @@ export default function PersonalScheduleScreen() {
         festival ? (
           <IconButton
             icon={<Ionicons name="add" size={24} color={colors.textPrimary} />}
-            accessibilityLabel="Add sets from the lineup"
-            onPress={() => router.push('/(tabs)/schedule/browse')}
+            accessibilityLabel={setTimesPending ? 'See the lineup (set times to be announced)' : 'Add sets from the lineup'}
+            onPress={() => router.push(setTimesPending ? '/(tabs)/lineup' : '/(tabs)/schedule/browse')}
           />
         ) : undefined
       }
@@ -380,14 +414,22 @@ export default function PersonalScheduleScreen() {
         />
 
         {festival ? (
-          schedule.isLoading ? (
+          schedule.isLoading || unscheduled.isLoading ? (
             <LoadingState label="Loading your schedule…" />
           ) : !hasPicks ? (
-            <EmptyState
-              title="No sets yet"
-              description="Add artists from the lineup and they'll show up here as a timeline, with a reminder before each set."
-              action={<SecondaryButton label="Browse lineup" onPress={() => router.navigate('/(tabs)/lineup')} />}
-            />
+            setTimesPending ? (
+              <EmptyState
+                title="Set times coming soon"
+                description="The lineup is announced, but the festival hasn’t published set times yet. Your picks and reminders start here once it does."
+                action={<SecondaryButton label="See the lineup" onPress={() => router.navigate('/(tabs)/lineup')} />}
+              />
+            ) : (
+              <EmptyState
+                title="No sets yet"
+                description="Add artists from the lineup and they'll show up here as a timeline, with a reminder before each set."
+                action={<SecondaryButton label="Browse lineup" onPress={() => router.navigate('/(tabs)/lineup')} />}
+              />
+            )
           ) : (
             <>
               <View style={styles.infoRow}>
@@ -396,6 +438,15 @@ export default function PersonalScheduleScreen() {
                   <Badge label={`${conflictIds.size} in conflict`} tone="warning" />
                 ) : null}
               </View>
+
+              <ScheduleChangesNotice
+                picks={rows}
+                timeZone={timeZone}
+                onSelect={(pick) => {
+                  const day = dayOf(pick);
+                  if (day) setSelectedDay(day);
+                }}
+              />
 
               {dayRows.length === 0 ? (
                 <EmptyState title="Nothing picked this day" description="Pick another day, or add sets from the lineup." />
@@ -440,7 +491,7 @@ export default function PersonalScheduleScreen() {
       <ActionSheet
         visible={actionRow !== null}
         title={actionRow?.artist_name}
-        message={actionRow ? `${actionRow.stage_name} · ${clock.day(actionRow.start_time, { weekday: 'short', month: 'short', day: 'numeric' })} · ${clock.range(actionRow.start_time, actionRow.end_time)}` : undefined}
+        message={actionRow ? actionSheetMessage(actionRow, clock) : undefined}
         actions={
           actionRow
             ? [{ label: 'Remove from my schedule', destructive: true, onPress: () => void toggle(actionRow) }]
@@ -496,6 +547,13 @@ const styles = StyleSheet.create({
     paddingVertical: BLOCK_PADDING_VERTICAL,
   },
   blockConflict: { borderColor: colors.warningText, borderLeftWidth: spacing.xs, borderWidth: BLOCK_CONFLICT_BORDER },
+  // Schedule changes, in the colours of the `danger` and `info` badges: a cancelled set sits on the
+  // destructive wash (its name struck through); a moved set wears a `link` ring of the conflict ring's
+  // width, so it stays inside the block's height budget.
+  blockCancelled: { backgroundColor: colors.destructiveBg },
+  blockMoved: { borderColor: colors.link, borderLeftWidth: spacing.xs, borderWidth: BLOCK_CONFLICT_BORDER },
+  blockStatusCancelled: { color: colors.destructive },
+  blockStatusMoved: { color: colors.link },
   blockArtist: { ...BLOCK_ARTIST_TEXT, color: colors.textPrimary },
   blockStage: { ...BLOCK_DETAIL_TEXT, color: colors.textSecondary },
   // `marginTop: 'auto'` pins the time to the bottom of the block.

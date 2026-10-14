@@ -52,6 +52,7 @@ export function shiftFestivalDates(seed: FestivalSeed, newStart: string): ShiftR
         ...set,
         start_time: shiftTimestamp(set.start_time, days, timeZone),
         end_time: shiftTimestamp(set.end_time, days, timeZone),
+        original_start_time: set.original_start_time ? shiftTimestamp(set.original_start_time, days, timeZone) : null,
       })),
     },
   };

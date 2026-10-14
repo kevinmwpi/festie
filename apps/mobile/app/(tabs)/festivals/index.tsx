@@ -1,12 +1,4 @@
-import {
-  getLocalFestivals,
-  getLocalUserFestivals,
-  refreshFestivalCatalog,
-  refreshUserFestivals,
-  toggleUserFestival,
-  toUserMessage,
-  type Festival,
-} from '@festival/data-access';
+import { getLocalFestivals, refreshFestivalCatalog, type Festival } from '@festival/data-access';
 import {
   Badge,
   colors,
@@ -21,30 +13,31 @@ import {
   PressableScale,
   radii,
   SecondaryButton,
-  showToast,
   spacing,
   tabularNums,
+  TextLink,
   textStyles,
   useOfflineStatus,
 } from '@festival/ui';
 import { Ionicons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Avatar } from '@/src/components/Avatar';
 import { FestivalDisclaimer } from '@/src/components/FestivalNotes';
+import { RemoteImage, useImageFallback } from '@/src/components/RemoteImage';
 import { ScreenHeader } from '@/src/components/ScreenHeader';
 import { ErrorState, LoadingState, StaleDataNote } from '@/src/components/StateViews';
 import { queryKeys } from '@/src/hooks/query-keys';
 import { useCacheFirstQuery } from '@/src/hooks/use-cache-first-query';
 import { useCurrentProfile } from '@/src/hooks/use-current-profile';
 import { formatFestivalDateRange } from '@/src/hooks/use-festival';
-import { useUserKey } from '@/src/hooks/use-session';
+import { useFollowFestivals } from '@/src/hooks/use-follow-festival';
 import { useTabBarClearance } from '@/src/hooks/use-tab-bar-clearance';
 import { useSafeAreaEdgeTint } from '@/src/providers/screen-tint';
 import { ensureActiveFestival, useAppStore } from '@/src/state/app-store';
+import { hasFestivalEnded, localTodayKey, orderFestivalsForList } from '@/src/state/default-festival';
 
 /** Edge of the festival's accent swatch tile. */
 const SWATCH_SIZE = 64;
@@ -64,6 +57,7 @@ function FestivalCard({
   festival,
   isFollowing,
   isActive,
+  ended,
   busy,
   stacked,
   onToggle,
@@ -72,6 +66,7 @@ function FestivalCard({
   festival: Festival;
   isFollowing: boolean;
   isActive: boolean;
+  ended: boolean;
   busy: boolean;
   stacked: boolean;
   onToggle: () => void;
@@ -80,6 +75,9 @@ function FestivalCard({
   const accent = deriveAccentColors(festival.accent_color ?? colors.primary);
   const dates = formatFestivalDateRange(festival);
   const meta = [festival.venue_name, dates].filter(Boolean).join(' • ');
+  // The festival's licensed photo (credited under Settings → Photo credits) fills the swatch; the flag
+  // stays for festivals without one and whenever the photo cannot load (e.g. offline, never cached).
+  const image = useImageFallback(festival.image_url);
 
   // The card body and the follow toggle are sibling buttons: a toggle nested inside an accessible
   // Pressable is one VoiceOver element with it and could never be focused or activated. The body is the
@@ -92,7 +90,7 @@ function FestivalCard({
       <PressableScale
         onPress={onSelect}
         accessibilityRole="button"
-        accessibilityLabel={`${festival.name}${festival.is_demo ? ', sample festival' : ''}, ${meta}${isFollowing ? ', following' : ''}`}
+        accessibilityLabel={`${festival.name}${festival.is_demo ? ', sample festival' : ''}${ended ? ', ended' : ''}, ${meta}${isFollowing ? ', following' : ''}`}
         accessibilityHint="Opens this festival's lineup"
         accessibilityState={{ selected: isActive }}
         style={[
@@ -104,11 +102,16 @@ function FestivalCard({
         ]}
       >
         <View style={[styles.iconBox, { backgroundColor: accent.solid }]}>
-          <Ionicons name="flag" size={28} color={colors.textPrimary} />
+          {image.showImage && festival.image_url ? (
+            <RemoteImage uri={festival.image_url} onError={image.onError} style={styles.iconImage} />
+          ) : (
+            <Ionicons name="flag" size={28} color={colors.textPrimary} />
+          )}
         </View>
 
         <View style={[styles.cardText, stacked ? styles.cardTextStacked : styles.cardTextRow]}>
           {festival.is_demo ? <Badge label="Sample" tone="sample" /> : null}
+          {ended && !festival.is_demo ? <Badge label="Ended" tone="neutral" /> : null}
           <Text style={styles.festivalName}>{festival.name}</Text>
           <Text style={styles.festivalMeta}>{meta}</Text>
         </View>
@@ -141,8 +144,6 @@ function FestivalCard({
 export default function FestivalsScreen() {
   const tabBarClearance = useTabBarClearance();
   const stackCards = useWindowDimensions().fontScale > STACK_FONT_SCALE;
-  const queryClient = useQueryClient();
-  const userKey = useUserKey();
   const isOffline = useOfflineStatus();
   const profile = useCurrentProfile().data;
   const activeFestivalId = useAppStore((s) => s.activeFestivalId);
@@ -150,7 +151,6 @@ export default function FestivalsScreen() {
   const activeFestivalAccent = useAppStore((s) => s.activeFestivalAccent);
   const screenBg = deriveAccentColors(activeFestivalAccent).bgTint;
   useSafeAreaEdgeTint(screenBg);
-  const [busyId, setBusyId] = React.useState<string | null>(null);
 
   const catalog = useCacheFirstQuery({
     queryKey: queryKeys.festivals(),
@@ -161,42 +161,11 @@ export default function FestivalsScreen() {
     },
   });
 
-  const following = useCacheFirstQuery({
-    queryKey: queryKeys.userFestivals(userKey),
-    readLocal: getLocalUserFestivals,
-    refresh: async () => {
-      await refreshUserFestivals();
-      await ensureActiveFestival();
-    },
-  });
+  const { following, followingIds, busyId, toggle: handleToggle } = useFollowFestivals();
 
-  const festivals = React.useMemo(() => {
-    const list = catalog.data ?? [];
-    // Demo ("Sample") festivals always sort last; otherwise keep the cache order (by start date).
-    return [...list].sort((left, right) => Number(left.is_demo) - Number(right.is_demo));
-  }, [catalog.data]);
-
-  const followingIds = React.useMemo(
-    () => new Set((following.data ?? []).map((row) => row.festival_id)),
-    [following.data],
-  );
-
-  const handleToggle = React.useCallback(
-    async (festival: Festival) => {
-      setBusyId(festival.id);
-      try {
-        const nowFollowing = await toggleUserFestival(festival.id);
-        await queryClient.invalidateQueries({ queryKey: queryKeys.userFestivals(userKey) });
-        await ensureActiveFestival();
-        showToast(nowFollowing ? `Following ${festival.name}.` : `Unfollowed ${festival.name}.`);
-      } catch (error) {
-        showToast(toUserMessage(error), 'error');
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [queryClient, userKey],
-  );
+  const today = localTodayKey();
+  // Upcoming and current festivals first, then ended ones, then demo ("Sample") festivals.
+  const festivals = React.useMemo(() => orderFestivalsForList(catalog.data ?? [], today), [catalog.data, today]);
 
   const handleSelect = React.useCallback(
     (festival: Festival) => {
@@ -209,6 +178,10 @@ export default function FestivalsScreen() {
   const handleRefresh = React.useCallback(async () => {
     await Promise.all([catalog.refetch(), following.refetch()]);
   }, [catalog, following]);
+
+  const openSuggest = React.useCallback(() => {
+    router.push('/(tabs)/festivals/suggest');
+  }, []);
 
   const activeName = festivals.find((festival) => festival.id === activeFestivalId)?.name;
   const isEmpty = festivals.length === 0;
@@ -230,7 +203,8 @@ export default function FestivalsScreen() {
       emptyContent = (
         <EmptyState
           title="No festivals yet"
-          description="Festivals appear here as soon as their schedules are published. Pull down to check again."
+          description="Festivals appear here as soon as their lineups are announced. Pull down to check again, or tell us which festival you'd like to see."
+          action={<SecondaryButton label="Suggest a festival" onPress={openSuggest} />}
         />
       );
     }
@@ -282,6 +256,7 @@ export default function FestivalsScreen() {
             festival={festival}
             isFollowing={followingIds.has(festival.id)}
             isActive={festival.id === activeFestivalId}
+            ended={hasFestivalEnded(festival, today)}
             busy={busyId === festival.id}
             stacked={stackCards}
             onToggle={() => void handleToggle(festival)}
@@ -291,6 +266,12 @@ export default function FestivalsScreen() {
         {!isEmpty ? <StaleDataNote error={catalog.refreshError ?? following.refreshError} /> : null}
         {!isEmpty && catalog.localError ? (
           <SecondaryButton label="Reload festivals" onPress={() => void catalog.refetch()} />
+        ) : null}
+        {!isEmpty ? (
+          <View style={styles.suggestRow}>
+            <Text style={styles.suggestText}>Don't see your festival?</Text>
+            <TextLink label="Suggest it" onPress={openSuggest} accessibilityLabel="Suggest a festival" />
+          </View>
         ) : null}
         <FestivalDisclaimer />
       </ScrollView>
@@ -344,8 +325,12 @@ const styles = StyleSheet.create({
     borderRadius: iconRadius(SWATCH_SIZE),
     height: SWATCH_SIZE,
     justifyContent: 'center',
+    // Clips the festival photo to the tile's corners. Safe here: the swatch carries no shadow.
+    overflow: 'hidden',
     width: SWATCH_SIZE,
   },
+  // The festival photo fills the swatch; the accent shows behind it while it loads.
+  iconImage: { ...StyleSheet.absoluteFillObject },
   cardText: { gap: spacing.xs },
   cardTextRow: { flex: 1 },
   cardTextStacked: { alignSelf: 'stretch' },
@@ -386,4 +371,20 @@ const styles = StyleSheet.create({
   },
   toggleFollowing: { backgroundColor: colors.success },
   toggleNotFollowing: { backgroundColor: colors.surface },
+
+  /*
+   * "Don't see your festival? Suggest it" under the list. The link's 12pt hit slop above and below needs
+   * room inside the row (a slop never reaches past its parent), so the row pads to the 44pt target.
+   */
+  suggestRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.ms,
+  },
+  // Same role as the link's label (`subheadline`), so the phrase sits on one baseline.
+  suggestText: { ...textStyles.subheadline, color: colors.textSecondary },
 });
