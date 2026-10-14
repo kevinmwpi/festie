@@ -141,10 +141,14 @@ are hard to tell apart. The visual goal is right; the sources need care:
   terms allow this use; link the kit), approved by a person. Ask organizers for a logo: many say yes.
 - **Artist photos come from Wikimedia Commons by default**, resolved from Wikidata (artist → P18 image)
   by `media:fetch-commons`, which records the file page, licence and attribution. Only `CC0`, public
-  domain, `CC BY` and `CC BY-SA` are accepted; `NC` (we are a commercial app) and `ND` (we crop and
-  resize) are refused automatically. CC licences require attribution, so the app shows every credit in
-  Settings → Photo credits, and the entry's `attribution` text is exactly what is shown. Coverage is
-  good for headliners and patchy for small acts; those keep the monogram.
+  domain, `CC BY` and `CC BY-SA` in their international or unported versions are accepted; `NC` (we are
+  a commercial app), `ND` (we crop and resize) and country versions (the app links the international
+  deed) are refused automatically. CC licences are conditional: the credit must be the one the author
+  asks for (the fetcher uses Commons' requested credit line word for word, else the author), the licence
+  must be named and linked, and changes must be noted. So the app shows every credit in Settings → Photo
+  credits exactly as the entry's `attribution` gives it, links each licence in use and says photos are
+  resized and cropped ([`../legal/ip-review.md`](../legal/ip-review.md) §2). Coverage is good for
+  headliners and patchy for small acts; those keep the monogram.
 - **Other sources are a decision, not a default.** Spotify and Apple Music provide artist images through
   their APIs under developer terms with their own display and attribution rules; a label's press kit
   may allow editorial use. Any of these needs the terms read and the licence id and source recorded.

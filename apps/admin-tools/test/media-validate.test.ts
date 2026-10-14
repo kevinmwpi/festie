@@ -232,6 +232,7 @@ describe('validateRegistry', () => {
       'entries[0].source.note: must be a string or null',
       'entries[0].license.url: must be an https:// URL or null',
       'entries[0].license.attribution: must be at most 300 characters',
+      'entries[0].license.attribution: must name the licence ("CC BY-SA 4.0"), because the app shows this text as the credit',
     ]);
     expect(issuesOf([artistEntry({ license: { id: 'CC-BY-4.0', url: null, attribution: null } })])).toEqual([
       'entries[0].license.attribution: CC-BY-4.0 requires attribution text (e.g. "Photo: Jane Doe, CC BY-SA 4.0, via Wikimedia Commons")',
@@ -242,6 +243,50 @@ describe('validateRegistry', () => {
     ]);
     expect(issuesOf([artistEntry({ license: { id: 'CC0-1.0', url: null, attribution: null } })])).toEqual([]);
     expect(issuesOf([artistEntry({ license: { id: 'generated', url: null, attribution: null }, source: { kind: 'generated', url: null, retrieved_at: '2026-10-01T00:00:00Z' } })])).toEqual([]);
+  });
+
+  it('requires a CC credit to name its licence', () => {
+    const withAttribution = (id: string, attribution: string) => artistEntry({ license: { id, url: null, attribution } });
+    const nameIt = (label: string) => `entries[0].license.attribution: must name the licence ("${label}"), because the app shows this text as the credit`;
+    expect(issuesOf([withAttribution('CC-BY-SA-4.0', 'Photo: Jane Doe, via Wikimedia Commons')])).toEqual([nameIt('CC BY-SA 4.0')]);
+    // Naming a different licence is not naming this one.
+    expect(issuesOf([withAttribution('CC-BY-SA-4.0', 'Photo: Jane Doe, CC BY 4.0, via Wikimedia Commons')])).toEqual([nameIt('CC BY-SA 4.0')]);
+    expect(issuesOf([withAttribution('CC-BY-4.0', 'Photo: Jane Doe, CC BY-SA 4.0')])).toEqual([nameIt('CC BY 4.0')]);
+    expect(issuesOf([withAttribution('CC-BY-2.0', 'Photo: Jane Doe, CC BY 2.5')])).toEqual([nameIt('CC BY 2.0')]);
+    // Spelling, case and hyphens do not matter.
+    expect(issuesOf([withAttribution('CC-BY-SA-4.0', 'Photo: Jane Doe, cc-by-sa-4.0')])).toEqual([]);
+    expect(issuesOf([withAttribution('CC-BY-3.0', '© Jane Doe (CC BY 3.0)')])).toEqual([]);
+    // Licences without an attribution duty are not checked.
+    expect(issuesOf([withAttribution('CC0-1.0', 'Photo: Jane Doe')])).toEqual([]);
+    expect(issuesOf([festivalEntry()])).toEqual([]);
+  });
+
+  it('requires a CC licence link to point at that licence, not a country version', () => {
+    const withUrl = (id: string, url: string | null, label: string) =>
+      artistEntry({ license: { id, url, attribution: `Photo: Jane Doe, ${label}, via Wikimedia Commons` } });
+    for (const url of [
+      'https://creativecommons.org/licenses/by-sa/4.0/',
+      'https://creativecommons.org/licenses/by-sa/4.0',
+      'https://creativecommons.org/licenses/by-sa/4.0/deed.en',
+      'https://creativecommons.org/licenses/by-sa/4.0/deed.zh-hans',
+      'https://creativecommons.org/licenses/by-sa/4.0/legalcode',
+      'https://creativecommons.org/licenses/by-sa/4.0/legalcode.en',
+      null,
+    ]) {
+      expect(issuesOf([withUrl('CC-BY-SA-4.0', url, 'CC BY-SA 4.0')]), String(url)).toEqual([]);
+    }
+    expect(issuesOf([withUrl('CC-BY-SA-3.0', 'https://creativecommons.org/licenses/by-sa/3.0/de/', 'CC BY-SA 3.0')])).toEqual([
+      'entries[0].license.url: must link the CC BY-SA 3.0 licence itself (e.g. https://creativecommons.org/licenses/by-sa/3.0/); country versions are not accepted',
+    ]);
+    expect(issuesOf([withUrl('CC-BY-SA-3.0', 'https://creativecommons.org/licenses/by-sa/3.0/de/deed.en', 'CC BY-SA 3.0')])).toHaveLength(1);
+    expect(issuesOf([withUrl('CC-BY-SA-4.0', 'https://creativecommons.org/licenses/by/4.0/', 'CC BY-SA 4.0')])).toEqual([
+      'entries[0].license.url: must link the CC BY-SA 4.0 licence itself (e.g. https://creativecommons.org/licenses/by-sa/4.0/); country versions are not accepted',
+    ]);
+    expect(issuesOf([withUrl('CC-BY-2.0', 'https://www.flickr.com/creativecommons/', 'CC BY 2.0')])).toHaveLength(1);
+    expect(issuesOf([artistEntry({ license: { id: 'CC0-1.0', url: 'https://creativecommons.org/publicdomain/zero/1.0/deed.en', attribution: null } })])).toEqual([]);
+    expect(issuesOf([artistEntry({ license: { id: 'CC0-1.0', url: 'https://creativecommons.org/licenses/by/4.0/', attribution: null } })])).toHaveLength(1);
+    // Non-CC ids keep any https link (a press kit page, a permission letter).
+    expect(issuesOf([festivalEntry({ license: { id: 'organizer-permission', url: 'https://example.org/press', attribution: null } })])).toEqual([]);
   });
 
   it('requires who and when on approved entries and allows pending ones without', () => {

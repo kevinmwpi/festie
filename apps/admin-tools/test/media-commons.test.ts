@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { MEDIA_COMMANDS, mediaFetchCommons, mediaFetchCommonsForSeed } from '../src/media/command';
 import {
   buildAttribution,
+  buildRequestedAttribution,
   CommonsClient,
   commonsFilePageUrl,
   DEFAULT_USER_AGENT,
@@ -69,6 +70,9 @@ function fakeFetch(): { fetch: FetchLike; calls: Call[] } {
         Q3: { claims: { P18: [{ mainsnak: { datavalue: { value: 'NC photo.jpg' } } }] } },
         Q4: { claims: { P18: [{ mainsnak: { datavalue: { value: 'PD photo.png' } } }] } },
         Q5: { claims: { P18: [{ mainsnak: { datavalue: { value: 'Own work photo.jpg' } } }] } },
+        Q12: { claims: { P18: [{ mainsnak: { datavalue: { value: 'Credit line photo.jpg' } } }] } },
+        Q13: { claims: { P18: [{ mainsnak: { datavalue: { value: 'Long credit photo.jpg' } } }] } },
+        Q14: { claims: { P18: [{ mainsnak: { datavalue: { value: 'Ported photo.jpg' } } }] } },
       };
       return json({ entities: { [id as string]: entities[id as string] ?? { id, missing: '' } } });
     }
@@ -142,6 +146,24 @@ function fakeFetch(): { fetch: FetchLike; calls: Call[] } {
           },
         });
       }
+      const imageinfoOnly = (extmetadata: Record<string, { value: string }>) =>
+        json({ query: { pages: { '12': { imageinfo: [{ thumburl: `https://upload.wikimedia.org/x/512px-${(title ?? '').slice(5).replace(/ /g, '_')}`, extmetadata }] } } } });
+      if (title === 'File:Credit line photo.jpg') {
+        // The licence template's attribution parameter: the author's own credit line.
+        return imageinfoOnly({
+          LicenseShortName: { value: 'CC BY-SA 3.0' },
+          License: { value: 'cc-by-sa-3.0' },
+          Artist: { value: '<a href="//commons.wikimedia.org/wiki/User:JD">JD</a>' },
+          Attribution: { value: 'Photo by <b>Jane Doe</b> / janedoe.com' },
+          AttributionRequired: { value: 'true' },
+        });
+      }
+      if (title === 'File:Long credit photo.jpg') {
+        return imageinfoOnly({ LicenseShortName: { value: 'CC BY 4.0' }, License: { value: 'cc-by-4.0' }, Attribution: { value: `Jane Doe ${'x'.repeat(280)}` } });
+      }
+      if (title === 'File:Ported photo.jpg') {
+        return imageinfoOnly({ LicenseShortName: { value: 'CC BY-SA 3.0 de' }, License: { value: 'cc-by-sa-3.0-de' }, Artist: { value: 'Someone' } });
+      }
       return json({ query: { pages: { '-1': { missing: '' } } } });
     }
     if (parsed.hostname === 'upload.wikimedia.org') {
@@ -182,7 +204,15 @@ describe('licence mapping and attribution', () => {
   it('maps Commons licences to registry ids and refuses NC, ND and unknown ones', () => {
     expect(mapLicense('CC BY-SA 4.0', 'cc-by-sa-4.0')).toEqual({ ok: true, id: 'CC-BY-SA-4.0', url: 'https://creativecommons.org/licenses/by-sa/4.0/', label: 'CC BY-SA 4.0' });
     expect(mapLicense('CC BY 2.0', null)).toMatchObject({ ok: true, id: 'CC-BY-2.0', url: 'https://creativecommons.org/licenses/by/2.0/' });
-    expect(mapLicense('CC BY-SA 3.0 de', 'cc-by-sa-3.0-de')).toMatchObject({ ok: true, id: 'CC-BY-SA-3.0' });
+    expect(mapLicense('CC BY-SA 3.0', 'cc-by-sa-3.0')).toMatchObject({ ok: true, id: 'CC-BY-SA-3.0', url: 'https://creativecommons.org/licenses/by-sa/3.0/' });
+    expect(mapLicense(null, 'cc-by-sa-3.0-migrated')).toMatchObject({ ok: true, id: 'CC-BY-SA-3.0' });
+    // Country versions would be linked to the international deed in the app: refused.
+    expect(mapLicense('CC BY-SA 3.0 de', 'cc-by-sa-3.0-de')).toEqual({
+      ok: false,
+      reason: 'CC BY-SA 3.0 de is a country version of a CC licence; only international (unported) versions are accepted',
+    });
+    expect(mapLicense(null, 'cc-by-2.0-fr')).toMatchObject({ ok: false, reason: expect.stringContaining('country version') });
+    expect(mapLicense('CC BY-SA 3.0 IGO', null)).toMatchObject({ ok: false, reason: expect.stringContaining('country version') });
     expect(mapLicense('CC0', 'cc0')).toMatchObject({ ok: true, id: 'CC0-1.0', url: 'https://creativecommons.org/publicdomain/zero/1.0/' });
     expect(mapLicense('Public domain', 'pd')).toMatchObject({ ok: true, id: 'public-domain', url: null });
     expect(mapLicense(null, 'PD-USGov')).toMatchObject({ ok: true, id: 'public-domain' });
@@ -201,6 +231,12 @@ describe('licence mapping and attribution', () => {
     expect(long.length).toBe(300);
     expect(long.endsWith('…, CC BY 4.0, via Wikimedia Commons')).toBe(true);
     expect(commonsFilePageUrl('Four Tet 2010.jpg')).toBe('https://commons.wikimedia.org/wiki/File:Four_Tet_2010.jpg');
+    // A credit line the author asked for is kept word for word, never shortened.
+    expect(buildRequestedAttribution('Jane Doe / janedoe.com', 'CC BY-SA 3.0')).toBe('Photo: Jane Doe / janedoe.com, CC BY-SA 3.0, via Wikimedia Commons');
+    expect(buildRequestedAttribution(' Photo by Jane Doe ', 'CC BY 4.0')).toBe('Photo by Jane Doe, CC BY 4.0, via Wikimedia Commons');
+    expect(buildRequestedAttribution('© Jane Doe, CC-BY-SA-4.0', 'CC BY-SA 4.0')).toBe('© Jane Doe, CC-BY-SA-4.0, via Wikimedia Commons');
+    expect(buildRequestedAttribution('x'.repeat(290), 'CC BY 4.0')).toBeNull();
+    expect(buildRequestedAttribution('   ', 'CC BY 4.0')).toBeNull();
     expect(MUSIC_DESCRIPTION_PATTERN.test('American rapper and record producer')).toBe(true);
     expect(MUSIC_DESCRIPTION_PATTERN.test('village in Poland')).toBe(false);
   });
@@ -319,6 +355,41 @@ describe('fetchCommonsCandidate', () => {
       wikidataId: 'Q5',
       fileName: 'Own work photo.jpg',
       license: 'CC BY-SA 4.0',
+    });
+    expect(existsSync(path.join(into, 'artists'))).toBe(false);
+  });
+
+  it("credits the author's requested credit line word for word and notes the Artist field", async () => {
+    const { fetch } = fakeFetch();
+    const into = tempDir();
+    const result = await fetchCommonsCandidate({ artistName: 'Credit Line Band', artistId: A2, wikidataId: 'Q12', into, client: client(fetch) });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.entry.license).toEqual({
+        id: 'CC-BY-SA-3.0',
+        url: 'https://creativecommons.org/licenses/by-sa/3.0/',
+        attribution: 'Photo by Jane Doe / janedoe.com, CC BY-SA 3.0, via Wikimedia Commons',
+      });
+      expect(result.entry.source.note).toBe('Wikidata Q12; Commons requested credit: Photo by Jane Doe / janedoe.com; Commons author: JD');
+    }
+  });
+
+  it('refuses a requested credit line that does not fit, and a country version of a licence', async () => {
+    const { fetch } = fakeFetch();
+    const into = tempDir();
+    expect(await fetchCommonsCandidate({ artistName: 'Long Credit', artistId: A3, wikidataId: 'Q13', into, client: client(fetch) })).toEqual({
+      ok: false,
+      stage: 'license',
+      reason: "the credit line the author asks for is too long for the app's 300-character credit; write the credit by hand or leave the photo out",
+      wikidataId: 'Q13',
+      fileName: 'Long credit photo.jpg',
+      license: 'CC BY 4.0',
+    });
+    expect(await fetchCommonsCandidate({ artistName: 'Ported', artistId: A4, wikidataId: 'Q14', into, client: client(fetch) })).toMatchObject({
+      ok: false,
+      stage: 'license',
+      reason: 'CC BY-SA 3.0 de is a country version of a CC licence; only international (unported) versions are accepted',
+      license: 'CC BY-SA 3.0 de',
     });
     expect(existsSync(path.join(into, 'artists'))).toBe(false);
   });

@@ -1,7 +1,7 @@
 import type { ImageCredit } from '@festival/data-access';
 import { describe, expect, it } from 'vitest';
 
-import { formatLicenseLabel, groupImageCredits, imageCreditSubtitle } from '../src/hooks/image-credits';
+import { formatLicenseLabel, groupImageCredits, imageCreditSubtitle, licenseDeedUrl, licensesInUse } from '../src/hooks/image-credits';
 
 function credit(subject_type: ImageCredit['subject_type'], name: string, overrides: Partial<ImageCredit> = {}): ImageCredit {
   return {
@@ -45,5 +45,33 @@ describe('imageCreditSubtitle', () => {
     expect(formatLicenseLabel('press-kit-editorial')).toBe('Official press kit');
     expect(formatLicenseLabel('organizer-permission')).toBe("Used with the organizer's permission");
     expect(formatLicenseLabel('something-else')).toBe('something-else');
+  });
+});
+
+describe('licence links', () => {
+  it('links Creative Commons ids to their international deed and nothing else', () => {
+    expect(licenseDeedUrl('CC-BY-SA-4.0')).toBe('https://creativecommons.org/licenses/by-sa/4.0/');
+    expect(licenseDeedUrl('CC-BY-2.0')).toBe('https://creativecommons.org/licenses/by/2.0/');
+    expect(licenseDeedUrl(' CC-BY-SA-3.0 ')).toBe('https://creativecommons.org/licenses/by-sa/3.0/');
+    expect(licenseDeedUrl('CC0-1.0')).toBe('https://creativecommons.org/publicdomain/zero/1.0/');
+    for (const id of ['public-domain', 'organizer-permission', 'press-kit-editorial', 'generated', 'CC-BY-NC-4.0', '']) {
+      expect(licenseDeedUrl(id), id).toBeNull();
+    }
+  });
+
+  it('lists each CC licence in use once, with its photo count, by label', () => {
+    const rows = [
+      credit('artist', 'A', { image_license: 'CC-BY-SA-4.0' }),
+      credit('artist', 'B', { image_license: 'CC-BY-2.0' }),
+      credit('festival', 'C', { image_license: 'organizer-permission' }),
+      credit('artist', 'D', { image_license: 'CC-BY-SA-4.0' }),
+      credit('artist', 'E', { image_license: null }),
+    ];
+    expect(licensesInUse(rows)).toEqual([
+      { id: 'CC-BY-2.0', label: 'CC BY 2.0', url: 'https://creativecommons.org/licenses/by/2.0/', count: 1 },
+      { id: 'CC-BY-SA-4.0', label: 'CC BY-SA 4.0', url: 'https://creativecommons.org/licenses/by-sa/4.0/', count: 2 },
+    ]);
+    expect(licensesInUse([credit('festival', 'C', { image_license: 'generated' })])).toEqual([]);
+    expect(licensesInUse([])).toEqual([]);
   });
 });

@@ -840,9 +840,10 @@ The production profile auto-increments the build number (`appVersionSource: remo
 ## 6. App Store Connect
 
 1. **App Information:** name "Festie", subtitle, primary category (`__APP_CATEGORY__`), content rights
-   (the app shows third-party festival and artist names as factual information, see
-   [`legal/ip-review.md`](./legal/ip-review.md)). Do not put festival or artist trademarks in the name,
-   subtitle or keywords.
+   (the app shows third-party content: festival and artist names as factual information and, where
+   published, photos used under their licences and credited in Settings → Photo credits; see
+   [`legal/ip-review.md`](./legal/ip-review.md) §1–§2). Do not put festival or artist trademarks in the
+   name, subtitle or keywords.
 2. **Privacy Policy URL:** the hosted `privacy.html` (§4).
 3. **App Privacy:** answer exactly as [`app-store-privacy.md`](./app-store-privacy.md) §1 says.
 4. **Age rating:** answer as [`app-store-privacy.md`](./app-store-privacy.md) §3 says (user-generated
@@ -852,8 +853,9 @@ The production profile auto-increments the build number (`appVersionSource: remo
    whether you are a trader (`__DSA_TRADER_STATUS__`).
 6. **Version page:** description, keywords, support URL (hosted `support.html`), marketing URL optional,
    screenshots for the iPhone display size App Store Connect requires (currently 6.9-inch); iPad
-   screenshots are not needed (`supportsTablet: false`). Use the demo festival or a real festival without
-   logos or artwork in screenshots.
+   screenshots are not needed (`supportsTablet: false`). Screenshots show only the demo festival: no real
+   festival or artist names and never a photo of a real person, because a photo's licence does not cover
+   using someone's likeness to promote the app ([`legal/ip-review.md`](./legal/ip-review.md) §4).
 7. **App Review Information:** sign-in required → the demo email and 8-digit code; your contact details;
    Notes from [`app-review-notes.md`](./app-review-notes.md).
 8. **Build:** select the processed build (no export-compliance question, see
@@ -917,7 +919,7 @@ Legal text is not legal advice; have it reviewed if you can.
       with a flag on a pink gradient) in place of the Expo template, and `app.config.ts` fails preview and
       production builds if template artwork comes back. Look at the icon at home-screen size and decide
       whether to replace it with a designer's version (see [`legal/ip-review.md`](./legal/ip-review.md)
-      §3). Trademark search for "Festie" recorded there.
+      §4). Trademark search for "Festie" recorded there.
 - [ ] If the legal text changed materially since a build that testers accepted, `TERMS_VERSION` in
       `apps/mobile/src/config/app-info.ts` was bumped so everyone agrees again.
 - [ ] EAS environment variables set for production; the production build succeeded (§5.1–5.3).
@@ -935,8 +937,8 @@ Legal text is not legal advice; have it reviewed if you can.
       credentials entered (§6).
 - [ ] **Liability items due at submission are closed** in
       [`legal/liability-checklist.md`](./legal/liability-checklist.md) §2: the LLC decision is made (L1),
-      the trademark search (L2), the EU trader decision (L3) and the IP review update (L4) are done, and
-      the store description promises no safety or outcomes (L9).
+      the trademark search (L2) and the EU trader decision (L3) are done, festival suggestions are
+      disclosed (L11), and the store description promises no safety or outcomes (L9).
 - [ ] Someone will run `reports:list` every day and answer data requests by email after release (§8).
 
 ### 7.3 Before releasing the approved build to the public

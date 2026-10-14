@@ -305,13 +305,17 @@ subjects that exist). `media:upload` pushes approved files to the public `artwor
 (migration 013) and writes `image_url`, `image_credit`, `image_license` and `image_source_url` on the
 artist or festival row (migration 012), then bumps the version of every published festival whose lineup
 (`festival_artists`) or sets include a changed artist, so phones refetch (a festival published before its
-set times exist is bumped too). The app shows every credit under Settings → Photo credits.
+set times exist is bumped too). The app shows every credit under Settings → Photo credits, with a link
+to each licence and a note that photos are resized and cropped.
 
 - **Artists:** `npm run admin -- media:fetch-commons --artist "<name>" --artist-id <uuid>` (or
   `--seed <festival.json>` for every artist of a festival) fetches a Wikimedia Commons photo through
-  Wikidata and records its licence. Only `CC0`, public domain, `CC BY` and `CC BY-SA` are accepted
-  (`NC`: commercial app; `ND`: we crop). Entries start as `pending`; approve them in the review tool
-  or by editing `review.status`.
+  Wikidata and records its licence. Only `CC0`, public domain, `CC BY` and `CC BY-SA` in their
+  international or unported versions are accepted (`NC`: commercial app; `ND`: we crop; country
+  versions: the app links the international deed). The credit is the line the author asks for on
+  Commons, word for word, or else the author. Entries start as `pending`; approve them in the review
+  tool or by editing `review.status`, after the checks in
+  [`legal/ip-review.md`](./legal/ip-review.md) §2.
 - **Festivals:** no posters or poster cut-outs. An official logo only with `organizer-permission` or
   `press-kit-editorial` recorded in the entry (link the permission or kit), never scraped.
 - **Removal:** set `review.status` to `rejected` and run `media:upload`: it clears the row and deletes

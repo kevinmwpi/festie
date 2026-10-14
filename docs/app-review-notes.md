@@ -62,7 +62,9 @@ FESTIVAL DATA
 Festie is independent and not affiliated with or endorsed by any festival, organizer or artist; the
 "Fests" list, "Lineup", the Schedule tab's "+" (add sets) screen, Settings and the Terms say so. Real
 schedules are factual (names, stages, set times), entered from organizers' public official schedules with
-the source recorded; no logos, artwork or photos. Published real festivals: __REAL_FESTIVALS__.
+the source recorded; no festival logos or artwork. Artist and festival photos appear only when their
+licence allows it (Creative Commons photos from Wikimedia Commons, or the rights holder's permission),
+each credited with its licence in Settings, "Photo credits". Published real festivals: __REAL_FESTIVALS__.
 
 PERMISSIONS
 Location (While Using): map position and, only while sharing, for your crew. Camera/Photos: only for a

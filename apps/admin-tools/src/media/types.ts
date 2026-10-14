@@ -40,6 +40,59 @@ export const ATTRIBUTION_REQUIRED: readonly LicenseId[] = [
   'CC-BY-SA-2.0', 'CC-BY-SA-2.5', 'CC-BY-SA-3.0', 'CC-BY-SA-4.0',
 ];
 
+const CC_BY_ID = /^CC-BY(-SA)?-(\d\.\d)$/;
+
+/**
+ * "CC BY-SA 4.0" for `CC-BY-SA-4.0`, "CC0 1.0" for `CC0-1.0`; null for ids that are not Creative Commons.
+ * Mirrors `formatLicenseLabel` in apps/mobile/src/hooks/image-credits.ts.
+ */
+export function ccLicenseLabel(id: string): string | null {
+  if (id === 'CC0-1.0') {
+    return 'CC0 1.0';
+  }
+  const match = CC_BY_ID.exec(id);
+  return match ? `CC BY${match[1] ? '-SA' : ''} ${match[2]}` : null;
+}
+
+/**
+ * The deed of a Creative Commons licence id (its international or unported version), which the app's
+ * Photo credits screen links to; null for ids that are not Creative Commons. Mirrors `licenseDeedUrl` in
+ * apps/mobile/src/hooks/image-credits.ts.
+ */
+export function ccLicenseDeedUrl(id: string): string | null {
+  if (id === 'CC0-1.0') {
+    return 'https://creativecommons.org/publicdomain/zero/1.0/';
+  }
+  const match = CC_BY_ID.exec(id);
+  return match ? `https://creativecommons.org/licenses/by${match[1] ? '-sa' : ''}/${match[2]}/` : null;
+}
+
+/**
+ * A creativecommons.org link to one licence: the deed or legal code of CC BY / BY-SA x.y or CC0 1.0, with
+ * an optional `deed.<lang>` or `legalcode[.<lang>]` page and trailing slash. A country version
+ * (`/licenses/by-sa/3.0/de/`) does not match.
+ */
+const CC_LICENSE_URL =
+  /^https:\/\/creativecommons\.org\/(?:licenses\/(by|by-sa)\/(\d\.\d)|publicdomain\/zero\/(1\.0))(?:\/(?:deed\.[a-z]{2,3}(?:[-_][a-z0-9]{2,4})?|legalcode(?:\.[a-z]{2,3}(?:[-_][a-z0-9]{2,4})?)?))?\/?$/i;
+
+/** The licence id a creativecommons.org licence link points at, or null when it is not one (or is a country version). */
+export function ccLicenseIdFromUrl(url: string): LicenseId | null {
+  const match = CC_LICENSE_URL.exec(url);
+  if (!match) {
+    return null;
+  }
+  if (match[3]) {
+    return 'CC0-1.0';
+  }
+  const id = `CC-BY${match[1].toLowerCase() === 'by-sa' ? '-SA' : ''}-${match[2]}`;
+  return (ALLOWED_LICENSES as readonly string[]).includes(id) ? (id as LicenseId) : null;
+}
+
+/** Lower case with spaces and hyphens collapsed, so `CC-BY-SA-4.0` and "CC BY-SA 4.0" compare equal. */
+export function normalizeLicenseText(text: string): string {
+  return text.toLowerCase().replace(/[\s-]+/g, ' ').trim();
+}
+
 export type MediaSourceKind = 'wikimedia-commons' | 'organizer-permission' | 'press-kit' | 'generated' | 'other';
 
 export type MediaReviewStatus = 'pending' | 'approved' | 'rejected';
