@@ -14,28 +14,27 @@
 :root {
   /* Sections use the app's pastel accents at full strength; text on them is --text (at least 8:1). */
   --sec-hero: #FFF5F9; --sec-features: #B2CEFE; --sec-privacy: #B2D8B2; --sec-help: #FFD6A5; --sec-end: #FFF5F9;
-  /* Squares at the front of a block transition: a step deeper than the sections, plus the ink. */
-  --spark-blue: #8FB8F8; --spark-mint: #8DC58D; --spark-peach: #F5B872; --spark-pink: #FF9CCB; --spark-lilac: #B49CFF;
   /* Ring tiles and feature motifs: pastel fills with the dark ink in both schemes. */
   --pink: #FFB3D9; --blue: #B2CEFE; --peach: #FFD6A5; --lilac: #C8B6FF; --mint: #B2D8B2; --lemon: #FDFD96; --white: #FFFFFF;
   --tile-ink: #2C3327; --warn-bg: #FFF4D6; --warn-text: #7A4A00;
   --wordmark: "Fredoka", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
   --system: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mark-size: min(17rem, 22vw, 30svh);
-  --mark-y: 40svh;
+  /* The wordmark sits high, in the space under the header; the ring turns below and around it. */
+  --mark-y: 25svh;
+  --ring-y: 48svh;
   /* Ring: radius, tile size, tile count and one full turn */
-  --R: min(38vw, 520px);
+  --R: min(36vw, 490px, 62svh);
   --cw: clamp(56px, calc(var(--R) * .27), 148px);
   --ch: calc(var(--cw) * 1.34);
   --n: 20;
   --spin: 80s;
 }
-@media (max-width: 599px) { :root { --R: 40vw; } }
+/* On phones the ring is small, so it tucks up closer under the wordmark. */
+@media (max-width: 599px) { :root { --R: 40vw; --ring-y: 37svh; } .ring-wrap { top: 52%; } }
 @media (prefers-color-scheme: dark) {
   :root {
     --sec-hero: #1B1D1A; --sec-features: #394048; --sec-privacy: #394238; --sec-help: #494236; --sec-end: #1B1D1A;
-    /* 45% pastel on the dark ground, so light text stays readable over them */
-    --spark-blue: #5F6D80; --spark-mint: #5F715E; --spark-peach: #827058; --spark-pink: #826170; --spark-lilac: #696281;
   }
 }
 
@@ -48,11 +47,11 @@ main { max-width: none; padding: 0; }
 
 /* ─── Hero: the wordmark with a ring of app moments around it ─── */
 .hero { position: relative; z-index: 1; }
-.hero-stage { position: relative; height: clamp(340px, 60svh, 660px); overflow-x: clip; pointer-events: none; }
-.mark { position: absolute; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%);
+.hero-stage { position: relative; height: clamp(380px, 68svh, 720px); overflow-x: clip; pointer-events: none; }
+.mark { position: absolute; left: 50%; top: 30%; margin: 0; transform: translate(-50%, -50%);
   font: 700 var(--mark-size)/.9 var(--wordmark); letter-spacing: -.015em; white-space: nowrap; color: var(--text); }
 .mark-letters span { display: inline-block; }
-.ring-wrap { position: absolute; left: 50%; top: 50%; width: 0; height: 0; perspective: calc(var(--R) * 3.6); }
+.ring-wrap { position: absolute; left: 50%; top: 64%; width: 0; height: 0; perspective: calc(var(--R) * 3.6); }
 /* Tiles stand like spokes, so they are edge-on at the front and back and face you at the sides. */
 .ring { position: absolute; margin: 0; padding: 0; list-style: none; transform-style: preserve-3d;
   animation: spin var(--spin) linear infinite paused; }
@@ -177,9 +176,10 @@ main { max-width: none; padding: 0; }
 .m-off .states .s-saved { opacity: 1; }
 
 /* ─── Motion (JavaScript on, Reduce Motion off) ─── */
-.motion .hero { min-height: 100svh; padding-top: calc(var(--mark-y) + var(--mark-size) * .55 + 5rem); }
+.motion .hero { min-height: 100svh; padding-top: calc(var(--ring-y) + var(--R) * .42); }
 .motion .hero-stage { position: fixed; inset: 0; z-index: 0; height: auto; overflow: hidden; }
-.motion .mark, .motion .ring-wrap { top: var(--mark-y); }
+.motion .mark { top: var(--mark-y); }
+.motion .ring-wrap { top: var(--ring-y); }
 /* --hero-p goes from 0 to 1 over the first half of the hero (home.js): the ring lifts away and the wordmark settles
    into a watermark before the hero text scrolls over it. */
 .motion .mark { opacity: calc(1 - min(1, var(--hero-p, 0) * 2.4) * .93); transform: translate(-50%, -50%) scale(calc(1 - var(--hero-p, 0) * .08)); }

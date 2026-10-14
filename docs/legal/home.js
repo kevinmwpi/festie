@@ -1,8 +1,9 @@
 /*
- * Home page motion (docs/site/index.html): the squares that swap one section's colour for the next behind
- * the page, the hero ring and wordmark fading as you scroll, the cards rising into place and leaning toward the
- * pointer. The ring, the wordmark's arrival, the tape and the feature motifs themselves are CSS (docs/legal/home.css). Everything needs the `motion` class on <html>:
- * the inline script in <head> adds it when Reduce Motion is off, and this script follows that setting.
+ * Home page motion (docs/site/index.html): the ragged edge of small squares where one section's colour meets
+ * the next, the hero ring and wordmark fading as you scroll, the cards rising into place and leaning toward the
+ * pointer. The ring, the wordmark's arrival, the tape and the feature motifs themselves are CSS
+ * (docs/legal/home.css). Everything needs the `motion` class on <html>: the inline script in <head> adds it
+ * when Reduce Motion is off, and this script follows that setting.
  */
 (() => {
   const root = document.documentElement;
@@ -11,13 +12,18 @@
   if (!canvas || !hero) return;
   const ctx = canvas.getContext('2d');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  // Each pane has a colour; the canvas paints it and swaps to the next pane's colour square by square.
+  // Each pane has a colour. The canvas paints them where the panes are and steps between neighbours along a
+  // narrow band of squares, so the change follows the content instead of washing over the whole window.
   const panes = [...document.querySelectorAll('[data-pane]'), document.querySelector('body > footer')];
   const paneColors = ['--sec-hero', '--sec-features', '--sec-privacy', '--sec-help', '--sec-end'];
-  const sparkColors = ['--spark-blue', '--spark-mint', '--spark-peach', '--spark-pink', '--spark-lilac'];
-  let width = 0, height = 0, cols = 0, rows = 0, fills = [], sparks = [], ink = '', grids = [], queued = false;
+  // The band, in rows of squares around a pane's top edge: each column's edge sits somewhere in STEP, and some
+  // columns throw one square a row ahead of it. Outside BAND every square is plainly one pane or the other.
+  const STEP = [-1, 0.6];
+  const STRAY_SHARE = 0.25;
+  const BAND = [STEP[0] - 2, STEP[1]];
+  let width = 0, height = 0, cols = 0, rows = 0, fills = [], edges = [], queued = false;
 
-  // A fixed pseudo-random value per square, so a transition looks the same scrolling down and back up.
+  // A fixed pseudo-random value per column, so an edge looks the same scrolling down and back up.
   const noise = (x, y, z) => {
     let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2246822519);
     h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -27,11 +33,6 @@
   function readColors() {
     const style = getComputedStyle(root);
     fills = paneColors.map((name) => style.getPropertyValue(name).trim());
-    sparks = sparkColors.map((name) => style.getPropertyValue(name).trim());
-    // The ink squares are see-through, so text that sits over one stays readable.
-    const hex = style.getPropertyValue('--text').trim().replace('#', '');
-    const n = parseInt(hex.length === 3 ? hex.replace(/./g, '$&$&') : hex, 16);
-    ink = `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.3)`;
   }
 
   function layout() {
@@ -41,57 +42,46 @@
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    const cell = width < 600 ? 40 : 64;
+    const cell = width < 600 ? 24 : 32;
     cols = Math.ceil(width / cell);
     rows = Math.ceil(height / cell);
-    // For each transition: when every square flips (bottom rows first, scattered) and which spark it shows.
-    grids = panes.slice(1).map((_, k) => {
-      const at = new Float32Array(cols * rows);
-      const spark = new Float32Array(cols * rows);
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          at[r * cols + c] = 0.72 * (1 - (r + 0.5) / rows) + 0.28 * noise(c, r, k + 1);
-          spark[r * cols + c] = noise(c, r, k + 101);
-        }
-      }
-      return { at, spark };
-    });
+    edges = panes.slice(1).map((_, k) => Array.from({ length: cols }, (_, c) => ({
+      step: STEP[0] + (STEP[1] - STEP[0]) * noise(c, 0, k + 1),
+      stray: noise(c, 1, k + 1) < STRAY_SHARE,
+    })));
   }
 
   function draw() {
     queued = false;
     if (!root.classList.contains('motion')) return;
-    const view = window.innerHeight;
-    // 0 while the next pane's top is below the window, 1 once it has risen to a quarter of the way down.
-    const progress = panes.slice(1).map((pane) => Math.min(1, Math.max(0, (view - pane.getBoundingClientRect().top) / (view * 0.75))));
-    if (progress.every((p) => p === 0 || p === 1)) {
-      ctx.fillStyle = fills[progress.filter((p) => p === 1).length];
-      ctx.fillRect(0, 0, width, height);
-    } else {
-      const cellW = width / cols;
-      const cellH = height / rows;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const i = r * cols + c;
-          let fill = fills[0];
-          let inked = false;
-          for (let k = 0; k < progress.length; k++) {
-            const p = progress[k];
-            const { at, spark } = grids[k];
-            if (p <= at[i]) continue;
-            // Squares that have only just flipped show a deeper pastel, or now and then a wash of ink.
-            const edge = p < 1 && p - at[i] < 0.07;
-            inked = edge && spark[i] < 0.1;
-            fill = edge && !inked ? sparks[Math.floor(spark[i] * 50) % sparks.length] : fills[k + 1];
-          }
-          const x = Math.floor(c * cellW), y = Math.floor(r * cellH), w = Math.ceil(cellW), h = Math.ceil(cellH);
-          ctx.fillStyle = fill;
-          ctx.fillRect(x, y, w, h);
-          if (inked) {
-            ctx.fillStyle = ink;
-            ctx.fillRect(x, y, w, h);
-          }
+    const cellW = width / cols;
+    const cellH = height / rows;
+    const tops = panes.slice(1).map((pane) => pane.getBoundingClientRect().top);
+    for (let r = 0; r < rows; r++) {
+      const y = Math.floor(r * cellH);
+      const h = Math.ceil(cellH);
+      const middle = (r + 0.5) * cellH;
+      // The pane this row belongs to away from any edge, and the edges whose band crosses it.
+      let pane = 0;
+      const near = [];
+      tops.forEach((top, k) => {
+        const below = (middle - top) / cellH;
+        if (below > BAND[1]) pane = k + 1;
+        else if (below > BAND[0]) near.push({ k, below });
+      });
+      if (!near.length) {
+        ctx.fillStyle = fills[pane];
+        ctx.fillRect(0, y, width, h);
+        continue;
+      }
+      for (let c = 0; c < cols; c++) {
+        let fill = pane;
+        for (const { k, below } of near) {
+          const { step, stray } = edges[k][c];
+          if (below > step || (stray && below > step - 2 && below <= step - 1)) fill = k + 1;
         }
+        ctx.fillStyle = fills[fill];
+        ctx.fillRect(Math.floor(c * cellW), y, Math.ceil(cellW), h);
       }
     }
     const heroProgress = Math.min(1, Math.max(0, -hero.getBoundingClientRect().top / (hero.offsetHeight * 0.55)));
