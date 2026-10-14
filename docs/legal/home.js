@@ -16,10 +16,12 @@
   // of squares, so the change follows the content instead of washing over the whole window.
   const panes = [...document.querySelectorAll('[data-pane]'), document.querySelector('body > footer')];
   const paneColors = ['--sec-hero', '--sec-features', '--sec-privacy', '--sec-help', '--sec-end'];
-  // The band, in rows of squares around a pane's top edge (BAND), where the colour changes. Each square takes
-  // one of a few shades between the two panes' colours (SHADES steps), set by how far into the band it sits plus
-  // its own random nudge (NUDGE). The nudges belong to the squares of the window, not to the page, so the mix
-  // keeps reshuffling as an edge moves through them. The footer gets a straight edge.
+  // The band, in rows of squares around a pane's top edge (BAND), where the colour changes. Each square takes one
+  // of SHADES + 1 colours: the upper pane's colour and a deeper and a lighter shade of it, then a lighter and a
+  // deeper shade of the lower pane's colour and that colour itself, never a third hue. Which one is set by how far
+  // into the band the square sits plus its own random nudge (NUDGE). The nudges belong to the squares of the
+  // window, not to the page, so the mix keeps reshuffling as an edge moves through them. The footer gets a
+  // straight edge.
   const BAND = [-2.2, 1.8];
   const SHADES = 5;
   const NUDGE = 0.8;
@@ -36,9 +38,7 @@
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   };
 
-  // The shades run through OKLCH so the steps between two colours stay clear instead of turning grey: lightness
-  // moves evenly, the hue turns the short way round, and a near-grey end (the dark hero, the cream wash) takes
-  // the other end's hue and colourfulness.
+  // Shades are worked out in OKLCH, so a deeper or lighter shade keeps its hue instead of drifting grey.
   const linear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const gamma = (v) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
   function toOklch(color) {
@@ -62,24 +62,18 @@
       -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
     ].map((v) => Math.round(255 * Math.min(1, gamma(Math.max(0, v)))));
   }
-  function blend(from, to, t) {
-    let [L1, C1, h1] = toOklch(from);
-    let [L2, C2, h2] = toOklch(to);
-    if (C1 < 0.03) [C1, h1] = [Math.max(C1, C2), h2];
-    if (C2 < 0.03) [C2, h2] = [Math.max(C2, C1), h1];
-    const turn = ((h2 - h1 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
-    return fromOklch([L1 + (L2 - L1) * t, C1 + (C2 - C1) * t, h1 + turn * t]);
+  // The same hue, lightness moved by `dL` and colourfulness by `dC`.
+  function shade(hex, dL, dC) {
+    const [L, C, h] = toOklch(rgb(hex));
+    return `rgb(${fromOklch([Math.min(0.985, Math.max(0.05, L + dL)), Math.max(0, C + dC), h]).join(', ')})`;
   }
+  const deeper = (hex) => shade(hex, -0.07, 0.02);
+  const lighter = (hex) => shade(hex, 0.05, -0.01);
 
   function readColors() {
     const style = getComputedStyle(root);
     fills = paneColors.map((name) => style.getPropertyValue(name).trim());
-    // For each edge, SHADES + 1 colours from this pane's to the next pane's; the two ends are the panes' own.
-    shades = fills.slice(1).map((next, k) => Array.from({ length: SHADES + 1 }, (_, step) => {
-      if (step === 0) return fills[k];
-      if (step === SHADES) return next;
-      return `rgb(${blend(rgb(fills[k]), rgb(next), step / SHADES).join(', ')})`;
-    }));
+    shades = fills.slice(1).map((next, k) => [fills[k], deeper(fills[k]), lighter(fills[k]), lighter(next), deeper(next), next]);
   }
 
   function layout() {
@@ -111,7 +105,7 @@
       const near = [];
       tops.forEach((top, k) => {
         const below = (middle - top) / cellH;
-        if (straight[k] ? below > 0 : below > BAND[1]) pane = k + 1;
+        if (straight[k] ? y >= top : below > BAND[1]) pane = k + 1;
         else if (!straight[k] && below > BAND[0]) near.push({ k, into: (below - BAND[0]) / (BAND[1] - BAND[0]) });
       });
       if (!near.length) {
@@ -129,6 +123,13 @@
         ctx.fillRect(Math.floor(c * cellW), y, Math.ceil(cellW), h);
       }
     }
+    // A straight edge sits exactly on the pane's top, not on the grid of squares.
+    tops.forEach((top, k) => {
+      if (!straight[k] || top >= height) return;
+      const from = Math.max(0, Math.round(top));
+      ctx.fillStyle = fills[k + 1];
+      ctx.fillRect(0, from, width, height - from);
+    });
     const heroProgress = Math.min(1, Math.max(0, -hero.getBoundingClientRect().top / (hero.offsetHeight * 0.55)));
     root.style.setProperty('--hero-p', heroProgress.toFixed(3));
     root.classList.toggle('ring-off', heroProgress > 0.62);

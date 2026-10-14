@@ -112,7 +112,10 @@ main { max-width: none; padding: 0; }
 @media (min-width: 900px) {
   .sec-inner { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; align-items: start; }
   .sec-head { position: sticky; top: 22svh; }
-  .sec-privacy .sec-inner, .sec-help .sec-inner { min-height: 84svh; }
+  .sec-privacy .sec-inner { min-height: 84svh; }
+  /* Help is short: equal space above and below, then the footer. */
+  .sec-help .sec-inner { align-items: center; }
+  .sec-help .sec-head { position: static; }
 }
 .feat-list, .checks { margin: 0; padding: 0; list-style: none; }
 .feat-list { display: grid; gap: 16px; }

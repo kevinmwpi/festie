@@ -227,8 +227,9 @@ inlines into `index.html`.
   app does turns below and around it. As you scroll, the ring lifts away and the wordmark holds still, then fades
   out before the next section.
 - **Sections meet along a band of small squares** that follows the boundary as you scroll, about four rows
-  deep: each square takes a random shade between the two sections' colours (blended in OKLCH, so the steps stay
-  clear instead of turning grey), and the mix reshuffles as the edge moves, like a schedule grid filling in. The
+  deep: each square takes a lighter or deeper shade of one of the two sections' colours, never a third hue
+  (shades worked out in OKLCH so they keep their hue), and the mix reshuffles as the edge moves, like a schedule
+  grid filling in. The
   footer gets a straight edge. The colours are the pink wash, then the `primary` blue, `success` mint and lilac
   accents at full strength, with ink headings (at least 7:1). In dark mode the hero and footer go dark and the
   sections keep the same pastels, with ink headings and the dark cards on top.
