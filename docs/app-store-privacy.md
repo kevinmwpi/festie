@@ -147,7 +147,7 @@ Answer for what the app contains and enables. Festie's relevant facts:
   totem photos that other crew members see. Moderation in place (App Review guideline 1.2): disallowed-
   word filter on names and meetup text (`public.moderation_terms`), Report on users, crews, meetups and
   photos, Block, admin Remove from crew, published zero-tolerance terms that users must accept, and
-  reports reviewed within 24 hours ([`festival-data.md`](./festival-data.md) §6).
+  reports reviewed within 24 hours ([`festival-data.md`](./festival-data.md) §8).
 - **Sharing location with other users: Yes.** Crew members can see each other's live location while
   sharing is on (opt-in, foreground only, time-limited). Declare it wherever the questionnaire asks about
   sharing location or personal information with other users.

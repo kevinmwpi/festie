@@ -221,8 +221,8 @@ as the lineup is official (migration 014):
   **draft** seed makes new artist names readable to any client (not which festival they play).
 - The demo festival is the exception: it must keep its sets (`demo:seed` builds the sample crew's picks
   and meetups from them); the validator refuses an `is_demo` file without sets.
-- In the app, the Lineup tab lists every announced act with "Set time TBA" and no Add button; Add sets
-  and My Schedule say that set times are coming. Crews, chat, meetups and the map already work, so people
+- In the app, the Lineup tab lists every announced act with "Set time to be announced" and no Add button; Add sets
+  and My Schedule say that set times are coming. Crews, meetups and the map already work, so people
   can follow the festival and form crews months ahead.
 - When set times arrive, add the sets (all at once or stage by stage, day by day) and seed again. Acts
   that have a set move into the timed list; the rest stay under "Set times to be announced". An act
@@ -248,7 +248,7 @@ every stage inside the park. The app labels it "Sample".
 Prepare the review build:
 
 ```sh
-# Optional: move the demo so "now playing / up next" is live during review
+# Optional: move the demo so "up next" is live during review
 npm run admin -- festival:shift-dates seed-data/demo-festival.json --start 2026-10-09 --out /tmp/demo.json
 npm run admin -- demo:seed --file /tmp/demo.json --dry-run
 npm run admin -- demo:seed --file /tmp/demo.json

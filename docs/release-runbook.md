@@ -31,7 +31,7 @@ The order matters: the build you submit (§5) must come after the key rotation (
 - Apple Developer Program membership with access to App Store Connect app id `6761392490`
   (team `Z94VZGABD8`, see `apps/mobile/eas.json`).
 - A Mapbox account (public token), a transactional email provider for SMTP (§2.7), and somewhere to host
-  three static pages (§4).
+  the static site in `docs/site/` (§4).
 - Optional for backups: Docker (for `supabase db dump`) or a local `pg_dump` matching the server's major
   version.
 
@@ -90,7 +90,8 @@ Never run `deno` against `supabase/` from the repo root without `--config` (it w
      `apps/mobile/eas.json` (they pin `https://lzxewkfxdibohzqbqmiu.supabase.co`) and in your EAS
      environment variables (§5.1).
 3. A released app needs a project that never pauses. Free-plan projects are paused after a period of
-   inactivity; move the production project to a paid plan before launch.
+   inactivity, and App Review signs in against this project; move it to a paid plan before the first
+   review submission.
 
 ### 2.2 Take a backup
 
@@ -613,8 +614,7 @@ report points at, even if the uploader replaced them or deleted the meetup, unti
 ### 3.3 Demo content before every App Review submission
 
 Run after migrations are applied (and again after any re-application of 007), on the project the review
-build uses. Pick a start date in the review window (usually the submission day) so "now playing / up next"
-is live:
+build uses. Pick a start date in the review window (usually the submission day) so the map's "up next" is live:
 
 ```sh
 npm run admin -- festival:shift-dates seed-data/demo-festival.json --start <YYYY-MM-DD> --out /tmp/demo.json
@@ -665,8 +665,7 @@ requests) and `apps/mobile/app/legal/*.tsx`.
      `www.joinfestie.com`. The pages are at `https://joinfestie.com/privacy`, `/terms` and `/support`
      (requests for the `.html` paths redirect there).
    - **Any static host that serves just that folder** (Netlify, Cloudflare Pages, S3 + CloudFront, your
-     own server): upload the files in `docs/site/` as they are (the four pages, `favicon.png` and
-     `apple-touch-icon.png`). This is the cleanest option.
+     own server): upload every file in `docs/site/` as it is. This is the cleanest option.
    - **GitHub Pages** (public repository, or a paid GitHub plan for private ones): repository Settings →
      Pages → Build and deployment → Deploy from a branch → your release branch, folder `/docs`. The pages
      are then at `https://<owner>.github.io/<repo>/site/privacy.html`, `…/terms.html`, `…/support.html`.
@@ -960,12 +959,13 @@ Start this with the first TestFlight build and keep it up after release.
 ### 8.1 Routine
 
 All admin work is local: `set -a; . ./.env; set +a` (§1.2), then `npm run admin -- <command>`. Commands
-and their options are documented in [`festival-data.md`](./festival-data.md) (sections 5 and 6); run every
+and their options are documented in [`festival-data.md`](./festival-data.md) (the command table at the
+top, sections 2 and 4–8); run every
 write with `--dry-run` first.
 
 - **Every day:** `npm run admin -- reports:list` and act on each open report within 24 hours
   (`reports:remove-content <report_id>`, `users:ban <user_id>`, or dismiss in the table editor), as
-  described in [`festival-data.md`](./festival-data.md) section 6. Every new block also appears as a
+  described in [`festival-data.md`](./festival-data.md) section 8. Every new block also appears as a
   report with target `block`: close it with `reports:remove-content <id>` (it only marks it actioned) or
   `users:ban`. `reports:remove-content` on a photo report deletes the reported photo, not the meetup's
   current one, and prints a `WARNING` when they differ. Users cannot delete a reported photo, so it

@@ -57,6 +57,6 @@ releasing the approved build (runbook §6 chooses a manual release). *Ongoing* m
 - When an item closes, move it to §1 with a link to what closed it: the commit, the registration record
   or the decision.
 - Review this file with the [`data-compliance.md`](./data-compliance.md) §6 checklist each release, and
-  whenever a feature adds data collection ([`../roadmap.md`](../roadmap.md) §5).
+  whenever a feature adds data collection ([`../roadmap.md`](../roadmap.md) §7).
 - Material changes to the legal text follow runbook §9: edit the Markdown, regenerate, republish the
   pages, bump `TERMS_VERSION` and ship a build.

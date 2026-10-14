@@ -132,10 +132,10 @@ Admin commands: [`festival-data.md`](./festival-data.md).
       and in its `festival.csv` give the copy a new name, `is_demo` false, any `https://` `source_url` and
       `status` published (the demo festival itself must keep its sets); reduce `sets.csv` to its header,
       convert with `festival:import-csv` and seed it (on staging). Lineup shows "Set times
-      aren't out yet", no day or stage chips, and one card per artist ("Set time TBA", photo or monogram,
+      aren't out yet", no day or stage chips, and one card per artist ("Set time to be announced", photo or monogram,
       no Add button; VoiceOver reads name and "set time to be announced" as one element). Add sets shows
       "Set times coming soon" with a working "See the lineup" button; My Schedule says set times are coming.
-      Crews, chat, meetups and the map work for the festival. Then seed the full CSV again and pull to
+      Crews, meetups and the map work for the festival. Then seed the full CSV again and pull to
       refresh: the timed cards appear and the TBA notice is gone, without reinstalling.
 - [ ] Partly timed lineup: seed the same copy with the sets of one artist removed from `sets.csv`
       (keep the artist in `artists.csv`). Under "All", that artist is listed in a "Set times to be
