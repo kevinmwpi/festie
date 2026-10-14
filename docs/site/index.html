@@ -278,16 +278,16 @@ main { max-width: none; padding: 0; }
 .motion .hero-stage { position: fixed; inset: 0; z-index: 0; height: auto; overflow: hidden; }
 .motion .mark { top: var(--mark-y); }
 .motion .ring-wrap { top: var(--ring-y); }
-/* --hero-p goes from 0 to 1 over the first half of the hero (home.js): the ring lifts away and the wordmark settles
-   into a watermark before the hero text scrolls over it. */
-.motion .mark { opacity: calc(1 - min(1, var(--hero-p, 0) * 2.4) * .93); transform: translate(-50%, -50%) scale(calc(1 - var(--hero-p, 0) * .08)); }
+/* --hero-p goes from 0 to 1 over the first half of the hero (home.js): the ring lifts away, and the wordmark holds
+   still and fades out before the hero text scrolls over it, so it is gone by the next section. */
+.motion .mark { opacity: calc(1 - min(1, var(--hero-p, 0) * 2.4)); transform: translate(-50%, -50%) scale(calc(1 - var(--hero-p, 0) * .08)); }
 .motion .ring-wrap { opacity: calc(1 - var(--hero-p, 0) * 1.7); transform: translateY(calc(var(--hero-p, 0) * -14svh)); }
 .motion .ring, .motion .tile { animation-play-state: running; }
 /* Arrival: the letters bounce in one by one and the ring settles around them. */
 .motion .mark-letters span { animation: letter-in .9s cubic-bezier(.3, 1.45, .5, 1) both calc(var(--l) * 70ms + 120ms); }
 .motion .ring-wrap { animation: ring-in 1.6s cubic-bezier(.2, .7, .2, 1) backwards; }
 .motion .tape-track { animation: tape 38s linear infinite; }
-.motion.ring-off .ring-wrap { visibility: hidden; }
+.motion.ring-off .ring-wrap, .motion.ring-off .mark { visibility: hidden; }
 .motion.ring-off .ring, .motion.ring-off .tile { animation-play-state: paused; }
 .motion .blocks { display: block; position: fixed; left: 0; top: 0; z-index: -1; width: 100%; height: 100lvh; }
 .motion .sec { background: transparent; }

@@ -224,8 +224,8 @@ inlines into `index.html`.
 
 - **The wordmark stays and the page moves around it.** The Fredoka "Festie" logotype (self-hosted from the
   app's bundled font, with its OFL licence beside it) sits high in the hero, and a ring of tiles showing what the
-  app does turns below and around it. As you scroll, the ring lifts away and the wordmark stays fixed behind the
-  sections as a 7% watermark.
+  app does turns below and around it. As you scroll, the ring lifts away and the wordmark holds still, then fades
+  out before the next section.
 - **Sections meet along a ragged edge of small squares** that follows the boundary as you scroll: two colours
   only, about three rows deep, like a schedule grid filling in; the footer gets a straight edge. The colours
   are the pink wash, then the `primary` blue, `success` mint and lilac accents at full strength, with ink text
