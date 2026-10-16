@@ -1,7 +1,7 @@
 # Intellectual property review: Festie v1
 
 Last reviewed: October 5, 2026, against the v1 code on this branch. §3.1 (name search) added October
-15, 2026.
+15–16, 2026.
 
 **This is an engineering checklist, not legal advice.** It records the content rules the code enforces
 and the checks a person must still do. If you can, have a lawyer review the app name and the festival
@@ -73,9 +73,24 @@ the generated pages and in-app screens, `values.json`, the EAS `EXPO_PUBLIC_*` U
 domain and the Supabase SMTP sender (runbook §2.7). The bundle identifier `com.kevin.festivalapp`, the
 `festivalapp://` scheme, the App Store Connect app id and the Supabase project do not change.
 
-**Replacement names screened (web, App Store and domain checks only).** The leading candidate is
-**Kinset** (`joinkinset.com` available); it still needs an exact App Store and Google Play search, a USPTO
-search (live marks, classes 9, 41, 42 and 45) and a Texas search before it is adopted. Rejected:
+**Chosen replacement: Glowspot (October 16, 2026), pending the checks below.**
+
+| Check | Result |
+|---|---|
+| USPTO | One old record, GLOW SPOT (serial 75605078, reg. 2466197), Vector Products, Inc., a hand-held spotlight in class 11. **Dead**: cancelled February 10, 2012 (Section 8). No live GLOWSPOT mark found in web-indexed trademark data; a direct search of the USPTO database is still needed |
+| App Store | **"GlowSpot \| جلوسبوت"** (Moltaqa), a salon booking app in Lifestyle, apparently for an Arabic-speaking market. Different category, but the same word is already in the store |
+| Other uses | Beauty and skincare businesses (GlowSpot Skincare on Instagram, glow-spot.net, GlowSpot by MK spa, Glow Spot in San Antonio, a hobby salon project glowspotbw) and GlowSpot® safety textiles (Erez Therm). None in social, events, music or festival software |
+| Domains | `glowspot.com`, `glowspot.app`, `glowspot.co` taken; `joinglowspot.com`, `getglowspot.com`, `glowspot.live`, `glowspot.io` available on October 16, 2026 |
+
+**Assessment.** No user found in our category, and the only trademark is dead and for spotlights. The
+risks are the existing salon app of the same name (App Store search collision; Apple requires a unique app
+name, so the exact store name may need a qualifier) and the word's beauty association ("glow", "spot").
+**Before adopting:** reserve the name in App Store Connect, run a direct USPTO search (live marks, classes
+9, 41, 42 and 45), register the domains, and have a trademark lawyer run a knockout search.
+
+**Other names screened.** About 5,500 compounds were generated and 250 were checked; the shortlist and
+every rejection are in the October 16 screening sheet (not committed). Earlier candidate **Kinset** was
+rejected: an existing sustainability data platform owns the name and `kinset.com`. Also rejected:
 
 | Name | Why |
 |---|---|
@@ -85,6 +100,10 @@ search (live marks, classes 9, 41, 42 and 45) and a Texas search before it is ad
 | Clashly | Existing apps (a Clash of Clans layout app and a bracket maker) |
 | Rovra | Sound-alike of The Rovr Group, a social-networking company |
 | Crewsy and other "crew" names | "Crew" is crowded in workforce apps, and "crew" is festie.live's tagline word |
+| All "-flock" names | "Flock: Find Your Crew" is an App Store app with our pitch |
+| RallyUp, Kickback, Linkup, Tagalong, Pullup, Meetpoint, GigMate, Yippi | Existing social or event apps of the same name |
+| Setbreak, Afterset | Names owned by existing businesses |
+| Meetspot, Hopspot, Meetmap, Afterglow, Wristband, Convoy | A live USPTO mark for a dating app (Meetspot), or existing social and event apps |
 - [x] **App icon and splash are original.** `apps/mobile/assets/images/` (icon, splash, Android adaptive
       icon layers, favicon) holds simple original Festie artwork made for this app (a tent with a yellow
       flag on a pink gradient), replacing the Expo template artwork that showed Expo's logo. `app.config.ts`
@@ -112,7 +131,7 @@ Verify before each release: `npx license-checker --production --summary` (or an 
 
 ## 5. Open items
 
-- [ ] Trademark search done and recorded (§3). "Festie" is not usable (§3.1); pick a new name, run the
-      same searches on it and record them in §3.1.
+- [ ] Trademark search done and recorded (§3). "Festie" is not usable; **Glowspot** is chosen (§3.1).
+      Still open: App Store Connect name reservation, direct USPTO search, lawyer knockout search.
 - [x] Original app icon and splash in place (§3); review the artwork before submission.
 - [ ] Each published real festival checked against its `source_url` with no copied artwork or text (§1).
